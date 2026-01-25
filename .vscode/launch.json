@@ -5,6 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
+            "name": "Python 调试程序: 网页",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${workspaceFolder}/gui/web.py",
+            "cwd":"${workspaceFolder}",
+            "console": "integratedTerminal"
+        },
+        {
             "name": " Python 调试程序: 主程序",
             "type": "debugpy",
             "request": "launch",

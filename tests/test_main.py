@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 from unittest.mock import patch
-from main import get_data
+from stocks import get_data
 
 
 class TestGetData(unittest.TestCase):

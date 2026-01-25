@@ -4,3 +4,4 @@ baostock
 backtrader
 matplotlib
 requests
+Flask

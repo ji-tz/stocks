@@ -2,7 +2,7 @@ import unittest
 import pandas as pd
 from unittest.mock import patch
 import backtrader as bt
-from main import get_data
+from stocks import get_data
 from solver.sma_strategy import SmaStrategy
 
 

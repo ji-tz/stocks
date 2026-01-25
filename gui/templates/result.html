@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>回测结果</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+      .error { color: #b00020; }
+      table { border-collapse: collapse; margin-top: 1rem; }
+      td, th { padding: 6px 10px; border: 1px solid #ddd; }
+    </style>
+  </head>
+  <body>
+    <h1>回测结果</h1>
+    {% if error %}
+      <p class="error">发生错误：{{ error }}</p>
+    {% else %}
+      <table>
+        <tr><th>代码</th><td>{{ symbol }}</td></tr>
+        <tr><th>数据源</th><td>{{ source }}</td></tr>
+        <tr><th>数据行数</th><td>{{ rows }}</td></tr>
+        <tr><th>起始日期</th><td>{{ start }}</td></tr>
+        <tr><th>结束日期</th><td>{{ end }}</td></tr>
+        <tr><th>初始资金</th><td>{{ '%.2f'|format(init) }}</td></tr>
+        <tr><th>回测后资金</th><td>{{ '%.2f'|format(final) }}</td></tr>
+      </table>
+    {% endif %}
+    <p><a href="/">返回</a></p>
+  </body>
+</html>

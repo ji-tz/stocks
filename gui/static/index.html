@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>量化回测前端</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+      label { display:block; margin-top: 1rem; }
+      input, select { padding: 0.5rem; width: 100%; max-width: 300px; }
+      button { margin-top: 1rem; padding: 0.6rem 1rem; }
+      .summary { display:flex; gap:1rem; flex-wrap:wrap; margin-top:1rem }
+      .card { padding:0.6rem 1rem; border:1px solid #eee; border-radius:6px; }
+    </style>
+  </head>
+  <body>
+    <h1>量化回测前端（前后端分离）</h1>
+    <div>
+      <label>股票代码 <input id="symbol" value="600900"/></label>
+      <label>策略
+        <select id="strategy">
+          <option value="mean_cost">平均成本日开盘</option>
+          <option value="sma">SMA 回测</option>
+        </select>
+      </label>
+      <label>数据源
+        <select id="source">
+          <option value="auto">auto</option>
+          <option value="akshare">akshare</option>
+          <option value="baostock">baostock</option>
+        </select>
+      </label>
+      <label>每手股数 <input id="lot" value="100"/></label>
+      <label>初始资金 <input id="cash" value="100000"/></label>
+      <button id="run">运行策略</button>
+    </div>
+
+    <div id="result" style="margin-top:1.2rem"></div>
+
+    <canvas id="chart" width="900" height="300" style="display:none"></canvas>
+
+    <script>
+      document.getElementById('run').addEventListener('click', async () => {
+        const symbol = document.getElementById('symbol').value.trim();
+        const strategy = document.getElementById('strategy').value;
+        const source = document.getElementById('source').value;
+        const lot = parseInt(document.getElementById('lot').value);
+        const cash = parseFloat(document.getElementById('cash').value);
+
+        const payload = { symbol, strategy, source, lot, cash };
+        const resDiv = document.getElementById('result');
+        resDiv.innerHTML = '运行中，请稍候...';
+
+        try {
+          const resp = await fetch('/api/run', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+          const j = await resp.json();
+          if (!j.ok) {
+            resDiv.innerHTML = '<div style="color:red">错误: ' + (j.error||'unknown') + '</div>';
+            return;
+          }
+          const r = j.result;
+          if (strategy === 'mean_cost') {
+            renderMeanCostResult(r);
+          } else if (strategy === 'sma') {
+            resDiv.innerHTML = `<pre>${JSON.stringify(r, null, 2)}</pre>`;
+          }
+        } catch (e) {
+          resDiv.innerHTML = '<div style="color:red">请求失败: '+e+'</div>';
+        }
+      });
+
+      function renderMeanCostResult(r) {
+        const resDiv = document.getElementById('result');
+        resDiv.innerHTML = '';
+        const sum = document.createElement('div'); sum.className='summary';
+        sum.innerHTML = `\n          <div class="card"><strong>代码：</strong>${r.symbol}</div>\n          <div class="card"><strong>日期：</strong>${r.start_date} → ${r.end_date}</div>\n          <div class="card"><strong>初始资金：</strong>${r.init_cash}</div>\n          <div class="card"><strong>交易次数：</strong>${r.trades}</div>\n          <div class="card"><strong>最终总资产：</strong>${r.total_value}</div>\n          <div class="card"><strong>已实现盈亏：</strong>${r.realized_pl}</div>\n          <div class="card"><strong>未实现盈亏：</strong>${r.unrealized_pl}</div>`;
+        resDiv.appendChild(sum);
+
+        // chart
+        const chart = document.getElementById('chart');
+        chart.style.display = 'block';
+        const labels = r.history.map(h=>h.date);
+        const data = r.history.map(h=>h.total_value);
+        if (window._chart) { window._chart.destroy(); }
+        const ctx = chart.getContext('2d');
+        window._chart = new Chart(ctx, { type: 'line', data: { labels, datasets:[{label:'总资产', data, borderColor:'rgb(75,192,192)', tension:0.1, pointRadius:0}]}, options:{responsive:true}});
+
+        // trades table (last 50)
+        const trades = r.trades_list || [];
+        const table = document.createElement('table'); table.style.width='100%'; table.style.marginTop='1rem';
+        table.innerHTML = '<tr><th>日期</th><th>动作</th><th>价格</th><th>手数</th><th>交易后现金</th><th>持仓</th><th>已实现盈亏</th></tr>';
+        trades.slice(-50).forEach(t=>{
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${t.date}</td><td>${t.action}</td><td>${(t.price||'').toFixed? (t.price).toFixed(2): t.price}</td><td>${t.shares||''}</td><td>${(t.cash||'').toFixed? (t.cash).toFixed(2): t.cash}</td><td>${t.shares_after||''}</td><td>${t.realized_pl? t.realized_pl.toFixed(2):''}</td>`;
+          table.appendChild(tr);
+        });
+        resDiv.appendChild(table);
+      }
+    </script>
+  </body>
+</html>

@@ -15,6 +15,9 @@ try:
 except Exception:
     bs = None
 
+from .akshare_provider import AkshareProvider
+from .baostock_provider import BaostockProvider
+
 def _ensure_cache_dir(cache_dir: str):
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -34,6 +37,73 @@ def _save_cache(df: pd.DataFrame, cache_file: str):
             except Exception:
                 pass
     except Exception:
+        pass
+
+
+def _read_cache(cache_file: str, start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame | None:
+    """Read cache file and optionally filter by start/end (supports YYYYMMDD and YYYY-MM-DD).
+
+    Returns filtered DataFrame or None if cache not present or invalid.
+    """
+    if not os.path.exists(cache_file):
+        return None
+    try:
+        cached = pd.read_csv(cache_file, parse_dates=["date"])
+        req_cols = ["date", "open", "high", "low", "close", "volume"]
+        if not set(req_cols).issubset(cached.columns):
+            return None
+
+        def _parse_date_input(s: str | None):
+            if s is None:
+                return None
+            s = str(s).strip()
+            if s == "":
+                return None
+            import re
+            if re.fullmatch(r"\d{8}", s):
+                return pd.to_datetime(s, format="%Y%m%d")
+            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
+                return pd.to_datetime(s, format="%Y-%m-%d")
+            return pd.to_datetime(s)
+
+        sd = _parse_date_input(start_date)
+        ed = _parse_date_input(end_date)
+        out = cached.loc[:, req_cols]
+        if sd is not None:
+            out = out[out['date'] >= sd]
+        if ed is not None:
+            out = out[out['date'] <= ed]
+        return out
+    except Exception:
+        return None
+
+
+def _merge_into_cache(cache_file: str, df_new: pd.DataFrame) -> None:
+    """Merge df_new into existing cache file (by `date`), deduplicate, sort and save atomically.
+
+    If cache doesn't exist, simply save df_new.
+    """
+    try:
+        # Ensure date column is datetime and consistent
+        df_new = df_new.copy()
+        df_new['date'] = pd.to_datetime(df_new['date'])
+        if os.path.exists(cache_file):
+            try:
+                existing = pd.read_csv(cache_file, parse_dates=['date'])
+                # concat and drop duplicates by date keeping last (newer)
+                merged = pd.concat([existing, df_new], ignore_index=True)
+                merged = merged.drop_duplicates(subset=['date'], keep='last')
+                merged = merged.sort_values('date').reset_index(drop=True)
+                _save_cache(merged, cache_file)
+                return
+            except Exception:
+                # fallback to overwrite
+                _save_cache(df_new.sort_values('date').reset_index(drop=True), cache_file)
+                return
+        else:
+            _save_cache(df_new.sort_values('date').reset_index(drop=True), cache_file)
+    except Exception:
+        # best-effort: do nothing on failure
         pass
 
 def get_data(symbol: str = "600900",
@@ -57,15 +127,33 @@ def get_data(symbol: str = "600900",
     _ensure_cache_dir(cache_dir)
     cache_file = os.path.join(cache_dir, f"{symbol}.csv")
 
-    # 优先使用本地缓存：若缓存存在则直接返回缓存数据
-    if os.path.exists(cache_file):
+    # 优先尝试从缓存读取（并按时间范围过滤）。使用抽象化函数以便复用。
+    cached_out = _read_cache(cache_file, start_date=start_date, end_date=end_date)
+    if cached_out is not None:
+        # 如果请求了具体区间，且缓存能覆盖该区间（包含边界），直接返回
         try:
-            cached = pd.read_csv(cache_file, parse_dates=["date"])
-            req_cols = ["date", "open", "high", "low", "close", "volume"]
-            if set(req_cols).issubset(cached.columns):
-                return cached.loc[:, req_cols]
+            if start_date or end_date:
+                # 判断缓存覆盖情况
+                if not cached_out.empty:
+                    min_dt = cached_out['date'].min()
+                    max_dt = cached_out['date'].max()
+                    ok_start = True
+                    ok_end = True
+                    if start_date:
+                        import re
+                        sd = pd.to_datetime(start_date, format="%Y%m%d") if re.fullmatch(r"\d{8}", str(start_date)) else pd.to_datetime(start_date)
+                        ok_start = (min_dt <= sd)
+                    if end_date:
+                        import re
+                        ed = pd.to_datetime(end_date, format="%Y%m%d") if re.fullmatch(r"\d{8}", str(end_date)) else pd.to_datetime(end_date)
+                        ok_end = (max_dt >= ed)
+                    if ok_start and ok_end:
+                        return cached_out
+            else:
+                # 没有指定日期，直接返回缓存
+                return cached_out
         except Exception:
-            # 若读取缓存失败则继续尝试从数据源拉取
+            # 若校验覆盖范围失败，继续走 provider 流程
             pass
 
     # 支持传入单个 source（字符串），或多个 source（列表/元组），或 'auto' 自动尝试常见来源
@@ -84,101 +172,34 @@ def get_data(symbol: str = "600900",
         raise ValueError("source must be a string or list/tuple of strings")
 
     errors = []
+    # 使用多态 provider 实现
+    provider_map = {
+        "akshare": lambda: AkshareProvider(max_attempts=max_attempts),
+        "baostock": lambda: BaostockProvider(),
+    }
+
     for src in sources:
+        src = src.lower()
+        if src not in provider_map:
+            errors.append((src, "unsupported source"))
+            continue
+
+        provider = provider_map[src]()
         try:
-            if src == "akshare":
-                try:
-                    import akshare as ak
-                except Exception as e:
-                    raise ImportError("akshare is required for source='akshare'") from e
+            df = provider.fetch(symbol=symbol, start_date=start_date, end_date=end_date)
+            if df is None or df.empty:
+                errors.append((src, "no data returned"))
+                continue
 
-                user_agents = [
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/117.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.4 Safari/605.1.15",
-                ]
+            # 将新拉取的数据合并入缓存（去重并排序）
+            _merge_into_cache(cache_file, df)
 
-                for attempt in range(1, max_attempts + 1):
-                    sess = requests.Session()
-                    sess.headers.update({"User-Agent": random.choice(user_agents)})
-                    orig_session = requests.Session
-                    requests.Session = lambda *a, **k: sess
-
-                    try:
-                        df = ak.stock_zh_a_hist(symbol=symbol,
-                                                period="daily",
-                                                start_date=start_date,
-                                                end_date=end_date,
-                                                adjust="",
-                                                timeout=None)
-                    finally:
-                        requests.Session = orig_session
-
-                    if df is None or df.empty:
-                        time.sleep(1)
-                        continue
-
-                    df = df[["日期", "开盘", "最高", "最低", "收盘", "成交量"]]
-                    df.columns = ["date", "open", "high", "low", "close", "volume"]
-                    df["date"] = pd.to_datetime(df["date"])
-                    _save_cache(df, cache_file)
-                    return df
-
-                errors.append(("akshare", "no data returned"))
-
-            elif src == "baostock":
-                try:
-                    import baostock as bs
-                except Exception as e:
-                    raise ImportError("baostock 未安装。请先 `pip install baostock` 后重试。") from e
-
-                if symbol.startswith("6"):
-                    code = f"sh.{symbol}"
-                else:
-                    code = f"sz.{symbol}"
-
-                lg = bs.login()
-                if lg.error_code != "0":
-                    bs.logout()
-                    raise RuntimeError("baostock 登录失败")
-
-                sd = start_date if "-" in start_date else f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:8]}"
-                ed = end_date if "-" in end_date else f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
-
-                rs = bs.query_history_k_data_plus(code,
-                                                  "date,open,high,low,close,volume",
-                                                  start_date=sd,
-                                                  end_date=ed,
-                                                  frequency="d",
-                                                  adjustflag="3")
-
-                if rs.error_code != "0":
-                    bs.logout()
-                    raise RuntimeError(f"baostock 查询失败: {rs.error_msg}")
-
-                data_list = []
-                while rs.next():
-                    data_list.append(rs.get_row_data())
-
-                bs.logout()
-
-                if not data_list:
-                    errors.append(("baostock", "no data returned"))
-                else:
-                    df = pd.DataFrame(data_list, columns=rs.fields)
-                    df = df.rename(columns={"date": "date", "open": "open", "high": "high", "low": "low", "close": "close", "volume": "volume"})
-                    df["date"] = pd.to_datetime(df["date"])
-                    for c in ["open", "high", "low", "close", "volume"]:
-                        df[c] = pd.to_numeric(df[c], errors="coerce")
-
-                    _save_cache(df, cache_file)
-                    return df.loc[:, ["date", "open", "high", "low", "close", "volume"]]
-
-            else:
-                errors.append((src, "unsupported source"))
-
+            # 从缓存读取并按请求的时间范围返回（以保证一致性）
+            cached_after = _read_cache(cache_file, start_date=start_date, end_date=end_date)
+            if cached_after is not None:
+                return cached_after
+            return df
         except Exception as e:
-            # 捕捉单个数据源的异常并继续尝试下一个
             errors.append((src, str(e)))
             continue
 
