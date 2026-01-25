@@ -57,6 +57,17 @@ def get_data(symbol: str = "600900",
     _ensure_cache_dir(cache_dir)
     cache_file = os.path.join(cache_dir, f"{symbol}.csv")
 
+    # 优先使用本地缓存：若缓存存在则直接返回缓存数据
+    if os.path.exists(cache_file):
+        try:
+            cached = pd.read_csv(cache_file, parse_dates=["date"])
+            req_cols = ["date", "open", "high", "low", "close", "volume"]
+            if set(req_cols).issubset(cached.columns):
+                return cached.loc[:, req_cols]
+        except Exception:
+            # 若读取缓存失败则继续尝试从数据源拉取
+            pass
+
     # 支持传入单个 source（字符串），或多个 source（列表/元组），或 'auto' 自动尝试常见来源
     if not source:
         source = "auto"
