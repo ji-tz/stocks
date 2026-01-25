@@ -1,35 +1,25 @@
-import backtrader as bt
-import pandas as pd
-import akshare as ak
-from solver.sma_strategy import SmaStrategy
+import os
+import sys
 
-# 获取长江电力历史数据（A股代码：600900）
-def get_data():
-    df = ak.stock_zh_a_hist(symbol="600900", period="daily", start_date="20200101", end_date="20231231", adjust="qfq")
-    df = df[["日期", "开盘", "最高", "最低", "收盘", "成交量"]]
-    df.columns = ["date", "open", "high", "low", "close", "volume"]
-    df["date"] = pd.to_datetime(df["date"])
-    return df
+# 确保工程根目录在 sys.path，便于导入 sibling 模块
+sys.path.insert(0, os.path.dirname(__file__))
+
+import stocks
+from gui import web
+
+
+def main():
+    # 初始化后端（创建缓存目录等）并尝试预热默认数据缓存
+    stocks.init()
+    try:
+        # 仅尝试预热默认 code，不成功也不阻塞启动
+        stocks.get_data()
+    except Exception:
+        pass
+
+    # 启动前端 Flask 应用（由 gui/web.py 提供 `app`）
+    web.app.run(debug=True)
+ 
 
 if __name__ == '__main__':
-    cerebro = bt.Cerebro()
-    df = get_data()
-    # 只保留回测所需的字段，去除多余列
-    df = df[["date", "open", "high", "low", "close", "volume"]]
-    data = bt.feeds.PandasData(
-        dataname=df,
-        datetime="date",
-        open="open",
-        high="high",
-        low="low",
-        close="close",
-        volume="volume",
-        openinterest=None
-    )
-    cerebro.adddata(data)
-    cerebro.addstrategy(SmaStrategy)
-    cerebro.broker.setcash(100000)
-    print('初始资金: %.2f' % cerebro.broker.getvalue())
-    cerebro.run()
-    print('回测后资金: %.2f' % cerebro.broker.getvalue())
-    cerebro.plot()
+    main()

@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>平均成本策略回测结果</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+      table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
+      td, th { padding: 6px 10px; border: 1px solid #ddd; }
+      .summary { display:flex; gap:1rem; flex-wrap:wrap; }
+      .card { padding:0.6rem 1rem; border:1px solid #eee; border-radius:6px; }
+    </style>
+  </head>
+  <body>
+    <h1>平均成本策略回测结果</h1>
+    <div class="summary">
+      <div class="card"><strong>代码：</strong> {{ result.symbol }}</div>
+      <div class="card"><strong>日期：</strong> {{ result.start_date }} → {{ result.end_date }}</div>
+      <div class="card"><strong>初始资金：</strong> {{ result.init_cash }}</div>
+      <div class="card"><strong>交易次数：</strong> {{ result.trades }}</div>
+      <div class="card"><strong>最终总资产：</strong> {{ result.total_value }}</div>
+      <div class="card"><strong>已实现盈亏：</strong> {{ result.realized_pl }}</div>
+      <div class="card"><strong>未实现盈亏：</strong> {{ result.unrealized_pl }}</div>
+    </div>
+
+    <h2>资产曲线</h2>
+    <canvas id="chart" width="900" height="300"></canvas>
+
+    <h2>近 50 笔交易</h2>
+    <table>
+      <tr><th>日期</th><th>动作</th><th>价格</th><th>手数</th><th>交易后现金</th><th>交易后持仓</th><th>已实现盈亏</th></tr>
+      {% for t in result.trades_list[-50:] %}
+      <tr>
+        <td>{{ t.date }}</td>
+        <td>{{ t.action }}</td>
+        <td>{{ '%.2f'|format(t.price) }}</td>
+        <td>{{ t.shares }}</td>
+        <td>{{ '%.2f'|format(t.cash) }}</td>
+        <td>{{ t.shares_after }}</td>
+        <td>{% if t.realized_pl is defined %}{{ '%.2f'|format(t.realized_pl) }}{% else %}-{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </table>
+
+    <p><a href="/">返回</a></p>
+
+    <script>
+      const labels = [
+        {% for h in result.history %}
+          '{{ h.date }}',
+        {% endfor %}
+      ];
+      const data = [
+        {% for h in result.history %}
+          {{ h.total_value }},
+        {% endfor %}
+      ];
+
+      const ctx = document.getElementById('chart').getContext('2d');
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: '总资产',
+            data: data,
+            borderColor: 'rgb(75, 192, 192)',
+            tension: 0.1,
+            pointRadius: 0
+          }]
+        },
+        options: {
+          responsive: true,
+          scales: { x: { display: true }, y: { display: true } }
+        }
+      });
+    </script>
+  </body>
+</html>

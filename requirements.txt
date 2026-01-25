@@ -1,0 +1,7 @@
+pandas
+akshare
+baostock
+backtrader
+matplotlib
+requests
+Flask
