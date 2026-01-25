@@ -1,19 +1,22 @@
 import backtrader as bt
 import pandas as pd
-import akshare as ak
+import os
+import sys
 from solver.sma_strategy import SmaStrategy
+from source.data_provider import get_data
 
 # 获取长江电力历史数据（A股代码：600900）
-def get_data():
-    df = ak.stock_zh_a_hist(symbol="600900", period="daily", start_date="20200101", end_date="20231231", adjust="qfq")
-    df = df[["日期", "开盘", "最高", "最低", "收盘", "成交量"]]
-    df.columns = ["date", "open", "high", "low", "close", "volume"]
-    df["date"] = pd.to_datetime(df["date"])
-    return df
+# 数据来源使用统一的 data_provider.get_data，支持多渠道（例如 akshare / baostock）
 
 if __name__ == '__main__':
     cerebro = bt.Cerebro()
-    df = get_data()
+    # 支持通过环境变量 DATA_SOURCE 指定数据来源：'akshare' 或 'baostock'
+    data_source = os.environ.get('DATA_SOURCE', 'akshare')
+    # 支持通过命令行传参覆盖（例如: python main.py baostock）
+    if len(sys.argv) > 1:
+        data_source = sys.argv[1]
+
+    df = get_data(symbol="600900", source=data_source)
     # 只保留回测所需的字段，去除多余列
     df = df[["date", "open", "high", "low", "close", "volume"]]
     data = bt.feeds.PandasData(
