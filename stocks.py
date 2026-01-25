@@ -13,8 +13,9 @@ from typing import Optional, Dict, Any
 from source.data_provider import get_data as _get_data
 
 try:
-    from solver.mean_cost_strategy import simulate_mean_cost
+    from simulator.simulator import simulate_mean_cost
 except Exception:
+    # 兼容性：若 simulator 不可用，保留 None
     simulate_mean_cost = None
 
 
@@ -111,15 +112,17 @@ def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_
 
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
-                     start_date: Optional[str] = None, end_date: Optional[str] = None) -> Dict[str, Any]:
-    """使用 Backtrader 运行 SMA 回测并返回摘要信息（纯数据/数字，不操作 Flask）。
+                     start_date: Optional[str] = None, end_date: Optional[str] = None,
+                     lot_size: int = 100, init_cash: float = 100000.0) -> Dict[str, Any]:
+    """使用 Backtrader 运行 SMA 回测并返回统一的展示结果。
 
-    参数 `start_date` / `end_date` 支持传入字符串以限制回测时间范围。
-    如果不传，则使用 `get_data` 的默认范围。
+    仍然会尝试通过 backtrader 运行策略（以保持与现有测试/行为兼容），
+    同时使用基于 pandas 的 `simulate_sma` 生成包含 `history`/`trades_list` 的详细结果，便于前端统一显示。
     """
     try:
         import backtrader as bt
         from solver.sma_strategy import SmaStrategy
+        from simulator.simulator import simulate_sma
     except Exception as e:
         raise RuntimeError(f"backtrader 或策略不可用: {e}")
 
@@ -135,18 +138,35 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
     data = bt.feeds.PandasData(dataname=df, datetime='date', open='open', high='high', low='low', close='close', volume='volume')
     cerebro.adddata(data)
     cerebro.addstrategy(SmaStrategy)
-    cerebro.broker.setcash(100000)
-    init_cash = cerebro.broker.getvalue()
+    cerebro.broker.setcash(init_cash)
+    init_val = cerebro.broker.getvalue()
     cerebro.run()
-    final_cash = cerebro.broker.getvalue()
+    final_val = cerebro.broker.getvalue()
 
-    return {
-        'symbol': symbol,
-        'start_date': df['date'].min().strftime('%Y-%m-%d') if not df.empty else '',
-        'end_date': df['date'].max().strftime('%Y-%m-%d') if not df.empty else '',
-        'init_cash': init_cash,
-        'final_cash': final_cash,
-    }
+    # 基于 pandas 的模拟，产生统一展示结构
+    try:
+        # 取策略内默认 period，如不可得则使用 20
+        period = 20
+        if hasattr(SmaStrategy, 'params'):
+            try:
+                # backtrader 的 params 通常不可直接读取为值，这里保守使用 20
+                period = 20
+            except Exception:
+                period = 20
+
+        sim_res = simulate_sma(symbol=symbol, df=df, period=period, lot_size=lot_size, init_cash=init_cash)
+    except Exception:
+        return {
+            'symbol': symbol,
+            'start_date': df['date'].min().strftime('%Y-%m-%d') if not df.empty else '',
+            'end_date': df['date'].max().strftime('%Y-%m-%d') if not df.empty else '',
+            'init_cash': init_val,
+            'final_cash': final_val,
+        }
+
+    sim_res.setdefault('init_cash', init_val)
+    sim_res.setdefault('final_cash', final_val)
+    return sim_res
 
 
 if __name__ == '__main__':

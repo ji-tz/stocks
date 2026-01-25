@@ -2,7 +2,7 @@
 import argparse
 import pprint
 
-from solver.mean_cost_strategy import simulate_mean_cost
+from simulator.simulator import simulate_mean_cost
 
 
 def main():

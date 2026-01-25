@@ -42,17 +42,21 @@ def run():
 
         return render_template('result_mean.html', result=res)
 
-    # 默认使用 stocks 提供的 SMA 回测封装
+    # 默认使用 stocks 提供的 SMA 回测封装，返回统一结构以便前端展示
     try:
-        res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end)
+        res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end, lot_size=lot, init_cash=cash)
     except Exception as e:
         return render_template('result.html', error=f"回测运行失败: {e}")
 
+    # 如果返回了详细的交易流水（兼容 simulate_* 接口），使用详细模板；否则回退到摘要模板以兼容旧行为或测试桩
+    if isinstance(res, dict) and ('trades_list' in res or 'history' in res):
+        return render_template('result_mean.html', result=res)
+
     rows = len(df)
-    start = res.get('start_date', '')
-    end = res.get('end_date', '')
-    init_value = res.get('init_cash')
-    final_value = res.get('final_cash')
+    start = res.get('start_date', '') if isinstance(res, dict) else ''
+    end = res.get('end_date', '') if isinstance(res, dict) else ''
+    init_value = res.get('init_cash') if isinstance(res, dict) else None
+    final_value = res.get('final_cash') if isinstance(res, dict) else None
 
     return render_template('result.html', symbol=symbol, source=source, rows=rows, start=start, end=end, init=init_value, final=final_value)
 
