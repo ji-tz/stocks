@@ -1,0 +1,24 @@
+[MASTER]
+# 使用多个进程加速 pylint
+jobs=1
+
+[MESSAGES CONTROL]
+# 禁用一些过于严格的检查
+disable=
+    C0111,  # missing-docstring
+    C0103,  # invalid-name
+    C0301,  # line-too-long
+    R0913,  # too-many-arguments
+    R0914,  # too-many-locals
+    W0703,  # broad-except
+    W0621,  # redefined-outer-name
+
+[FORMAT]
+# 最大行长度
+max-line-length=120
+
+[DESIGN]
+# 最大参数数量
+max-args=10
+# 最大局部变量数量
+max-locals=20
