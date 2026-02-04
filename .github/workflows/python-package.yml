@@ -15,6 +15,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.GITHUB_TOKEN }}
     
     - name: Set up Python
       uses: actions/setup-python@v5
@@ -116,7 +119,8 @@ jobs:
         # Commit and push to current PR branch
         if [ "$HAS_CHANGES" = true ]; then
           git commit -m "Add screenshots from CI run ${{ github.run_number }} [skip ci]"
-          git push
+          # Push using the head ref to handle detached HEAD state
+          git push origin HEAD:${{ github.head_ref }}
           echo "has_screenshots=true" >> $GITHUB_OUTPUT
           echo "Waiting for GitHub to process commit..."
           sleep 10
