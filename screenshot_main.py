@@ -7,7 +7,6 @@ import os
 import sys
 import time
 import subprocess
-import signal
 from playwright.sync_api import sync_playwright
 
 # 确保项目根目录在 sys.path
@@ -31,7 +30,22 @@ def take_main_gui_screenshot(output_path: str = "screenshots/main_gui.png", port
     
     # 等待服务器启动
     print("等待服务器启动...")
-    time.sleep(5)
+    import requests
+    max_retries = 10
+    for i in range(max_retries):
+        try:
+            response = requests.get(f"http://127.0.0.1:{port}/", timeout=2)
+            if response.status_code == 200:
+                print(f"服务器已就绪 (尝试 {i+1}/{max_retries})")
+                break
+        except Exception:
+            if i < max_retries - 1:
+                time.sleep(1)
+            else:
+                print("警告: 服务器可能未完全就绪，继续尝试截图...")
+    
+    # 额外等待确保页面稳定
+    time.sleep(2)
     
     try:
         with sync_playwright() as p:
@@ -61,8 +75,15 @@ def take_main_gui_screenshot(output_path: str = "screenshots/main_gui.png", port
     finally:
         # 关闭 Flask 服务器
         print("关闭 Flask 服务器...")
-        flask_process.send_signal(signal.SIGTERM)
-        flask_process.wait(timeout=5)
+        try:
+            flask_process.terminate()
+            flask_process.wait(timeout=5)
+        except Exception as e:
+            print(f"关闭服务器时出错: {e}")
+            try:
+                flask_process.kill()
+            except Exception:
+                pass
 
 
 if __name__ == "__main__":

@@ -97,9 +97,23 @@ def save_result_chart(result: Dict[str, Any], output_path: str = "screenshots/ya
     # 创建图表
     fig, (ax1, ax2) = plt.subplots(2, 1, figsize=(12, 10))
     
-    # 设置中文字体
-    plt.rcParams['font.sans-serif'] = ['SimHei', 'DejaVu Sans']
-    plt.rcParams['axes.unicode_minus'] = False
+    # 设置中文字体 - 使用fallback机制确保在不同系统上都能正常显示
+    import matplotlib.font_manager as fm
+    
+    # 尝试使用中文字体，如果不可用则使用系统默认字体
+    chinese_fonts = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'WenQuanYi Micro Hei']
+    available_font = None
+    for font in chinese_fonts:
+        if font in [f.name for f in fm.fontManager.ttflist]:
+            available_font = font
+            break
+    
+    if available_font:
+        plt.rcParams['font.sans-serif'] = [available_font]
+        plt.rcParams['axes.unicode_minus'] = False
+    else:
+        # 如果没有中文字体，使用默认字体但可能无法正确显示中文
+        print("警告: 未找到中文字体，图表中的中文可能无法正确显示")
     
     # 图1: 资产价值变化
     history = result.get('history', [])
