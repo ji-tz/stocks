@@ -5,3 +5,7 @@ backtrader
 matplotlib
 requests
 Flask
+pylint
+flake8
+mypy
+playwright

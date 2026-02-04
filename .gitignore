@@ -1,3 +1,5 @@
 __pycache__
 pip.conf
 .venv
+screenshots/
+test_results/
