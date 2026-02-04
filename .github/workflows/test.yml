@@ -109,12 +109,24 @@ jobs:
             echo "Files already committed, skipping commit"
             echo "has_screenshots=true" >> $GITHUB_OUTPUT
           else
-            git commit -m "Add test screenshots from CI run ${{ github.run_number }} [skip ci]" || true
-            # Push using the head ref to handle detached HEAD state
-            git push origin HEAD:${{ github.head_ref }} || echo "Push failed, continuing..."
-            echo "has_screenshots=true" >> $GITHUB_OUTPUT
-            echo "Waiting for GitHub to process commit..."
-            sleep 10
+            # Attempt to commit
+            if git commit -m "Add test screenshots from CI run ${{ github.run_number }} [skip ci]"; then
+              echo "Commit successful"
+              # Push using the head ref to handle detached HEAD state
+              if git push origin HEAD:${{ github.head_ref }}; then
+                echo "Push successful"
+                echo "has_screenshots=true" >> $GITHUB_OUTPUT
+                echo "Waiting for GitHub to process commit..."
+                sleep 10
+              else
+                echo "⚠️ Warning: Push failed, screenshots not committed to PR branch"
+                echo "Screenshots will still be available in artifacts"
+                echo "has_screenshots=true" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "⚠️ Warning: Commit failed"
+              echo "has_screenshots=true" >> $GITHUB_OUTPUT
+            fi
           fi
         else
           echo "No screenshots to commit"
