@@ -172,7 +172,7 @@ jobs:
               const imageData = fs.readFileSync(mainGuiPath);
               const base64Image = imageData.toString('base64');
               mainGuiImage = `![主界面截图](data:image/png;base64,${base64Image})`;
-              console.log('Main GUI screenshot encoded, size:', (base64Image.length / 1024).toFixed(1), 'KB');
+              console.log('Main GUI screenshot encoded, original size:', (imageData.length / 1024).toFixed(1), 'KB');
             } catch (e) {
               console.log('Failed to encode main GUI image:', e.message);
               const stats = fs.statSync(mainGuiPath);
@@ -189,14 +189,14 @@ jobs:
               const imageData = fs.readFileSync(yangtzeImagePath);
               const base64Image = imageData.toString('base64');
               yangtzeImage = `![长江电力测试结果图表](data:image/png;base64,${base64Image})`;
-              console.log('Yangtze chart encoded, size:', (base64Image.length / 1024).toFixed(1), 'KB');
+              console.log('Yangtze chart encoded, original size:', (imageData.length / 1024).toFixed(1), 'KB');
             } catch (e) {
               console.log('Failed to encode Yangtze chart:', e.message);
               const stats = fs.statSync(yangtzeImagePath);
               yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
           } else {
-            yangtzeImage = '';
+            yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
           }
           
            // 读取测试结果
