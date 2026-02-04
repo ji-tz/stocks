@@ -1,5 +1,12 @@
-__pycache__
-pip.conf
+__pycache__/
+*.pyc
+*.pyo
 .venv
+venv/
 screenshots/
 test_results/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/

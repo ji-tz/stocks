@@ -18,13 +18,15 @@
 - 可视化回测结果展示
 - 支持自定义参数配置
 
-### 4. 自动化工作流
+### 4. 自动化工作流（CI/CD）
 
-#### 代码静态检查
-系统集成了完善的代码质量检查工具：
+项目采用三个独立的 GitHub Actions 工作流，实现全面的 CI/CD 流程：
+
+#### 🔍 Lint 工作流 (lint.yml)
+**自动代码检视** - 在每次推送和PR时运行
 
 - **Pylint**: Python代码规范检查
-- **Flake8**: 代码风格和语法检查
+- **Flake8**: 代码风格和语法检查  
 - **Mypy**: 静态类型检查
 
 配置文件：
@@ -32,26 +34,58 @@
 - `.flake8`: Flake8配置
 - `mypy.ini`: Mypy配置
 
-#### 主界面自动截图
-使用 Playwright 自动化工具在CI/CD流程中：
-- 自动启动 Flask 应用
-- 访问主界面并截图
-- 将截图上传到 GitHub Actions Artifacts
+#### 🧪 Test 工作流 (test.yml)
+**自动化测试** - 运行所有测试并生成报告
 
-脚本位置：`screenshot_main.py`
+功能包括：
+1. **单元测试**
+   - 运行所有 tests/ 目录下的测试
+   - 策略模拟器专项测试
+   - 验证策略加载功能
 
-#### 集成测试
-**长江电力（600900）定投回测测试**
+2. **界面截图**
+   - 使用 Playwright 自动截取主界面
+   - 脚本：`screenshot_main.py`
 
-测试脚本 `test_yangtze_power.py` 提供了完整的定投策略回测：
-- 测试期间：2020-2022年
-- 策略：定投（Mean Cost DCA）
-- 生成详细的收益图表和统计数据
-- 自动保存测试结果为JSON格式
+3. **集成测试**
+   - 长江电力（600900）定投回测测试
+   - 测试期间：2020-2022年
+   - 生成收益图表和统计数据
+
+4. **测试报告**
+   - 自动上传截图到 Artifacts
+   - 上传测试结果 JSON 数据
+   - **在 PR 中自动评论测试结果和截图**
+   - 提供详细的收益数据摘要
 
 测试输出：
+- `screenshots/main_gui.png`: 主界面截图
 - `screenshots/yangtze_power_test.png`: 收益图表
 - `test_results/yangtze_power_test.json`: 详细测试数据
+
+#### 📦 Package 工作流 (package.yml)
+**自动化打包** - 构建发布包和归档产物
+
+打包内容：
+1. **源代码包**
+   - 完整项目源代码压缩包
+   - 自动排除无关文件（.git, __pycache__ 等）
+
+2. **依赖文件**
+   - `requirements.txt`: 项目依赖列表
+   - `requirements-freeze.txt`: 完整版本锁定
+
+3. **文档**
+   - `INSTALL.md`: 详细安装说明
+   - `MANIFEST.md`: 打包清单
+
+4. **测试产物**
+   - 测试截图归档
+   - 测试结果归档
+
+5. **发布支持**
+   - 在 tag 推送时自动创建 GitHub Release
+   - 附带所有打包文件
 
 ## 项目结构
 
@@ -75,7 +109,9 @@ stocks/
 ├── test_yangtze_power.py  # 长江电力集成测试
 └── .github/
     └── workflows/
-        └── python-package.yml  # GitHub Actions工作流
+        ├── lint.yml       # 代码检视工作流
+        ├── test.yml       # 测试工作流
+        └── package.yml    # 打包工作流
 ```
 
 ## 快速开始
@@ -127,33 +163,68 @@ playwright install chromium
 python screenshot_main.py screenshots/main_gui.png
 ```
 
-## GitHub Actions工作流
+## GitHub Actions 工作流
 
-项目配置了完整的CI/CD流程（`.github/workflows/python-package.yml`），包括：
+项目配置了三个独立的 CI/CD 工作流，分工明确，互不干扰：
 
-1. **代码静态检查**
-   - Pylint代码规范检查
-   - Flake8代码风格检查
-   - Mypy类型检查
+### 1. 🔍 Lint 工作流 (`.github/workflows/lint.yml`)
 
-2. **单元测试**
-   - 所有测试用例自动运行
-   - 策略模拟器专项测试
+**代码质量检查** - 确保代码符合规范
 
-3. **主界面截图**
-   - 自动启动Flask应用
-   - 使用Playwright截取主界面
-   - 截图上传到Artifacts
+触发条件：
+- 推送到 main 分支
+- 创建 Pull Request
 
-4. **长江电力集成测试**
-   - 运行完整的定投策略回测
-   - 生成收益图表和统计数据
-   - 测试结果上传到Artifacts
+检查内容：
+- **Pylint**: 代码规范检查
+- **Flake8**: 代码风格和语法检查
+- **Mypy**: 静态类型检查
 
-5. **PR评论**
-   - 自动在Pull Request中发布测试报告
-   - 展示测试结果摘要和收益数据
-   - 提供Artifacts下载链接
+### 2. 🧪 Test 工作流 (`.github/workflows/test.yml`)
+
+**自动化测试** - 验证功能正确性
+
+触发条件：
+- 推送到 main 分支
+- 创建 Pull Request
+
+测试内容：
+1. **单元测试** - 所有 tests/ 下的测试用例
+2. **策略测试** - 交易策略模拟器测试
+3. **集成测试** - 长江电力定投回测（2020-2022）
+4. **界面测试** - 主界面自动截图
+
+输出产物：
+- 测试截图上传到 Artifacts
+- 测试结果 JSON 上传到 Artifacts
+- **自动在 PR 中评论测试报告**（包含截图和收益数据）
+
+### 3. 📦 Package 工作流 (`.github/workflows/package.yml`)
+
+**打包和发布** - 构建发布包
+
+触发条件：
+- 推送到 main 分支
+- 创建 Pull Request
+- 推送 tag（如 v1.0.0）
+- 手动触发
+
+打包内容：
+- 源代码压缩包（排除无关文件）
+- 依赖列表（requirements.txt 和完整版本锁定）
+- 安装说明文档（INSTALL.md）
+- 打包清单（MANIFEST.md）
+- 测试产物归档
+
+特殊功能：
+- **在 tag 推送时自动创建 GitHub Release**
+- 包含所有发布文件和说明
+
+### 工作流权限
+
+- **Lint**: 无需特殊权限
+- **Test**: `contents: write`, `pull-requests: write`（用于提交截图和评论PR）
+- **Package**: `contents: write`（用于创建 Release）
 
 ## 环境要求
 

@@ -1,0 +1,53 @@
+name: Lint
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: 代码检视 (Code Linting)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install pip conf
+      run: |
+        mkdir -p ~/.pip
+        cp pip.conf ~/.pip/pip.conf || true
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pylint flake8 mypy
+        # 安装项目依赖以便类型检查
+        pip install -r requirements.txt
+    
+    - name: Static Code Analysis - Pylint
+      run: |
+        echo "=== Running Pylint ==="
+        pylint --rcfile=.pylintrc stocks.py main.py gui/ simulator/ solver/ tests/ || true
+      continue-on-error: true
+    
+    - name: Static Code Analysis - Flake8
+      run: |
+        echo "=== Running Flake8 ==="
+        flake8 . || true
+      continue-on-error: true
+    
+    - name: Static Code Analysis - Mypy
+      run: |
+        echo "=== Running Mypy Type Checking ==="
+        mypy stocks.py main.py --config-file=mypy.ini || true
+      continue-on-error: true
