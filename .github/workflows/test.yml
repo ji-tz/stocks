@@ -154,8 +154,8 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
-          // 使用 base64 编码将图片直接嵌入到评论中
-          // 这样即使是私有仓库，图片也能直接显示
+          // 使用 GitHub 图片上传 API（用于 issues/PRs）
+          // 这个 API 会返回一个可公开访问的 user-images.githubusercontent.com URL
           let mainGuiImage = '';
           let yangtzeImage = '';
           
@@ -165,16 +165,64 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
+          // 函数：上传图片到 GitHub 并获取公开 URL
+          async function uploadImageToGitHub(imagePath, imageName) {
+            try {
+              console.log(`Uploading ${imageName} to GitHub...`);
+              const imageData = fs.readFileSync(imagePath);
+              
+              // 使用 GitHub 的资产上传 API for authenticated assets
+              // 这会创建一个带认证的 URL，可在任何地方访问
+              const response = await github.request('POST /repos/{owner}/{repo}/issues/{issue_number}/assets', {
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                name: imageName,
+                data: imageData,
+                headers: {
+                  'content-type': 'application/octet-stream',
+                  'content-length': imageData.length
+                }
+              });
+              
+              console.log(`Image uploaded successfully: ${imageName}`);
+              console.log(`Asset URL: ${response.data.browser_download_url}`);
+              
+              return response.data.browser_download_url;
+            } catch (error) {
+              console.error(`Failed to upload ${imageName}:`, error.message);
+              console.error(`Error details:`, error);
+              
+              // 备用方案：尝试使用 Octokit 的内置方法
+              try {
+                console.log(`Trying alternative upload method for ${imageName}...`);
+                
+                // 将图片转换为 base64 并通过 API 上传
+                const base64Data = imageData.toString('base64');
+                
+                // 这个方法虽然会让评论变大，但至少能工作
+                // 我们限制图片大小以避免超出 GitHub 限制
+                if (imageData.length > 1024 * 1024) {  // 如果大于 1MB
+                  console.log(`Image too large (${(imageData.length / 1024).toFixed(1)} KB), using fallback`);
+                  return null;
+                }
+                
+                // 返回 data URL（base64 编码）
+                return `data:image/png;base64,${base64Data}`;
+              } catch (innerError) {
+                console.error(`Alternative method also failed:`, innerError.message);
+                return null;
+              }
+            }
+          }
+          
           // 处理主界面截图
           if (fs.existsSync(mainGuiPath)) {
-            try {
-              console.log('Encoding main GUI screenshot as base64...');
-              const imageData = fs.readFileSync(mainGuiPath);
-              const base64Image = imageData.toString('base64');
-              mainGuiImage = `![主界面截图](data:image/png;base64,${base64Image})`;
-              console.log('Main GUI screenshot encoded, original size:', (imageData.length / 1024).toFixed(1), 'KB');
-            } catch (e) {
-              console.log('Failed to encode main GUI image:', e.message);
+            const imageUrl = await uploadImageToGitHub(mainGuiPath, 'main_gui.png');
+            if (imageUrl) {
+              mainGuiImage = `![主界面截图](${imageUrl})`;
+              console.log(`Main GUI image ready: ${imageUrl.substring(0, 100)}...`);
+            } else {
               const stats = fs.statSync(mainGuiPath);
               mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
@@ -184,14 +232,11 @@ jobs:
           
           // 处理测试结果图表
           if (fs.existsSync(yangtzeImagePath)) {
-            try {
-              console.log('Encoding Yangtze Power test chart as base64...');
-              const imageData = fs.readFileSync(yangtzeImagePath);
-              const base64Image = imageData.toString('base64');
-              yangtzeImage = `![长江电力测试结果图表](data:image/png;base64,${base64Image})`;
-              console.log('Yangtze chart encoded, original size:', (imageData.length / 1024).toFixed(1), 'KB');
-            } catch (e) {
-              console.log('Failed to encode Yangtze chart:', e.message);
+            const imageUrl = await uploadImageToGitHub(yangtzeImagePath, 'yangtze_power_test.png');
+            if (imageUrl) {
+              yangtzeImage = `![长江电力测试结果图表](${imageUrl})`;
+              console.log(`Yangtze chart ready: ${imageUrl.substring(0, 100)}...`);
+            } else {
               const stats = fs.statSync(yangtzeImagePath);
               yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
