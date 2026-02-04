@@ -1,5 +1,9 @@
 __pycache__
-pip.conf
 .venv
 screenshots/
 test_results/
+dist/
+build/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/

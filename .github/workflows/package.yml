@@ -1,0 +1,205 @@
+name: Package
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  package:
+    name: 自动化打包 (Automated Packaging)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install pip conf
+      run: |
+        mkdir -p ~/.pip
+        cp pip.conf ~/.pip/pip.conf || true
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+    
+    - name: Create Distribution Package
+      run: |
+        echo "=== Creating Distribution Package ==="
+        mkdir -p dist
+        
+        # 打包源代码
+        tar -czf dist/stocks-source-${{ github.sha }}.tar.gz \
+          --exclude='.git' \
+          --exclude='.github' \
+          --exclude='__pycache__' \
+          --exclude='*.pyc' \
+          --exclude='.venv' \
+          --exclude='venv' \
+          --exclude='dist' \
+          --exclude='build' \
+          --exclude='.pytest_cache' \
+          --exclude='.mypy_cache' \
+          .
+        
+        echo "✓ Source package created"
+        ls -lh dist/
+    
+    - name: Create Requirements Bundle
+      run: |
+        echo "=== Creating Requirements Bundle ==="
+        
+        # 导出完整的依赖列表（包含版本）
+        pip freeze > dist/requirements-freeze.txt
+        
+        # 复制基础 requirements
+        cp requirements.txt dist/requirements.txt
+        
+        # 创建安装说明
+        cat > dist/INSTALL.md << 'EOF'
+        # 量化股票回测系统安装说明
+        
+        ## 环境要求
+        - Python 3.12+
+        - pip
+        
+        ## 安装步骤
+        
+        1. 解压源代码包：
+        ```bash
+        tar -xzf stocks-source-*.tar.gz
+        cd stocks
+        ```
+        
+        2. 创建虚拟环境（推荐）：
+        ```bash
+        python -m venv .venv
+        source .venv/bin/activate  # Linux/Mac
+        # 或
+        .venv\Scripts\activate  # Windows
+        ```
+        
+        3. 安装依赖：
+        ```bash
+        pip install -r requirements.txt
+        ```
+        
+        4. 安装 Playwright 浏览器（用于截图功能）：
+        ```bash
+        playwright install chromium
+        playwright install-deps chromium
+        ```
+        
+        ## 运行应用
+        
+        ### Web 界面
+        ```bash
+        python gui/web.py
+        ```
+        然后访问 http://127.0.0.1:5000
+        
+        ### 命令行回测
+        ```bash
+        python main.py
+        ```
+        
+        ### 运行测试
+        ```bash
+        python -m unittest discover tests -v
+        ```
+        
+        ## 配置
+        
+        项目使用中国镜像源加速 pip 安装，配置文件：`pip.conf`
+        
+        EOF
+        
+        echo "✓ Requirements bundle created"
+        ls -lh dist/
+    
+    - name: Package Test Artifacts
+      run: |
+        echo "=== Packaging Test Artifacts ==="
+        
+        # 创建测试相关文件的打包
+        if [ -d "screenshots" ]; then
+          tar -czf dist/screenshots-${{ github.sha }}.tar.gz screenshots/
+          echo "✓ Screenshots packaged"
+        fi
+        
+        if [ -d "test_results" ]; then
+          tar -czf dist/test-results-${{ github.sha }}.tar.gz test_results/
+          echo "✓ Test results packaged"
+        fi
+        
+        echo "Package contents:"
+        ls -lh dist/
+    
+    - name: Generate Package Manifest
+      run: |
+        echo "=== Generating Package Manifest ==="
+        
+        cat > dist/MANIFEST.md << EOF
+        # 打包清单
+        
+        **构建时间**: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        **Git Commit**: ${{ github.sha }}
+        **Git Branch**: ${{ github.ref_name }}
+        **Workflow Run**: ${{ github.run_number }}
+        
+        ## 包含文件
+        
+        EOF
+        
+        # 列出所有打包文件及其大小
+        for file in dist/*; do
+          if [ -f "$file" ]; then
+            size=$(ls -lh "$file" | awk '{print $5}')
+            name=$(basename "$file")
+            echo "- **$name** ($size)" >> dist/MANIFEST.md
+          fi
+        done
+        
+        cat dist/MANIFEST.md
+    
+    - name: Upload Package Artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: package-${{ github.sha }}
+        path: dist/
+        retention-days: 90
+    
+    - name: Create Release (on tag push)
+      if: startsWith(github.ref, 'refs/tags/v')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/stocks-source-*.tar.gz
+          dist/requirements-freeze.txt
+          dist/INSTALL.md
+          dist/MANIFEST.md
+        body: |
+          ## 量化股票回测系统发布包
+          
+          此版本包含完整的源代码和依赖说明。
+          
+          ### 包含内容
+          - 源代码压缩包
+          - 依赖列表（requirements）
+          - 安装说明
+          
+          详见 MANIFEST.md 获取完整清单。
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

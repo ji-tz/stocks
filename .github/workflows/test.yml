@@ -1,0 +1,203 @@
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  test:
+    name: 自动化测试 (Automated Testing)
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        ref: ${{ github.head_ref }}
+        token: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install pip conf
+      run: |
+        mkdir -p ~/.pip
+        cp pip.conf ~/.pip/pip.conf || true
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        playwright install chromium
+        playwright install-deps chromium
+    
+    - name: Run all tests
+      run: |
+        echo "=== Running All Tests ==="
+        python -m unittest discover tests -v
+    
+    - name: Run strategy simulator tests
+      run: |
+        echo "=== Testing Trading Strategy Simulators ==="
+        python -m unittest tests.test_simulator -v
+    
+    - name: Verify simulator functionality
+      run: |
+        echo "=== Verifying Mean Cost Strategy ==="
+        python -c "from simulator.simulator import Simulator; from solver.mean_cost_strategy import MeanCostDecision; print('✓ Mean Cost Strategy loaded successfully')"
+        echo "=== Verifying SMA Strategy ==="
+        python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')"
+    
+    - name: Take Main GUI Screenshot
+      run: |
+        echo "=== Taking Main GUI Screenshot ==="
+        python screenshot_main.py screenshots/main_gui.png
+      continue-on-error: true
+    
+    - name: Run Yangtze Power Integration Test
+      run: |
+        echo "=== Running Yangtze Power (600900) Integration Test ==="
+        python test_yangtze_power.py
+      continue-on-error: true
+    
+    - name: Upload Screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-screenshots
+        path: screenshots/
+        retention-days: 30
+    
+    - name: Upload Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: test_results/
+        retention-days: 30
+    
+    - name: Commit Screenshots to PR Branch
+      if: github.event_name == 'pull_request'
+      id: commit_screenshots
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Add screenshots if they exist
+        HAS_CHANGES=false
+        if [ -f "screenshots/main_gui.png" ]; then
+          git add -f screenshots/main_gui.png
+          HAS_CHANGES=true
+        fi
+        if [ -f "screenshots/yangtze_power_test.png" ]; then
+          git add -f screenshots/yangtze_power_test.png
+          HAS_CHANGES=true
+        fi
+        
+        # Commit and push to current PR branch
+        if [ "$HAS_CHANGES" = true ]; then
+          git commit -m "Add test screenshots from CI run ${{ github.run_number }} [skip ci]"
+          # Push using the head ref to handle detached HEAD state
+          git push origin HEAD:${{ github.head_ref }}
+          echo "has_screenshots=true" >> $GITHUB_OUTPUT
+          echo "Waiting for GitHub to process commit..."
+          sleep 10
+        else
+          echo "No screenshots to commit"
+          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+        fi
+    
+    - name: Comment PR with Test Results and Screenshots
+      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          // 准备截图链接 - 使用当前 PR 分支的 raw 内容链接
+          let mainGuiImage = '';
+          let yangtzeImage = '';
+          
+          const branch = context.payload.pull_request.head.ref;
+          const mainGuiPath = 'screenshots/main_gui.png';
+          const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
+          
+          const baseUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${branch}`;
+          
+          if (fs.existsSync(mainGuiPath)) {
+            mainGuiImage = `![主界面截图](${baseUrl}/screenshots/main_gui.png?raw=true&t=${Date.now()})`;
+          } else {
+            mainGuiImage = '⚠️ 主界面截图未生成。';
+          }
+          
+          if (fs.existsSync(yangtzeImagePath)) {
+            yangtzeImage = `![长江电力测试结果图表](${baseUrl}/screenshots/yangtze_power_test.png?raw=true&t=${Date.now()})`;
+          } else {
+            yangtzeImage = '⚠️ 测试结果图表未生成。';
+          }
+          
+          // 读取测试结果
+          let testResult = '';
+          try {
+            const resultPath = 'test_results/yangtze_power_test.json';
+            if (fs.existsSync(resultPath)) {
+              const data = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
+              const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
+              const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
+              testResult = `
+          ## 长江电力（600900）2020-2022定投测试结果
+          
+          - **股票代码**: ${data.symbol || '600900'}
+          - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
+          - **初始资金**: ¥${(data.init_cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
+          - **最终资金**: ¥${(data.cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
+          - **持有市值**: ¥${(data.market_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
+          - **总资产**: ¥${(data.total_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
+          - **总收益**: ¥${totalProfit.toLocaleString('zh-CN', {minimumFractionDigits: 2})}
+          - **收益率**: ${returnRate.toFixed(2)}%
+          - **交易次数**: ${data.trades || 0}
+          - **持有股数**: ${data.shares || 0}
+          
+          ${yangtzeImage}
+          `;
+            }
+          } catch (e) {
+            console.log('Failed to read test results:', e);
+          }
+          
+          const runId = context.runId;
+          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+          
+          const comment = `
+          ## 🧪 自动化测试报告
+          
+          ### 📊 主界面截图
+          
+          ${mainGuiImage}
+          
+          ${testResult}
+          
+          ### 📁 完整报告
+          
+          所有截图和详细测试结果可在 [GitHub Actions Artifacts](${artifactUrl}) 中下载：
+          - **test-screenshots**: 包含主界面截图和测试结果图表
+          - **test-results**: 包含测试结果JSON数据
+          
+          ---
+          *Generated by Test Workflow*
+          `;
+          
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: comment
+          });
