@@ -23,7 +23,7 @@ def run_yangtze_power_test(
     start_date: str = "20200101",
     end_date: str = "20221231",
     lot_size: int = 100,
-    init_cash: float = 100000.0,
+    init_cash: float = 1000000.0,
     source: str = "auto"
 ) -> Dict[str, Any]:
     """

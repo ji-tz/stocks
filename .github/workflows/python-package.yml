@@ -103,6 +103,41 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
+          // 读取并转换截图为 base64
+          function imageToBase64(imagePath) {
+            try {
+              if (fs.existsSync(imagePath)) {
+                const imageBuffer = fs.readFileSync(imagePath);
+                return imageBuffer.toString('base64');
+              }
+            } catch (e) {
+              console.log(`Failed to read image ${imagePath}:`, e);
+            }
+            return null;
+          }
+          
+          // 准备截图嵌入
+          let mainGuiImage = '';
+          let yangtzeImage = '';
+          
+          const mainGuiPath = 'screenshots/main_gui.png';
+          const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
+          
+          const mainGuiBase64 = imageToBase64(mainGuiPath);
+          const yangtzeBase64 = imageToBase64(yangtzeImagePath);
+          
+          if (mainGuiBase64) {
+            mainGuiImage = `![主界面截图](data:image/png;base64,${mainGuiBase64})`;
+          } else {
+            mainGuiImage = '主界面截图未生成。请查看 Artifacts。';
+          }
+          
+          if (yangtzeBase64) {
+            yangtzeImage = `![长江电力测试结果图表](data:image/png;base64,${yangtzeBase64})`;
+          } else {
+            yangtzeImage = '测试结果图表未生成。请查看 Artifacts。';
+          }
+          
           // 读取测试结果
           let testResult = '';
           try {
@@ -124,6 +159,8 @@ jobs:
           - **收益率**: ${returnRate.toFixed(2)}%
           - **交易次数**: ${data.trades || 0}
           - **持有股数**: ${data.shares || 0}
+          
+          ${yangtzeImage}
           `;
             }
           } catch (e) {
@@ -135,7 +172,7 @@ jobs:
           
           ### 📊 主界面截图
           
-          主界面已成功运行并截图。请查看 Artifacts 中的 \`screenshots/main_gui.png\`
+          ${mainGuiImage}
           
           ${testResult}
           
