@@ -95,62 +95,62 @@ jobs:
         path: test_results/
         retention-days: 30
     
-    - name: Upload Screenshots to GitHub
+    - name: Commit Screenshots to PR Branch
       if: github.event_name == 'pull_request'
-      id: upload_screenshots
+      id: commit_screenshots
       run: |
-        # Create a temporary commit with screenshots to reference them
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
         
-        # Create a temp branch for screenshots
-        SCREENSHOT_BRANCH="screenshots-${{ github.run_number }}"
-        git checkout -b $SCREENSHOT_BRANCH
-        
         # Add screenshots if they exist
+        HAS_CHANGES=false
         if [ -f "screenshots/main_gui.png" ]; then
           git add -f screenshots/main_gui.png
+          HAS_CHANGES=true
         fi
         if [ -f "screenshots/yangtze_power_test.png" ]; then
           git add -f screenshots/yangtze_power_test.png
+          HAS_CHANGES=true
         fi
         
-        # Commit and push
-        git commit -m "Add screenshots for run ${{ github.run_number }}" || echo "No screenshots to commit"
-        git push origin $SCREENSHOT_BRANCH || echo "Failed to push"
-        
-        # Output the branch name for later use
-        echo "branch=$SCREENSHOT_BRANCH" >> $GITHUB_OUTPUT
-        
-        # Switch back to original branch
-        git checkout -
+        # Commit and push to current PR branch
+        if [ "$HAS_CHANGES" = true ]; then
+          git commit -m "Add screenshots from CI run ${{ github.run_number }} [skip ci]"
+          git push
+          echo "has_screenshots=true" >> $GITHUB_OUTPUT
+          echo "Waiting for GitHub to process commit..."
+          sleep 10
+        else
+          echo "No screenshots to commit"
+          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+        fi
     
     - name: Comment PR with Screenshots
-      if: github.event_name == 'pull_request'
+      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
       uses: actions/github-script@v7
       with:
         script: |
           const fs = require('fs');
           const path = require('path');
           
-          // 准备截图链接 - 使用 GitHub raw 内容链接
+          // 准备截图链接 - 使用当前 PR 分支的 raw 内容链接
           let mainGuiImage = '';
           let yangtzeImage = '';
           
-          const screenshotBranch = '${{ steps.upload_screenshots.outputs.branch }}';
+          const branch = context.payload.pull_request.head.ref;
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
           
-          const baseUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${screenshotBranch}`;
+          const baseUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${branch}`;
           
           if (fs.existsSync(mainGuiPath)) {
-            mainGuiImage = `![主界面截图](${baseUrl}/screenshots/main_gui.png)`;
+            mainGuiImage = `![主界面截图](${baseUrl}/screenshots/main_gui.png?raw=true&t=${Date.now()})`;
           } else {
             mainGuiImage = '⚠️ 主界面截图未生成。';
           }
           
           if (fs.existsSync(yangtzeImagePath)) {
-            yangtzeImage = `![长江电力测试结果图表](${baseUrl}/screenshots/yangtze_power_test.png)`;
+            yangtzeImage = `![长江电力测试结果图表](${baseUrl}/screenshots/yangtze_power_test.png?raw=true&t=${Date.now()})`;
           } else {
             yangtzeImage = '⚠️ 测试结果图表未生成。';
           }
