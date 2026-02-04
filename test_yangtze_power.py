@@ -67,11 +67,17 @@ def run_yangtze_power_test(
     print(f"开始日期: {result.get('start_date', start_date)}")
     print(f"结束日期: {result.get('end_date', end_date)}")
     print(f"初始资金: ¥{result.get('init_cash', init_cash):,.2f}")
-    print(f"最终资金: ¥{result.get('final_cash', 0):,.2f}")
-    print(f"总收益: ¥{result.get('total_profit', 0):,.2f}")
-    print(f"收益率: {result.get('return_rate', 0):.2%}")
-    print(f"交易次数: {result.get('total_trades', 0)}")
-    print(f"持有股数: {result.get('final_shares', 0)}")
+    print(f"最终资金: ¥{result.get('cash', 0):,.2f}")
+    print(f"持有市值: ¥{result.get('market_value', 0):,.2f}")
+    print(f"总资产: ¥{result.get('total_value', 0):,.2f}")
+    print(f"已实现盈亏: ¥{result.get('realized_pl', 0):,.2f}")
+    print(f"未实现盈亏: ¥{result.get('unrealized_pl', 0):,.2f}")
+    profit = result.get('total_value', init_cash) - init_cash
+    return_rate = profit / init_cash if init_cash > 0 else 0
+    print(f"总收益: ¥{profit:,.2f}")
+    print(f"收益率: {return_rate:.2%}")
+    print(f"交易次数: {result.get('trades', 0)}")
+    print(f"持有股数: {result.get('shares', 0)}")
     print(f"平均成本: ¥{result.get('avg_cost', 0):.2f}")
     print("=" * 60)
     
@@ -100,7 +106,7 @@ def save_result_chart(result: Dict[str, Any], output_path: str = "screenshots/ya
     if history:
         df_history = pd.DataFrame(history)
         dates = pd.to_datetime(df_history['date'])
-        total_values = df_history['cash'] + df_history['shares'] * df_history['close']
+        total_values = df_history['total_value']
         
         ax1.plot(dates, total_values, 'b-', linewidth=2, label='总资产')
         ax1.axhline(y=result.get('init_cash', 0), color='r', linestyle='--', label='初始资金')
@@ -112,13 +118,17 @@ def save_result_chart(result: Dict[str, Any], output_path: str = "screenshots/ya
         ax1.ticklabel_format(style='plain', axis='y')
     
     # 图2: 收益统计
+    init_cash_val = result.get('init_cash', 0)
+    total_value_val = result.get('total_value', 0)
+    profit = total_value_val - init_cash_val
+    
     stats = {
-        '初始资金': result.get('init_cash', 0),
-        '最终资金': result.get('final_cash', 0),
-        '总收益': result.get('total_profit', 0)
+        '初始资金': init_cash_val,
+        '最终总资产': total_value_val,
+        '总收益': profit
     }
     
-    colors = ['#3498db', '#2ecc71', '#e74c3c' if stats['总收益'] < 0 else '#2ecc71']
+    colors = ['#3498db', '#2ecc71', '#e74c3c' if profit < 0 else '#2ecc71']
     bars = ax2.bar(stats.keys(), stats.values(), color=colors, alpha=0.7)
     
     # 在柱状图上显示数值
@@ -134,7 +144,7 @@ def save_result_chart(result: Dict[str, Any], output_path: str = "screenshots/ya
     ax2.ticklabel_format(style='plain', axis='y')
     
     # 添加收益率文本
-    return_rate = result.get('return_rate', 0)
+    return_rate = profit / init_cash_val if init_cash_val > 0 else 0
     color = 'red' if return_rate < 0 else 'green'
     ax2.text(0.5, 0.95, f'收益率: {return_rate:.2%}',
             transform=ax2.transAxes,
