@@ -7,7 +7,7 @@ on:
     branches: [ main ]
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
 
 jobs:
@@ -95,6 +95,36 @@ jobs:
         path: test_results/
         retention-days: 30
     
+    - name: Upload Screenshots to GitHub
+      if: github.event_name == 'pull_request'
+      id: upload_screenshots
+      run: |
+        # Create a temporary commit with screenshots to reference them
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create a temp branch for screenshots
+        SCREENSHOT_BRANCH="screenshots-${{ github.run_number }}"
+        git checkout -b $SCREENSHOT_BRANCH
+        
+        # Add screenshots if they exist
+        if [ -f "screenshots/main_gui.png" ]; then
+          git add -f screenshots/main_gui.png
+        fi
+        if [ -f "screenshots/yangtze_power_test.png" ]; then
+          git add -f screenshots/yangtze_power_test.png
+        fi
+        
+        # Commit and push
+        git commit -m "Add screenshots for run ${{ github.run_number }}" || echo "No screenshots to commit"
+        git push origin $SCREENSHOT_BRANCH || echo "Failed to push"
+        
+        # Output the branch name for later use
+        echo "branch=$SCREENSHOT_BRANCH" >> $GITHUB_OUTPUT
+        
+        # Switch back to original branch
+        git checkout -
+    
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request'
       uses: actions/github-script@v7
@@ -103,39 +133,26 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
-          // 读取并转换截图为 base64
-          function imageToBase64(imagePath) {
-            try {
-              if (fs.existsSync(imagePath)) {
-                const imageBuffer = fs.readFileSync(imagePath);
-                return imageBuffer.toString('base64');
-              }
-            } catch (e) {
-              console.log(`Failed to read image ${imagePath}:`, e);
-            }
-            return null;
-          }
-          
-          // 准备截图嵌入
+          // 准备截图链接 - 使用 GitHub raw 内容链接
           let mainGuiImage = '';
           let yangtzeImage = '';
           
+          const screenshotBranch = '${{ steps.upload_screenshots.outputs.branch }}';
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
           
-          const mainGuiBase64 = imageToBase64(mainGuiPath);
-          const yangtzeBase64 = imageToBase64(yangtzeImagePath);
+          const baseUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${screenshotBranch}`;
           
-          if (mainGuiBase64) {
-            mainGuiImage = `![主界面截图](data:image/png;base64,${mainGuiBase64})`;
+          if (fs.existsSync(mainGuiPath)) {
+            mainGuiImage = `![主界面截图](${baseUrl}/screenshots/main_gui.png)`;
           } else {
-            mainGuiImage = '主界面截图未生成。请查看 Artifacts。';
+            mainGuiImage = '⚠️ 主界面截图未生成。';
           }
           
-          if (yangtzeBase64) {
-            yangtzeImage = `![长江电力测试结果图表](data:image/png;base64,${yangtzeBase64})`;
+          if (fs.existsSync(yangtzeImagePath)) {
+            yangtzeImage = `![长江电力测试结果图表](${baseUrl}/screenshots/yangtze_power_test.png)`;
           } else {
-            yangtzeImage = '测试结果图表未生成。请查看 Artifacts。';
+            yangtzeImage = '⚠️ 测试结果图表未生成。';
           }
           
           // 读取测试结果
@@ -167,6 +184,9 @@ jobs:
             console.log('Failed to read test results:', e);
           }
           
+          const runId = context.runId;
+          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+          
           const comment = `
           ## 🤖 自动化测试报告
           
@@ -178,8 +198,8 @@ jobs:
           
           ### 📁 完整报告
           
-          请下载以下 Artifacts 查看详细结果:
-          - **screenshots**: 包含主界面和测试结果图表
+          所有截图和详细测试结果可在 [GitHub Actions Artifacts](${artifactUrl}) 中下载：
+          - **screenshots**: 包含主界面截图和测试结果图表
           - **test-results**: 包含测试结果JSON数据
           
           ---
