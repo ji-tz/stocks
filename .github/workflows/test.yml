@@ -154,9 +154,10 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
-          // 由于仓库是私有的，raw.githubusercontent.com 链接需要认证
-          // 因此我们提供 artifact 下载链接
-          let screenshotInfo = '';
+          // 使用 base64 编码将图片直接嵌入到评论中
+          // 这样即使是私有仓库，图片也能直接显示
+          let mainGuiImage = '';
+          let yangtzeImage = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
@@ -164,27 +165,38 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 检查截图文件是否存在
-          const hasMainGui = fs.existsSync(mainGuiPath);
-          const hasYangtze = fs.existsSync(yangtzeImagePath);
-          
-          if (hasMainGui || hasYangtze) {
-            screenshotInfo = '### 📊 测试截图\n\n';
-            screenshotInfo += `由于仓库为私有，截图无法直接在评论中显示。请从以下链接下载查看：\n\n`;
-            screenshotInfo += `🔗 [下载测试截图（Artifacts）](${artifactUrl})\n\n`;
-            
-            if (hasMainGui) {
+          // 处理主界面截图
+          if (fs.existsSync(mainGuiPath)) {
+            try {
+              console.log('Encoding main GUI screenshot as base64...');
+              const imageData = fs.readFileSync(mainGuiPath);
+              const base64Image = imageData.toString('base64');
+              mainGuiImage = `![主界面截图](data:image/png;base64,${base64Image})`;
+              console.log('Main GUI screenshot encoded, size:', (base64Image.length / 1024).toFixed(1), 'KB');
+            } catch (e) {
+              console.log('Failed to encode main GUI image:', e.message);
               const stats = fs.statSync(mainGuiPath);
-              screenshotInfo += `- ✅ **主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB\n`;
+              mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
-            if (hasYangtze) {
-              const stats = fs.statSync(yangtzeImagePath);
-              screenshotInfo += `- ✅ **测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB\n`;
-            }
-            
-            screenshotInfo += `\n> 💡 提示：点击上方链接，找到 "Artifacts" 部分，下载 "test-screenshots" 压缩包即可查看所有截图。\n`;
           } else {
-            screenshotInfo = '### 📊 测试截图\n\n⚠️ 截图未生成。\n';
+            mainGuiImage = '⚠️ 主界面截图未生成';
+          }
+          
+          // 处理测试结果图表
+          if (fs.existsSync(yangtzeImagePath)) {
+            try {
+              console.log('Encoding Yangtze Power test chart as base64...');
+              const imageData = fs.readFileSync(yangtzeImagePath);
+              const base64Image = imageData.toString('base64');
+              yangtzeImage = `![长江电力测试结果图表](data:image/png;base64,${base64Image})`;
+              console.log('Yangtze chart encoded, size:', (base64Image.length / 1024).toFixed(1), 'KB');
+            } catch (e) {
+              console.log('Failed to encode Yangtze chart:', e.message);
+              const stats = fs.statSync(yangtzeImagePath);
+              yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
+            }
+          } else {
+            yangtzeImage = '';
           }
           
            // 读取测试结果
@@ -208,6 +220,8 @@ jobs:
           - **收益率**: ${returnRate.toFixed(2)}%
           - **交易次数**: ${data.trades || 0}
           - **持有股数**: ${data.shares || 0}
+          
+          ${yangtzeImage}
           `;
             }
           } catch (e) {
@@ -217,7 +231,9 @@ jobs:
           const comment = `
           ## 🧪 自动化测试报告
           
-          ${screenshotInfo}
+          ### 📊 主界面截图
+          
+          ${mainGuiImage}
           
           ${testResult}
           
