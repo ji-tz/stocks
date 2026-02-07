@@ -15,8 +15,14 @@ class TestGuiRoutes(unittest.TestCase):
         # page title should be present (Chinese)
         body = rv.data.decode('utf-8')
         self.assertIn('量化回测平台', body)
-        # ensure client-side validation script present
-        self.assertIn('function validateDates', body)
+        # ensure strategy cards are present
+        self.assertIn('SMA 策略', body)
+        self.assertIn('均值成本策略', body)
+        self.assertIn('定投策略', body)
+        # ensure navigation links are present
+        self.assertIn('/strategy/sma', body)
+        self.assertIn('/strategy/mean_cost', body)
+        self.assertIn('/strategy/fixed_amount', body)
 
     @patch('stocks.get_data')
     @patch('stocks.run_mean_cost')
@@ -62,6 +68,36 @@ class TestGuiRoutes(unittest.TestCase):
         rv = self.client.post('/run', data={'symbol': '600900', 'strategy': 'sma', 'start': 'invalid-date'})
         self.assertEqual(rv.status_code, 200)
         self.assertIn('发生错误', rv.data.decode('utf-8'))
+
+    def test_strategy_sma_get(self):
+        """测试 SMA 策略配置页面"""
+        rv = self.client.get('/strategy/sma')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('SMA 策略回测', body)
+        self.assertIn('策略说明', body)
+        self.assertIn('SMA 周期', body)
+        self.assertIn('function validateDates', body)
+
+    def test_strategy_mean_cost_get(self):
+        """测试均值成本策略配置页面"""
+        rv = self.client.get('/strategy/mean_cost')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('均值成本策略回测', body)
+        self.assertIn('策略说明', body)
+        self.assertIn('逢低加仓', body)
+        self.assertIn('function validateDates', body)
+
+    def test_strategy_fixed_amount_get(self):
+        """测试定投策略配置页面"""
+        rv = self.client.get('/strategy/fixed_amount')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('定投策略回测', body)
+        self.assertIn('策略说明', body)
+        self.assertIn('每次定投金额', body)
+        self.assertIn('function validateDates', body)
 
 
 if __name__ == '__main__':

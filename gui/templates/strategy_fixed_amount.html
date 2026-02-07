@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>定投策略 - 量化回测平台</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+      .header h1 { margin: 0; color: #1976d2; }
+      .back-link { color: #1976d2; text-decoration: none; }
+      .back-link:hover { text-decoration: underline; }
+      .strategy-info { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 1rem; margin: 1rem 0; }
+      .strategy-info h2 { margin-top: 0; color: #2e7d32; font-size: 1.2rem; }
+      .strategy-info p { margin: 0.5rem 0; line-height: 1.6; }
+      .strategy-info ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+      .form-section { background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+      .form-section h3 { margin-top: 0; color: #333; }
+      label { display: block; margin-top: 1rem; font-weight: 500; }
+      input, select { padding: 0.5rem; width: 100%; max-width: 400px; border: 1px solid #ccc; border-radius: 4px; }
+      button { margin-top: 1.5rem; padding: 0.8rem 2rem; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+      button:hover { background: #388e3c; }
+      .param-hint { color: #666; font-size: 0.9rem; margin-top: 0.25rem; }
+      .date-error { color: #d32f2f; font-weight: 600; margin-top: 0.5rem; display: none; }
+      .highlight { background: #fff9c4; padding: 0.2rem 0.4rem; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>🎯 定投策略回测</h1>
+      <a href="/" class="back-link">← 返回首页</a>
+    </div>
+
+    <div class="strategy-info">
+      <h2>策略说明</h2>
+      <p><strong>定投（Fixed Amount Investment）策略</strong>是一种"傻瓜式"长期投资策略，每天投入固定金额购买股票。</p>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">策略原理：</h3>
+      <ul>
+        <li><strong>固定金额投入</strong>：每天投入固定金额（如 1000 元）买入股票</li>
+        <li><strong>自动计算股数</strong>：根据当日股价自动计算购买股数（必须是手数整数倍）</li>
+        <li><strong>只买不卖</strong>：持续买入，不考虑卖出，长期持有</li>
+        <li><strong>平滑成本</strong>：价格高时买入少，价格低时买入多，自动平滑成本</li>
+      </ul>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">策略优势：</h3>
+      <ul>
+        <li>✓ <span class="highlight">降低择时风险</span>：无需判断市场高低点</li>
+        <li>✓ <span class="highlight">平滑成本</span>：在波动中自动平摊成本</li>
+        <li>✓ <span class="highlight">简单易行</span>：无需复杂的技术分析</li>
+        <li>✓ <span class="highlight">纪律性强</span>：避免情绪化交易</li>
+        <li>✓ <span class="highlight">适合长期</span>：通过时间平滑市场短期波动</li>
+      </ul>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">适用场景：</h3>
+      <ul>
+        <li>长期看好某只股票或指数基金</li>
+        <li>没有时间频繁操作的投资者</li>
+        <li>追求长期稳健收益（3年以上）</li>
+        <li>市场处于震荡或下跌趋势（逢低吸筹）</li>
+      </ul>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">注意事项：</h3>
+      <ul>
+        <li>⚠ 需要充足的初始资金支持长期定投</li>
+        <li>⚠ 适合优质标的，避免选择基本面恶化的股票</li>
+        <li>⚠ 短期内可能出现浮亏，需要耐心持有</li>
+      </ul>
+    </div>
+
+    <div class="form-section">
+      <h3>回测参数配置</h3>
+      <form action="/run" method="post">
+        <input type="hidden" name="strategy" value="fixed_amount" />
+        
+        <label>股票代码
+          <input name="symbol" value="600900" required placeholder="例如：600900" />
+          <div class="param-hint">输入A股股票代码，例如：600900（长江电力）、600519（贵州茅台）</div>
+        </label>
+
+        <label>每次定投金额（元）
+          <input type="number" name="fixed_amount" value="1000" min="100" step="100" required />
+          <div class="param-hint">每天投入的固定金额，推荐 500-2000 元</div>
+        </label>
+
+        <label>数据源
+          <select name="source">
+            <option value="auto">自动选择</option>
+            <option value="akshare">AKShare</option>
+            <option value="baostock">Baostock</option>
+          </select>
+          <div class="param-hint">数据源选择，推荐使用"自动选择"</div>
+        </label>
+
+        <label>每手股数
+          <input type="number" name="lot" value="100" min="100" step="100" required />
+          <div class="param-hint">A股市场 1 手 = 100 股</div>
+        </label>
+
+        <label>初始资金（元）
+          <input type="number" name="cash" value="100000" min="10000" step="1000" required />
+          <div class="param-hint">回测初始资金，建议至少为"定投金额 × 预计天数"，如 1000元/天 × 100天 = 100000元</div>
+        </label>
+
+        <label>起始日期（可选）
+          <input type="text" name="start" placeholder="例如：20230101 或 2023-01-01" />
+          <div class="param-hint">格式：YYYYMMDD 或 YYYY-MM-DD，留空则使用全部历史数据</div>
+        </label>
+
+        <label>结束日期（可选）
+          <input type="text" name="end" placeholder="例如：20231231 或 2023-12-31" />
+          <div class="param-hint">格式：YYYYMMDD 或 YYYY-MM-DD，留空则使用最新数据</div>
+        </label>
+
+        <div class="date-error" id="date-error">日期格式错误</div>
+
+        <button type="submit">🚀 开始回测</button>
+      </form>
+    </div>
+
+    <script>
+      // 日期格式校验
+      function validateDates() {
+        const start = document.querySelector('input[name="start"]').value.trim();
+        const end = document.querySelector('input[name="end"]').value.trim();
+        const re1 = /^\d{8}$/;
+        const re2 = /^\d{4}-\d{2}-\d{2}$/;
+        const errEl = document.getElementById('date-error');
+
+        function ok(s) {
+          return s === '' || re1.test(s) || re2.test(s);
+        }
+
+        if (!ok(start)) {
+          errEl.textContent = '起始日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
+          errEl.style.display = 'block';
+          return false;
+        }
+        if (!ok(end)) {
+          errEl.textContent = '结束日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
+          errEl.style.display = 'block';
+          return false;
+        }
+        if (start !== '' && end !== '') {
+          const norm = s => s.replace(/-/g, '');
+          if (norm(start) > norm(end)) {
+            errEl.textContent = '起始日期不能晚于结束日期';
+            errEl.style.display = 'block';
+            return false;
+          }
+        }
+
+        errEl.style.display = 'none';
+        return true;
+      }
+
+      // 绑定表单提交验证
+      const form = document.querySelector('form');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          if (!validateDates()) {
+            e.preventDefault();
+            return false;
+          }
+        });
+        
+        ['start', 'end'].forEach(name => {
+          const el = document.querySelector('input[name="' + name + '"]');
+          if (el) el.addEventListener('input', validateDates);
+        });
+      }
+    </script>
+  </body>
+</html>

@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>SMA 策略 - 量化回测平台</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+      .header h1 { margin: 0; color: #1976d2; }
+      .back-link { color: #1976d2; text-decoration: none; }
+      .back-link:hover { text-decoration: underline; }
+      .strategy-info { background: #e3f2fd; border-left: 4px solid #1976d2; padding: 1rem; margin: 1rem 0; }
+      .strategy-info h2 { margin-top: 0; color: #1976d2; font-size: 1.2rem; }
+      .strategy-info p { margin: 0.5rem 0; line-height: 1.6; }
+      .strategy-info ul { margin: 0.5rem 0; padding-left: 1.5rem; }
+      .form-section { background: #f9f9f9; border: 1px solid #ddd; border-radius: 8px; padding: 1.5rem; margin: 1rem 0; }
+      .form-section h3 { margin-top: 0; color: #333; }
+      label { display: block; margin-top: 1rem; font-weight: 500; }
+      input, select { padding: 0.5rem; width: 100%; max-width: 400px; border: 1px solid #ccc; border-radius: 4px; }
+      button { margin-top: 1.5rem; padding: 0.8rem 2rem; background: #1976d2; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 1rem; }
+      button:hover { background: #1565c0; }
+      .param-hint { color: #666; font-size: 0.9rem; margin-top: 0.25rem; }
+      .date-error { color: #d32f2f; font-weight: 600; margin-top: 0.5rem; display: none; }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>📈 SMA 策略回测</h1>
+      <a href="/" class="back-link">← 返回首页</a>
+    </div>
+
+    <div class="strategy-info">
+      <h2>策略说明</h2>
+      <p><strong>简单移动平均（Simple Moving Average, SMA）策略</strong>是一种经典的趋势跟随策略。</p>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">策略原理：</h3>
+      <ul>
+        <li><strong>买入信号</strong>：当股价上穿移动平均线时买入（看涨信号）</li>
+        <li><strong>卖出信号</strong>：当股价下穿移动平均线时卖出（看跌信号）</li>
+        <li><strong>持有</strong>：其他情况保持当前仓位</li>
+      </ul>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">策略特点：</h3>
+      <ul>
+        <li>✓ 简单直观，易于理解和实施</li>
+        <li>✓ 适合单边趋势行情，能够捕捉中长期趋势</li>
+        <li>✓ 滞后性较强，可能错过反转初期</li>
+        <li>⚠ 震荡市场可能产生频繁假信号</li>
+      </ul>
+      
+      <h3 style="font-size: 1rem; margin-top: 1rem;">参数说明：</h3>
+      <p><strong>周期（Period）</strong>：计算移动平均线的天数。常用值：</p>
+      <ul>
+        <li>短期：5-10 天（快速响应，但噪音较多）</li>
+        <li>中期：20-30 天（平衡响应速度和稳定性，推荐）</li>
+        <li>长期：60-120 天（滞后性强，但信号可靠）</li>
+      </ul>
+    </div>
+
+    <div class="form-section">
+      <h3>回测参数配置</h3>
+      <form action="/run" method="post">
+        <input type="hidden" name="strategy" value="sma" />
+        
+        <label>股票代码
+          <input name="symbol" value="600900" required placeholder="例如：600900" />
+          <div class="param-hint">输入A股股票代码，例如：600900（长江电力）、600519（贵州茅台）</div>
+        </label>
+
+        <label>SMA 周期
+          <input type="number" name="period" value="20" min="1" max="250" required />
+          <div class="param-hint">移动平均线计算周期，推荐 20 天</div>
+        </label>
+
+        <label>数据源
+          <select name="source">
+            <option value="auto">自动选择</option>
+            <option value="akshare">AKShare</option>
+            <option value="baostock">Baostock</option>
+          </select>
+          <div class="param-hint">数据源选择，推荐使用"自动选择"</div>
+        </label>
+
+        <label>每手股数
+          <input type="number" name="lot" value="100" min="100" step="100" required />
+          <div class="param-hint">A股市场 1 手 = 100 股</div>
+        </label>
+
+        <label>初始资金（元）
+          <input type="number" name="cash" value="100000" min="1000" step="1000" required />
+          <div class="param-hint">回测初始资金，建议至少 10000 元</div>
+        </label>
+
+        <label>起始日期（可选）
+          <input type="text" name="start" placeholder="例如：20230101 或 2023-01-01" />
+          <div class="param-hint">格式：YYYYMMDD 或 YYYY-MM-DD，留空则使用全部历史数据</div>
+        </label>
+
+        <label>结束日期（可选）
+          <input type="text" name="end" placeholder="例如：20231231 或 2023-12-31" />
+          <div class="param-hint">格式：YYYYMMDD 或 YYYY-MM-DD，留空则使用最新数据</div>
+        </label>
+
+        <div class="date-error" id="date-error">日期格式错误</div>
+
+        <button type="submit">🚀 开始回测</button>
+      </form>
+    </div>
+
+    <script>
+      // 日期格式校验
+      function validateDates() {
+        const start = document.querySelector('input[name="start"]').value.trim();
+        const end = document.querySelector('input[name="end"]').value.trim();
+        const re1 = /^\d{8}$/;
+        const re2 = /^\d{4}-\d{2}-\d{2}$/;
+        const errEl = document.getElementById('date-error');
+
+        function ok(s) {
+          return s === '' || re1.test(s) || re2.test(s);
+        }
+
+        if (!ok(start)) {
+          errEl.textContent = '起始日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
+          errEl.style.display = 'block';
+          return false;
+        }
+        if (!ok(end)) {
+          errEl.textContent = '结束日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
+          errEl.style.display = 'block';
+          return false;
+        }
+        if (start !== '' && end !== '') {
+          const norm = s => s.replace(/-/g, '');
+          if (norm(start) > norm(end)) {
+            errEl.textContent = '起始日期不能晚于结束日期';
+            errEl.style.display = 'block';
+            return false;
+          }
+        }
+
+        errEl.style.display = 'none';
+        return true;
+      }
+
+      // 绑定表单提交验证
+      const form = document.querySelector('form');
+      if (form) {
+        form.addEventListener('submit', function(e) {
+          if (!validateDates()) {
+            e.preventDefault();
+            return false;
+          }
+        });
+        
+        ['start', 'end'].forEach(name => {
+          const el = document.querySelector('input[name="' + name + '"]');
+          if (el) el.addEventListener('input', validateDates);
+        });
+      }
+    </script>
+  </body>
+</html>
