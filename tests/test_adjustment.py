@@ -111,17 +111,24 @@ class TestAdjustmentParameters(unittest.TestCase):
 
     def test_adjustment_consistency(self):
         """测试两个数据源使用一致的复权方式（前复权）"""
-        # 这是一个文档性测试，说明两个数据源的复权方式
+        # 验证两个数据源的复权配置一致性
         
-        # AkshareProvider 使用 adjust='qfq' (前复权)
-        # BaostockProvider 使用 adjustflag='2' (前复权)
+        # 通过源代码验证配置
+        from source.akshare_provider import AkshareProvider
+        from source.baostock_provider import BaostockProvider
         
-        # 前复权的特点：
-        # 1. 保持最新价格不变
-        # 2. 向前调整历史价格
-        # 3. 便于与实盘对比
+        # 读取源代码验证复权参数配置
+        import inspect
         
-        self.assertTrue(True, "两个数据源都使用前复权，保持一致性")
+        # 验证AkshareProvider的fetch方法包含adjust="qfq"
+        akshare_source = inspect.getsource(AkshareProvider.fetch)
+        self.assertIn('adjust="qfq"', akshare_source,
+                     "AkshareProvider应使用前复权参数adjust='qfq'")
+        
+        # 验证BaostockProvider的fetch方法包含adjustflag="2"
+        baostock_source = inspect.getsource(BaostockProvider.fetch)
+        self.assertIn('adjustflag="2"', baostock_source,
+                     "BaostockProvider应使用前复权参数adjustflag='2'")
 
 
 class TestAdjustmentDocumentation(unittest.TestCase):

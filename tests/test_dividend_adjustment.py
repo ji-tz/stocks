@@ -61,14 +61,17 @@ class TestDividendAdjustment(unittest.TestCase):
         self.assertIn('total_value', result)
         self.assertIn('cash', result)
         
-        # 前复权数据应该显示正收益（价格从10.1涨到11.0）
+        # 前复权数据应该显示合理收益（价格从10.1涨到11.0，约9%涨幅）
+        # 考虑交易成本和策略特性，最终价值应该接近初始资金
+        # 允许-1%的容差（考虑策略可能在高点买入低点卖出的情况）
+        MIN_VALUE_RATIO = 0.99  # 允许最多1%的损失
         total_pl = result['realized_pl'] + result['unrealized_pl']
-        self.assertGreater(total_pl, -500, 
-                          "使用前复权数据的收益不应该严重为负")
+        self.assertGreater(total_pl, result['init_cash'] * (MIN_VALUE_RATIO - 1), 
+                          f"使用前复权数据的收益不应该低于-{(1-MIN_VALUE_RATIO)*100:.0f}%")
         
         # 最终总价值应该接近或大于初始资金
-        self.assertGreater(result['total_value'], result['init_cash'] * 0.95,
-                          "前复权数据：最终总价值应该接近或大于初始资金")
+        self.assertGreater(result['total_value'], result['init_cash'] * MIN_VALUE_RATIO,
+                          f"前复权数据：最终总价值应该至少是初始资金的{MIN_VALUE_RATIO*100:.0f}%")
 
     def test_unadjusted_data_shows_incorrect_profit(self):
         """测试不复权数据会导致收益计算不准确（文档测试）
@@ -191,9 +194,12 @@ class TestRealStockDividendScenario(unittest.TestCase):
         self.assertIn('realized_pl', result)
         self.assertIn('total_value', result)
         
-        # 因为是上涨趋势，最终价值应该接近或大于初始资金
-        self.assertGreater(result['total_value'], result['init_cash'] * 0.8,
-                          "在上涨趋势中，最终价值应该接近或大于初始资金的80%")
+        # 因为是上涨趋势（价格从20涨到~22.5，约12.5%涨幅），
+        # 且使用均值成本策略（会在价格上涨时卖出获利），
+        # 考虑交易成本，最终价值应该至少保持在初始资金的95%以上
+        MIN_VALUE_RATIO = 0.95
+        self.assertGreater(result['total_value'], result['init_cash'] * MIN_VALUE_RATIO,
+                          f"在上涨趋势中，最终价值应该至少是初始资金的{MIN_VALUE_RATIO*100:.0f}%")
 
 
 if __name__ == '__main__':
