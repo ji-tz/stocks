@@ -78,7 +78,7 @@
       const baseValue = totalValueData[0];
       
       // 验证基准值有效性
-      if (!baseValue || baseValue <= 0) {
+      if (baseValue === null || baseValue === undefined || baseValue <= 0) {
         console.error('❌ 无效的基准总资产值:', baseValue);
         alert('数据错误：无法计算资产变化曲线');
         throw new Error('Invalid base value for total assets');
@@ -105,7 +105,7 @@
       }
       
       // 归一化股价数据
-      if (basePrice !== null && basePrice > 0) {
+      if (basePrice !== null) {
         for (let i = 0; i < stockPriceData.length; i++) {
           if (stockPriceData[i] !== null) {
             normalizedStockPrice.push((stockPriceData[i] / basePrice) * 100);

@@ -170,6 +170,9 @@ class TestGuiRoutes(unittest.TestCase):
         # 验证两条曲线使用同一个Y轴
         self.assertIn("yAxisID: 'y'", body)
         
+        # 验证已移除双Y轴配置
+        self.assertNotIn("yAxisID: 'y1'", body)
+        
         # 验证包含图表标签
         self.assertIn('总资产变化', body)
         self.assertIn('股价变化', body)
