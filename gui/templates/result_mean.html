@@ -81,6 +81,7 @@
       if (!baseValue || baseValue <= 0) {
         console.error('❌ 无效的基准总资产值:', baseValue);
         alert('数据错误：无法计算资产变化曲线');
+        throw new Error('Invalid base value for total assets');
       }
       
       // 找到第一个有效的股价作为基准
@@ -92,11 +93,15 @@
         }
       }
       
+      // 验证股价基准值
+      if (basePrice === null) {
+        console.warn('⚠️ 未找到有效的股价数据');
+        alert('警告：股价数据不可用，仅显示总资产曲线');
+      }
+      
       // 归一化总资产数据
-      if (baseValue > 0) {
-        for (let i = 0; i < totalValueData.length; i++) {
-          normalizedTotalValue.push((totalValueData[i] / baseValue) * 100);
-        }
+      for (let i = 0; i < totalValueData.length; i++) {
+        normalizedTotalValue.push((totalValueData[i] / baseValue) * 100);
       }
       
       // 归一化股价数据
@@ -158,10 +163,15 @@
                   
                   // 显示归一化指数和原始值
                   if (datasetLabel.includes('总资产')) {
-                    return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + totalValueData[index].toFixed(2) + ' 元)';
+                    const originalValue = totalValueData[index];
+                    if (originalValue !== null && originalValue !== undefined) {
+                      return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + originalValue.toFixed(2) + ' 元)';
+                    } else {
+                      return datasetLabel + ': ' + value.toFixed(2);
+                    }
                   } else {
                     const originalPrice = stockPriceData[index];
-                    if (originalPrice !== null) {
+                    if (originalPrice !== null && originalPrice !== undefined) {
                       return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + originalPrice.toFixed(2) + ' 元)';
                     } else {
                       return datasetLabel + ': 无数据';
