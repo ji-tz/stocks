@@ -128,7 +128,20 @@ class TestAdjustmentDocumentation(unittest.TestCase):
     """测试复权参数的文档说明"""
     
     def test_adjustment_parameter_values(self):
-        """验证复权参数的可选值（文档用途）"""
+        """验证复权参数的可选值（文档用途）
+        
+        AKShare参数:
+        - 不复权: ''
+        - 前复权: 'qfq'
+        - 后复权: 'hfq'
+        
+        Baostock参数:
+        - 不复权: '3'
+        - 前复权: '2'
+        - 后复权: '1'
+        
+        当前配置: 统一使用前复权
+        """
         
         # AKShare参数
         akshare_params = {
@@ -144,14 +157,9 @@ class TestAdjustmentDocumentation(unittest.TestCase):
             '后复权': '1'
         }
         
-        # 当前使用的参数
+        # 验证当前使用的参数
         self.assertEqual(akshare_params['前复权'], 'qfq')
         self.assertEqual(baostock_params['前复权'], '2')
-        
-        print("\n=== 复权参数说明 ===")
-        print("AKShare:", akshare_params)
-        print("Baostock:", baostock_params)
-        print("当前配置: 统一使用前复权")
 
 
 if __name__ == '__main__':

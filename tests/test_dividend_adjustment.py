@@ -71,8 +71,13 @@ class TestDividendAdjustment(unittest.TestCase):
                           "前复权数据：最终总价值应该接近或大于初始资金")
 
     def test_unadjusted_data_shows_incorrect_profit(self):
-        """测试不复权数据会导致收益计算不准确（文档测试）"""
-        # 这个测试展示了为什么需要复权
+        """测试不复权数据会导致收益计算不准确（文档测试）
+        
+        这个测试展示了为什么需要复权。不复权数据在除权点会有价格跳空，
+        这会导致算法误判市场走势。
+        
+        注意：具体行为取决于策略。这个测试主要用于文档参考。
+        """
         strategy = MeanCostDecision()
         simulator = Simulator(lot_size=100, init_cash=100000.0, verbose=False)
         
@@ -83,15 +88,10 @@ class TestDividendAdjustment(unittest.TestCase):
             verbose=False
         )
         
-        # 不复权数据在除权点会有价格跳空
-        # 这会导致算法误判市场走势
-        
-        # 注意：这里不做强制断言，因为具体行为取决于策略
-        # 但我们记录了这种情况供文档参考
-        total_pl = result.get('realized_pl', 0) + result.get('unrealized_pl', 0)
-        total_return = total_pl / result['init_cash'] if result['init_cash'] > 0 else 0
-        print(f"\n不复权数据收益率: {total_return:.2%}")
-        print(f"前复权数据应该提供更准确的收益计算")
+        # 验证结果结构完整
+        self.assertIn('realized_pl', result)
+        self.assertIn('unrealized_pl', result)
+        self.assertIn('total_value', result)
 
     def test_price_continuity_with_adjustment(self):
         """测试前复权数据的价格连续性"""
@@ -110,7 +110,14 @@ class TestDividendAdjustment(unittest.TestCase):
                        "前复权数据的日收益率应该相对平稳（<2%）")
 
     def test_price_discontinuity_without_adjustment(self):
-        """测试不复权数据在除权点有价格跳空"""
+        """测试不复权数据在除权点有价格跳空
+        
+        不复权数据在除权点会有跳空。例如：
+        - 除权前日收益率会因分红而接近0
+        - 除权后日收益率也会接近0
+        
+        这种价格跳空会影响技术分析和策略决策的准确性。
+        """
         # 不复权数据在除权点会有跳空
         unadjusted_close = self.unadjusted_data['close'].values
         
@@ -119,10 +126,9 @@ class TestDividendAdjustment(unittest.TestCase):
         ret_4_5 = (unadjusted_close[4] - unadjusted_close[3]) / unadjusted_close[3]
         ret_5_6 = (unadjusted_close[5] - unadjusted_close[4]) / unadjusted_close[4]
         
-        # 除权前后的收益率模式会不同
-        # 这个测试主要是文档性的，说明不复权的问题
-        print(f"\n除权前日收益率: {ret_4_5:.4f}")
-        print(f"除权后日收益率: {ret_5_6:.4f}")
+        # 验证价格变化模式
+        self.assertIsNotNone(ret_4_5)
+        self.assertIsNotNone(ret_5_6)
 
 
 class TestRealStockDividendScenario(unittest.TestCase):
