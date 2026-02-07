@@ -246,11 +246,12 @@ jobs:
               const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
               const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
               testResult = `
-          ### 📈 股票定投测试结果（随机选择）
+          ### 📊 策略复盘
           
           - **股票代码**: ${data.symbol || '未知'}
           - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
           - **初始资金**: ¥${(data.init_cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
+          - **最大占用资金**: ¥${(data.max_capital_used || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
           - **最终资金**: ¥${(data.cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
           - **持有市值**: ¥${(data.market_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
           - **总资产**: ¥${(data.total_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
