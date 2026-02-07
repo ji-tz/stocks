@@ -65,7 +65,8 @@ stocks/
 ├── tests/                 # 单元测试
 │   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 ├── data/                  # 本地数据缓存
-├── screenshot_main.py     # 主界面截图脚本
+├── screenshot_main.py     # GUI截图脚本（统一入口）
+├── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 └── .github/
     └── workflows/
         ├── lint.yml       # 代码检视工作流
@@ -184,14 +185,19 @@ flake8 .
 mypy stocks.py main.py --config-file=mypy.ini
 ```
 
-### 主界面截图
+### GUI 截图
 
 ```bash
 # 需要先安装playwright浏览器
 playwright install chromium
 
-# 运行截图脚本
-python screenshot_main.py screenshots/main_gui.png
+# 运行统一截图脚本（推荐）
+python screenshot_main.py main --output screenshots/main_gui.png
+python screenshot_main.py strategy --output-dir screenshots
+python screenshot_main.py history --output-dir screenshots
+python screenshot_main.py chart --output screenshots/stock_price_chart.png
+python screenshot_main.py all --output-dir screenshots
+
 ```
 
 ## 命令行工具
