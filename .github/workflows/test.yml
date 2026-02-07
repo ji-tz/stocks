@@ -90,66 +90,18 @@ jobs:
         path: test_results/
         retention-days: 30
     
-    - name: Commit Screenshots to PR Branch
+    - name: Check Screenshot Status
       if: github.event_name == 'pull_request'
       id: commit_screenshots
-      continue-on-error: true
       run: |
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Add screenshots if they exist
-        HAS_CHANGES=false
-        if [ -f "screenshots/main_gui.png" ]; then
-          git add -f screenshots/main_gui.png
-          HAS_CHANGES=true
-        fi
-        if [ -f "screenshots/yangtze_power_test.png" ]; then
-          git add -f screenshots/yangtze_power_test.png
-          HAS_CHANGES=true
-        fi
-        
-        # Commit and push to current PR branch
-        if [ "$HAS_CHANGES" = true ]; then
-          # Check if there are actual changes to commit
-          if git diff --cached --quiet; then
-            echo "Files already committed, skipping commit"
-            echo "has_screenshots=true" >> $GITHUB_OUTPUT
-          else
-            # Attempt to commit
-            if git commit -m "Add test screenshots from CI run ${{ github.run_number }} [skip ci]"; then
-              echo "Commit successful"
-              # Push using the head ref to handle detached HEAD state
-              if git push origin HEAD:${{ github.head_ref }}; then
-                echo "Push successful"
-                echo "has_screenshots=true" >> $GITHUB_OUTPUT
-                echo "Waiting for GitHub to process commit..."
-                sleep 10
-              else
-                echo "⚠️ Warning: Push failed, screenshots not committed to PR branch"
-                echo "Screenshots will still be available in artifacts"
-                echo "has_screenshots=true" >> $GITHUB_OUTPUT
-              fi
-            else
-              echo "⚠️ Warning: Commit failed"
-              echo "has_screenshots=true" >> $GITHUB_OUTPUT
-            fi
-          fi
+        # Check if screenshots were generated
+        if ls screenshots/*.png 1> /dev/null 2>&1; then
+          echo "Screenshots found"
+          echo "has_screenshots=true" >> $GITHUB_OUTPUT
         else
-          echo "No screenshots to commit"
+          echo "No screenshots found"
           echo "has_screenshots=false" >> $GITHUB_OUTPUT
         fi
-    
-    - name: Debug - Check screenshots and outputs
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "=== Debugging Screenshot Status ==="
-        echo "Event name: ${{ github.event_name }}"
-        echo "Has screenshots output: ${{ steps.commit_screenshots.outputs.has_screenshots }}"
-        echo "Files in screenshots directory:"
-        ls -la screenshots/ || echo "No screenshots directory"
-        echo "Git status:"
-        git status
     
     - name: Upload Screenshots to Public Images Repository
       if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
