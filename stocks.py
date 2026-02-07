@@ -112,8 +112,12 @@ def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_
     return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, lot_size=lot_size, init_cash=init_cash, source=source)
 
 
-def run_fixed_amount(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
-                    fixed_amount: float = 1000.0, lot_size: int = 100, init_cash: float = 100000.0, 
+def run_fixed_amount(symbol: str = "600900",
+                    start_date: Optional[str] = None,
+                    end_date: Optional[str] = None,
+                    fixed_amount: float = 1000.0,
+                    lot_size: int = 100,
+                    init_cash: float = 100000.0,
                     source: object = "auto") -> Dict[str, Any]:
     """调用定投策略模拟（封装自 simulator.simulator.simulate_fixed_amount）。
     
@@ -131,9 +135,13 @@ def run_fixed_amount(symbol: str = "600900", start_date: Optional[str] = None, e
     """
     if simulate_fixed_amount is None:
         raise RuntimeError("fixed_amount 模块不可用")
-    return simulate_fixed_amount(symbol=symbol, start_date=start_date, end_date=end_date, 
-                                fixed_amount=fixed_amount, lot_size=lot_size, 
-                                init_cash=init_cash, source=source)
+    return simulate_fixed_amount(symbol=symbol,
+                                start_date=start_date,
+                                end_date=end_date,
+                                fixed_amount=fixed_amount,
+                                lot_size=lot_size,
+                                init_cash=init_cash,
+                                source=source)
 
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
