@@ -68,16 +68,6 @@ jobs:
         python screenshot_main.py screenshots/main_gui.png
       continue-on-error: true
     
-    - name: Take Strategy Config Screenshots
-      run: |
-        echo "=== Taking Strategy Config Screenshots ==="
-        python screenshot_strategy_config.py screenshots/
-      continue-on-error: true
-    
-    - name: Take History Screenshots
-      run: |
-        echo "=== Taking History Screenshots ==="
-        python screenshot_history.py screenshots/
     - name: Take History Feature Screenshots
       run: |
         echo "=== Taking History and Compare Feature Screenshots ==="
@@ -224,27 +214,11 @@ jobs:
           let mainGuiImage = '';
           let yangtzeImage = '';
           let stockPriceChartImage = '';
-          let strategyConfigImages = '';
           let historyImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
           const stockPriceChartPath = 'screenshots/stock_price_chart.png';
-          
-          // 策略配置截图路径
-          const strategyPaths = {
-            sma: 'screenshots/strategy_sma_config.png',
-            meanCost: 'screenshots/strategy_mean_cost_config.png',
-            fixedAmount: 'screenshots/strategy_fixed_amount_config.png'
-          };
-          
-          // 历史记录截图路径
-          const historyPaths = [
-            'screenshots/history_empty.png',
-            'screenshots/history_one_record.png',
-            'screenshots/history_selected.png',
-            'screenshots/compare_page.png'
-          ];
           
           // 历史记录功能截图路径
           const historyScreenshots = [
@@ -306,37 +280,6 @@ jobs:
             stockPriceChartImage = ''; // 股价图表是可选的，不显示警告
           }
           
-          // 处理策略配置截图
-          let strategyCount = 0;
-          for (const [name, path] of Object.entries(strategyPaths)) {
-            if (fs.existsSync(path)) {
-              strategyCount++;
-              if (uploaded && baseUrl) {
-                const filename = path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                strategyConfigImages += `![${name}策略配置](${imageUrl})\n\n`;
-              }
-            }
-          }
-          if (strategyCount === 0) {
-            strategyConfigImages = ''; // 策略配置截图是可选的
-          }
-          
-          // 处理历史记录截图
-          let historyCount = 0;
-          for (const path of historyPaths) {
-            if (fs.existsSync(path)) {
-              historyCount++;
-              if (uploaded && baseUrl) {
-                const filename = path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                const title = filename.replace('.png', '').replace(/_/g, ' ');
-                historyImages += `![${title}](${imageUrl})\n\n`;
-              }
-            }
-          }
-          if (historyCount === 0) {
-            historyImages = ''; // 历史记录截图是可选的
           // 处理历史记录功能截图
           let historyImagesList = [];
           for (const screenshot of historyScreenshots) {
@@ -399,9 +342,7 @@ jobs:
           
           ${mainGuiImage}
           
-          ${strategyConfigImages ? '### 🎯 策略参数配置界面\n\n' + strategyConfigImages : ''}
-          
-          ${historyImages ? '### 📚 历史记录与对比功能\n\n' + historyImages : ''}
+          ${historyImages}
           
           ${testResult}
           
@@ -416,7 +357,6 @@ jobs:
           - ✅ 验证双Y轴配置（左轴：总资产，右轴：股价）
           - ✅ 验证图表标签和Y轴标题
           - ✅ 自动化截图验证图表渲染
-          ${historyImages}
           
           ### 📁 完整报告
           
