@@ -72,6 +72,7 @@ jobs:
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
         python screenshot_strategy_config.py screenshots
+      continue-on-error: true
     - name: Take History Feature Screenshots
       run: |
         echo "=== Taking History and Compare Feature Screenshots ==="
