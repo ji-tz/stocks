@@ -51,7 +51,11 @@ def run_yangtze_power_test(
         print("=" * 60)
         print(f"指定股票: {symbol}")
     
-    print("股票定投集成测试 (2020-2022)")
+    # 格式化日期范围用于显示
+    start_display = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}" if len(start_date) == 8 else start_date
+    end_display = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}" if len(end_date) == 8 else end_date
+    
+    print(f"股票定投集成测试 ({start_display[:4]}-{end_display[:4]})")
     print("=" * 60)
     print(f"股票代码: {symbol}")
     print(f"测试期间: {start_date} - {end_date}")

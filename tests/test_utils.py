@@ -30,7 +30,9 @@ def get_random_stock_code(seed: Optional[int] = None, cache_dir: str = "data") -
     
     Args:
         seed: 随机种子，用于可重现的测试。如果为None，则使用真随机
-        cache_dir: 缓存目录路径，如果提供则只从有缓存的股票中选择
+        cache_dir: 缓存目录路径（相对于项目根目录或绝对路径）。
+                  如果目录存在，优先从有缓存的股票中选择；
+                  如果目录不存在或无缓存文件，则从完整股票池中选择
     
     Returns:
         股票代码字符串
