@@ -2,6 +2,20 @@
 
 一个基于 Python 的量化股票回测系统，集成了 Backtrader 策略和 AKShare 数据获取，支持Web界面操作和自动化CI/CD流程。
 
+[![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-orange.svg)](.github/workflows/)
+
+## ✨ 特色亮点
+
+- 🚀 **开箱即用**: 提供 Web 界面、命令行工具、Python API 三种使用方式
+- 📊 **多数据源**: 支持 AKShare、Baostock 自动切换，数据稳定可靠
+- 🎯 **策略灵活**: 内置 SMA、定投策略，支持自定义策略扩展
+- 🔍 **详细日志**: verbose 模式提供每日交易明细，便于调试分析
+- 🏗️ **架构清晰**: 分层设计，模拟交易引擎与实盘接口解耦，易于扩展
+- 🧪 **测试完善**: 单元测试、集成测试、CI/CD 全流程自动化
+- 📦 **打包发布**: 支持自动打包和 GitHub Release 发布
+
 ## 主要功能
 
 ### 1. 量化回测策略
@@ -116,10 +130,73 @@ stocks/
 
 ## 快速开始
 
-### 安装依赖
+### 前置要求
+
+- Python 3.12 或更高版本
+- pip 包管理器
+- （可选）Node.js（用于 Playwright 浏览器自动化）
+
+### 安装步骤
+
+1. **克隆仓库**
+   ```bash
+   git clone https://github.com/183965983/stocks.git
+   cd stocks
+   ```
+
+2. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+3. **（可选）安装 Playwright 浏览器**（如需截图功能）
+   ```bash
+   playwright install chromium
+   ```
+
+### 快速开始示例
+
+#### 方式1: 使用 Web 界面
 
 ```bash
-pip install -r requirements.txt
+python main.py
+```
+
+然后访问 http://127.0.0.1:5000 即可看到友好的 Web 操作界面。
+
+#### 方式2: 使用命令行工具
+
+快速运行定投策略回测：
+
+```bash
+# 回测长江电力（600900）从2020年开始的定投策略
+python run_mean_cost.py --symbol 600900 --start 20200101 --cash 100000
+```
+
+#### 方式3: 使用 Python API
+
+```python
+from simulator import Simulator
+from solver.mean_cost_strategy import MeanCostDecision
+import stocks
+
+# 初始化
+stocks.init()
+
+# 获取股票数据
+data = stocks.get_data(symbol="600900", start_date="20200101")
+
+# 创建模拟器和策略
+sim = Simulator(lot_size=100, init_cash=100000.0, verbose=True)
+strategy = MeanCostDecision()
+
+# 运行回测
+result = sim.simulate(df=data, strategy=strategy, symbol="600900")
+
+# 查看结果
+print(f"总交易次数: {result['trades']}")
+print(f"最终总资产: {result['total_value']:.2f}")
+print(f"收益率: {(result['total_value']/100000 - 1)*100:.2f}%")
 ```
 
 ### 运行Web界面
@@ -162,6 +239,62 @@ playwright install chromium
 # 运行截图脚本
 python screenshot_main.py screenshots/main_gui.png
 ```
+
+## 命令行工具
+
+### 定投策略回测 (run_mean_cost.py)
+
+直接从命令行运行定投策略回测：
+
+```bash
+# 基本用法（默认：600900长江电力，从2025年1月1日开始）
+python run_mean_cost.py
+
+# 自定义参数
+python run_mean_cost.py \
+  --symbol 600519 \          # 股票代码（贵州茅台）
+  --start 20200101 \         # 起始日期
+  --lot 100 \                # 每次交易手数
+  --cash 100000.0 \          # 初始资金
+  --source auto              # 数据源（auto/akshare/baostock）
+```
+
+**参数说明：**
+- `--symbol, -s`: 股票代码（默认：600900）
+- `--start`: 回测起始日期，格式YYYYMMDD（默认：20250101）
+- `--lot`: 每次交易手数（默认：100股）
+- `--cash`: 初始资金（默认：100000元）
+- `--source`: 数据源，可选 auto/akshare/baostock（默认：auto）
+
+**输出示例：**
+```python
+{'avg_cost': 23.45,
+ 'cash': 52340.00,
+ 'realized_pl': 1234.56,
+ 'shares': 2000,
+ 'total_value': 99240.00,
+ 'trades': 20,
+ 'unrealized_pl': 456.78}
+```
+
+### 演示脚本 (demo_simulator.py)
+
+展示 Simulator 模块的增强功能，包括详细日志、解耦架构等：
+
+```bash
+python demo_simulator.py
+```
+
+**演示内容：**
+1. **Simulator + verbose模式**: 显示每日详细交易日志
+2. **直接使用SimulatorEngine**: 展示底层API用法
+3. **架构说明**: 展示模块的解耦设计和可扩展性
+
+**特色功能：**
+- ✨ 详细的每日交易日志（开盘价、收盘价、操作、持仓、浮盈等）
+- 🏗️ 清晰的分层架构（BaseEngine → SimulatorEngine/RealEngine）
+- 🔄 向后兼容的高层接口
+- 📊 完整的交易报告和统计数据
 
 ## GitHub Actions 工作流
 
@@ -259,10 +392,182 @@ python screenshot_main.py screenshots/main_gui.png
 4. 编写集成测试
 5. 代码审查和优化
 
-## 许可证
+## 常见问题 (FAQ)
 
-[待添加]
+### Q1: 如何添加新的交易策略？
+
+在 `solver/` 目录下创建新的策略类，继承适当的基类并实现 `decide()` 方法：
+
+```python
+# solver/my_strategy.py
+class MyStrategy:
+    def decide(self, row):
+        """根据当前行数据决定买入或卖出"""
+        # 实现你的策略逻辑
+        if 满足买入条件:
+            return 'buy'
+        elif 满足卖出条件:
+            return 'sell'
+        return 'hold'
+```
+
+然后在测试文件中使用：
+
+```python
+from solver.my_strategy import MyStrategy
+from simulator import Simulator
+
+sim = Simulator(lot_size=100, init_cash=100000.0)
+strategy = MyStrategy()
+result = sim.simulate(df=data, strategy=strategy, symbol="600900")
+```
+
+### Q2: 支持哪些数据源？
+
+当前支持两个主要数据源：
+- **AKShare**: 国内股票数据，更新及时
+- **Baostock**: 历史数据完整，稳定性好
+
+使用 `source="auto"` 会自动选择可用的数据源，优先使用 AKShare。
+
+### Q3: 如何调试策略？
+
+使用 `verbose=True` 参数开启详细日志：
+
+```python
+sim = Simulator(lot_size=100, init_cash=100000.0, verbose=True)
+result = sim.simulate(df=data, strategy=strategy, verbose=True)
+```
+
+这会打印每日的详细交易信息，包括价格、操作、持仓、浮盈等。
+
+### Q4: CI/CD 工作流失败怎么办？
+
+1. **Lint失败**: 查看 Pylint/Flake8/Mypy 的错误信息，修复代码规范问题
+2. **Test失败**: 查看测试日志，确定失败的测试用例，本地复现并修复
+3. **截图失败**: 检查 Playwright 安装，确保 Flask 应用能正常启动
+
+查看 [.github/workflows/](/.github/workflows/) 下的工作流配置文件了解详情。
+
+### Q5: 如何贡献代码？
+
+请参考下方的"贡献指南"章节。
 
 ## 贡献指南
 
-欢迎提交Issue和Pull Request！
+欢迎提交 Issue 和 Pull Request！我们非常感谢社区的贡献。
+
+### 贡献流程
+
+1. **Fork 本仓库**
+   ```bash
+   # 在 GitHub 上点击 Fork 按钮
+   ```
+
+2. **克隆到本地**
+   ```bash
+   git clone https://github.com/你的用户名/stocks.git
+   cd stocks
+   ```
+
+3. **创建功能分支**
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+4. **安装开发依赖**
+   ```bash
+   pip install -r requirements.txt
+   playwright install chromium
+   ```
+
+5. **进行开发**
+   - 编写代码
+   - 添加/更新测试
+   - 确保测试通过
+   - 运行代码检查
+
+6. **运行测试和检查**
+   ```bash
+   # 运行所有测试
+   python -m unittest discover tests -v
+   
+   # 代码检查
+   pylint --rcfile=.pylintrc stocks.py main.py
+   flake8 .
+   mypy stocks.py main.py --config-file=mypy.ini
+   ```
+
+7. **提交更改**
+   ```bash
+   git add .
+   git commit -m "描述你的更改"
+   ```
+
+8. **推送到 GitHub**
+   ```bash
+   git push origin feature/your-feature-name
+   ```
+
+9. **创建 Pull Request**
+   - 在 GitHub 上打开你的 Fork
+   - 点击 "New Pull Request"
+   - 填写 PR 描述，说明你的更改
+   - 等待 CI/CD 自动测试通过
+   - 等待代码审查
+
+### 开发规范
+
+- **代码风格**: 遵循 PEP 8，使用 Pylint/Flake8 检查
+- **类型注解**: 尽可能添加类型注解，使用 Mypy 检查
+- **测试驱动**: 新功能需要配套单元测试
+- **中文注释**: 代码、注释、文档均使用中文
+- **模块化**: 保持代码模块化，单一职责原则
+- **向后兼容**: 尽量保持向后兼容性
+
+### 报告问题
+
+发现 Bug 或有功能建议？请创建 Issue：
+
+1. 使用清晰的标题
+2. 详细描述问题或建议
+3. 提供复现步骤（如果是 Bug）
+4. 提供环境信息（Python版本、操作系统等）
+5. 如果可能，提供最小可复现示例
+
+## 许可证
+
+本项目采用 **MIT License** 开源许可证。
+
+这意味着你可以自由地：
+- ✅ 使用本项目进行商业和非商业用途
+- ✅ 修改源代码
+- ✅ 分发原始或修改后的代码
+- ✅ 私有使用
+
+唯一的要求是：
+- 📝 保留原始的版权声明和许可证文本
+
+详见 [LICENSE](LICENSE) 文件（如果存在）。
+
+**免责声明**: 本项目仅供学习和研究使用，不构成任何投资建议。股市有风险，投资需谨慎。
+
+## 相关链接
+
+- 📖 [Simulator 架构文档](docs/SIMULATOR_ARCHITECTURE.md)
+- 🔄 [工作流详细说明](docs/WORKFLOW.md)
+- 🐛 [提交 Issue](https://github.com/183965983/stocks/issues)
+- 🔀 [提交 Pull Request](https://github.com/183965983/stocks/pulls)
+
+## 致谢
+
+本项目使用了以下优秀的开源项目：
+- [Backtrader](https://www.backtrader.com/) - 量化回测框架
+- [AKShare](https://github.com/akfamily/akshare) - 金融数据接口
+- [Baostock](http://baostock.com/) - 证券数据平台
+- [Flask](https://flask.palletsprojects.com/) - Web 框架
+- [Playwright](https://playwright.dev/) - 浏览器自动化
+- [Pandas](https://pandas.pydata.org/) - 数据分析库
+- [Matplotlib](https://matplotlib.org/) - 数据可视化
+
+感谢所有贡献者的支持！
