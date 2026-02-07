@@ -110,30 +110,59 @@
     </div>
     
     <div class="strategy-cards">
-      <div class="strategy-card" onclick="location.href='/strategy/sma'">
+      <div class="strategy-card" onclick="selectStrategy('sma', 'SMA')">
         <h3>📈 SMA 策略</h3>
         <p><strong>简单移动平均策略</strong></p>
         <p>基于移动平均线的趋势跟随策略。当价格突破均线时买入，跌破时卖出。</p>
         <p>✓ 趋势跟随 | ✓ 简单有效 | ✓ 适合单边行情</p>
-        <a href="/strategy/sma" class="btn">配置并运行 →</a>
+        <a href="#" onclick="event.preventDefault(); selectStrategy('sma', 'SMA');" class="btn">选择此策略 →</a>
       </div>
       
-      <div class="strategy-card" onclick="location.href='/strategy/mean_cost'">
+      <div class="strategy-card" onclick="selectStrategy('mean_cost', '均值成本')">
         <h3>💰 均值成本策略</h3>
         <p><strong>低买高卖策略</strong></p>
         <p>在价格低于平均成本时加仓，高于成本时减仓。适合震荡市场。</p>
         <p>✓ 摊低成本 | ✓ 逢低加仓 | ✓ 适合震荡行情</p>
-        <a href="/strategy/mean_cost" class="btn">配置并运行 →</a>
+        <a href="#" onclick="event.preventDefault(); selectStrategy('mean_cost', '均值成本');" class="btn">选择此策略 →</a>
       </div>
       
-      <div class="strategy-card" onclick="location.href='/strategy/fixed_amount'">
+      <div class="strategy-card" onclick="selectStrategy('fixed_amount', '定投')">
         <h3>🎯 定投策略</h3>
         <p><strong>固定金额投资策略</strong></p>
         <p>每天投入固定金额买入股票，平滑市场波动，适合长期投资。</p>
         <p>✓ 降低择时风险 | ✓ 平滑成本 | ✓ 适合长期持有</p>
-        <a href="/strategy/fixed_amount" class="btn">配置并运行 →</a>
+        <a href="#" onclick="event.preventDefault(); selectStrategy('fixed_amount', '定投');" class="btn">选择此策略 →</a>
       </div>
     </div>
+    
+    <script>
+      function selectStrategy(strategyType, strategyName) {
+        // 保存策略信息到后端session
+        fetch('/api/select_strategy', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ 
+            strategy_type: strategyType,
+            strategy_name: strategyName
+          })
+        })
+        .then(response => response.json())
+        .then(data => {
+          if (data.success) {
+            // 跳转到运行模式选择页面
+            window.location.href = '/select_mode';
+          } else {
+            alert('保存策略失败：' + (data.error || '未知错误'));
+          }
+        })
+        .catch(error => {
+          console.error('Error:', error);
+          alert('网络错误，请重试');
+        });
+      }
+    </script>
 
   </body>
 </html>
