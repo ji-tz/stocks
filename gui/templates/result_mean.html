@@ -58,9 +58,14 @@
           '{{ h.date }}',
         {% endfor %}
       ];
-      const data = [
+      const totalValueData = [
         {% for h in result.history %}
           {{ h.total_value }},
+        {% endfor %}
+      ];
+      const stockPriceData = [
+        {% for h in result.history %}
+          {{ h.last_price }},
         {% endfor %}
       ];
 
@@ -71,15 +76,52 @@
           labels: labels,
           datasets: [{
             label: '总资产',
-            data: data,
+            data: totalValueData,
             borderColor: 'rgb(75, 192, 192)',
+            backgroundColor: 'rgba(75, 192, 192, 0.1)',
             tension: 0.1,
-            pointRadius: 0
+            pointRadius: 0,
+            yAxisID: 'y'
+          }, {
+            label: '股价',
+            data: stockPriceData,
+            borderColor: 'rgb(255, 99, 132)',
+            backgroundColor: 'rgba(255, 99, 132, 0.1)',
+            tension: 0.1,
+            pointRadius: 0,
+            yAxisID: 'y1'
           }]
         },
         options: {
           responsive: true,
-          scales: { x: { display: true }, y: { display: true } }
+          interaction: {
+            mode: 'index',
+            intersect: false
+          },
+          scales: {
+            x: { display: true },
+            y: {
+              type: 'linear',
+              display: true,
+              position: 'left',
+              title: {
+                display: true,
+                text: '总资产（元）'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: '股价（元）'
+              },
+              grid: {
+                drawOnChartArea: false
+              }
+            }
+          }
         }
       });
     </script>
