@@ -140,6 +140,43 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('长江电力', body)
         self.assertIn('function validateDates', body)
 
+    def test_result_page_contains_stock_price_chart(self):
+        """测试复盘界面包含股价波动线（使用长江电力真实数据）"""
+        # 使用真实的长江电力数据进行测试
+        rv = self.client.post('/run', data={
+            'symbol': '600900',  # 长江电力
+            'strategy': 'mean_cost',
+            'start': '20230101',
+            'end': '20230131',  # 使用一个月的数据
+            'cash': '100000'
+        })
+        
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        
+        # 验证页面包含图表元素
+        self.assertIn('<canvas id="chart"', body)
+        
+        # 验证包含总资产数据数组
+        self.assertIn('totalValueData', body)
+        
+        # 验证包含股价数据数组
+        self.assertIn('stockPriceData', body)
+        
+        # 验证包含双Y轴配置
+        self.assertIn("yAxisID: 'y'", body)
+        self.assertIn("yAxisID: 'y1'", body)
+        
+        # 验证包含图表标签
+        self.assertIn('总资产', body)
+        self.assertIn('股价', body)
+        
+        # 验证Y轴标题
+        self.assertIn('总资产（元）', body)
+        self.assertIn('股价（元）', body)
+        
+        # 验证股票代码显示正确
+        self.assertIn('600900', body)
     def test_api_search_stock_by_code(self):
         """测试通过股票代码搜索API"""
         rv = self.client.get('/api/search_stock?query=600900')
