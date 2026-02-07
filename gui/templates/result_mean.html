@@ -69,12 +69,47 @@
         {% endfor %}
       ];
 
+      // 归一化处理：将股价和总资产都转换为以起点为100的百分比形式
+      // 这样两条曲线的起点就会在同一位置
+      const normalizedTotalValue = [];
+      const normalizedStockPrice = [];
+      
+      // 找到第一个有效的总资产值作为基准
+      const baseValue = totalValueData[0];
+      
+      // 找到第一个有效的股价作为基准
+      let basePrice = null;
+      for (let i = 0; i < stockPriceData.length; i++) {
+        if (stockPriceData[i] !== null) {
+          basePrice = stockPriceData[i];
+          break;
+        }
+      }
+      
+      // 归一化总资产数据
+      for (let i = 0; i < totalValueData.length; i++) {
+        normalizedTotalValue.push((totalValueData[i] / baseValue) * 100);
+      }
+      
+      // 归一化股价数据
+      if (basePrice !== null) {
+        for (let i = 0; i < stockPriceData.length; i++) {
+          if (stockPriceData[i] !== null) {
+            normalizedStockPrice.push((stockPriceData[i] / basePrice) * 100);
+          } else {
+            normalizedStockPrice.push(null);
+          }
+        }
+      }
+
       // 调试信息
       console.log('📊 图表数据检查:');
       console.log('总资产数据点数:', totalValueData.length);
       console.log('股价数据点数:', stockPriceData.length);
       console.log('前5个股价:', stockPriceData.slice(0, 5));
       console.log('非null股价数:', stockPriceData.filter(p => p !== null).length);
+      console.log('归一化后总资产起点:', normalizedTotalValue[0]);
+      console.log('归一化后股价起点:', normalizedStockPrice.find(p => p !== null));
 
       const ctx = document.getElementById('chart').getContext('2d');
       new Chart(ctx, {
@@ -82,21 +117,21 @@
         data: {
           labels: labels,
           datasets: [{
-            label: '总资产',
-            data: totalValueData,
+            label: '总资产变化',
+            data: normalizedTotalValue,
             borderColor: 'rgb(75, 192, 192)',
             backgroundColor: 'rgba(75, 192, 192, 0.1)',
             tension: 0.1,
             pointRadius: 0,
             yAxisID: 'y'
           }, {
-            label: '股价',
-            data: stockPriceData,
+            label: '股价变化',
+            data: normalizedStockPrice,
             borderColor: 'rgb(255, 99, 132)',
             backgroundColor: 'rgba(255, 99, 132, 0.1)',
             tension: 0.1,
             pointRadius: 0,
-            yAxisID: 'y1'
+            yAxisID: 'y'
           }]
         },
         options: {
@@ -104,6 +139,29 @@
           interaction: {
             mode: 'index',
             intersect: false
+          },
+          plugins: {
+            tooltip: {
+              callbacks: {
+                label: function(context) {
+                  const datasetLabel = context.dataset.label;
+                  const value = context.parsed.y;
+                  const index = context.dataIndex;
+                  
+                  // 显示归一化值和原始值
+                  if (datasetLabel.includes('总资产')) {
+                    return datasetLabel + ': ' + value.toFixed(2) + '% (原始: ' + totalValueData[index].toFixed(2) + ' 元)';
+                  } else {
+                    const originalPrice = stockPriceData[index];
+                    if (originalPrice !== null) {
+                      return datasetLabel + ': ' + value.toFixed(2) + '% (原始: ' + originalPrice.toFixed(2) + ' 元)';
+                    } else {
+                      return datasetLabel + ': 无数据';
+                    }
+                  }
+                }
+              }
+            }
           },
           scales: {
             x: { display: true },
@@ -113,19 +171,7 @@
               position: 'left',
               title: {
                 display: true,
-                text: '总资产（元）'
-              }
-            },
-            y1: {
-              type: 'linear',
-              display: true,
-              position: 'right',
-              title: {
-                display: true,
-                text: '股价（元）'
-              },
-              grid: {
-                drawOnChartArea: false
+                text: '相对变化（起点=100）'
               }
             }
           }

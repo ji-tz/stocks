@@ -163,17 +163,19 @@ class TestGuiRoutes(unittest.TestCase):
         # 验证包含股价数据数组
         self.assertIn('stockPriceData', body)
         
-        # 验证包含双Y轴配置
+        # 验证包含归一化数据数组
+        self.assertIn('normalizedTotalValue', body)
+        self.assertIn('normalizedStockPrice', body)
+        
+        # 验证两条曲线使用同一个Y轴
         self.assertIn("yAxisID: 'y'", body)
-        self.assertIn("yAxisID: 'y1'", body)
         
         # 验证包含图表标签
-        self.assertIn('总资产', body)
-        self.assertIn('股价', body)
+        self.assertIn('总资产变化', body)
+        self.assertIn('股价变化', body)
         
-        # 验证Y轴标题
-        self.assertIn('总资产（元）', body)
-        self.assertIn('股价（元）', body)
+        # 验证Y轴标题显示相对变化
+        self.assertIn('相对变化（起点=100）', body)
         
         # 验证股票代码显示正确
         self.assertIn('600900', body)
