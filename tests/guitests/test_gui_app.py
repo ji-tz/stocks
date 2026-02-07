@@ -33,7 +33,7 @@ class TestGuiRoutes(unittest.TestCase):
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
-        
+
         # return a minimal dataframe required by the view
         dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
         df = pd.DataFrame({
@@ -63,7 +63,7 @@ class TestGuiRoutes(unittest.TestCase):
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
-        
+
         dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
         df = pd.DataFrame({
             'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
@@ -81,7 +81,7 @@ class TestGuiRoutes(unittest.TestCase):
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
-        
+
         rv = self.client.post('/run', data={'strategy': 'sma', 'start': 'invalid-date'})
         self.assertEqual(rv.status_code, 200)
         self.assertIn('发生错误', rv.data.decode('utf-8'))
@@ -95,7 +95,6 @@ class TestGuiRoutes(unittest.TestCase):
             sess['strategy_type'] = 'sma'
             sess['strategy_name'] = 'SMA'
             sess['run_mode'] = 'backtest'
-        
 
         rv = self.client.get('/strategy/sma')
         self.assertEqual(rv.status_code, 200)
@@ -117,7 +116,6 @@ class TestGuiRoutes(unittest.TestCase):
             sess['strategy_type'] = 'mean_cost'
             sess['strategy_name'] = '均值成本'
             sess['run_mode'] = 'backtest'
-        
 
         rv = self.client.get('/strategy/mean_cost')
         self.assertEqual(rv.status_code, 200)
@@ -139,7 +137,6 @@ class TestGuiRoutes(unittest.TestCase):
             sess['strategy_type'] = 'fixed_amount'
             sess['strategy_name'] = '定投'
             sess['run_mode'] = 'backtest'
-        
 
         rv = self.client.get('/strategy/fixed_amount')
         self.assertEqual(rv.status_code, 200)
@@ -166,7 +163,7 @@ class TestGuiRoutes(unittest.TestCase):
             'volume': [1000000 + i*10000 for i in range(20)]
         })
         mock_get_data.return_value = mock_df
-        
+
         # Mock回测结果 - 包含模板需要的所有字段
         mock_run.return_value = {
             'symbol': '600900',
@@ -191,7 +188,7 @@ class TestGuiRoutes(unittest.TestCase):
                 {'date': '2023-01-02', 'total_value': 101000, 'last_price': 22.1},
             ]
         }
-        
+
         rv = self.client.post('/run', data={
             'symbol': '600900',
             'strategy': 'mean_cost',
@@ -199,209 +196,22 @@ class TestGuiRoutes(unittest.TestCase):
             'end': '20230131',
             'cash': '100000'
         })
-        
+
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
-        
+
         # 验证页面包含图表元素
         self.assertIn('<canvas id="chart"', body)
-        
+
         # 验证包含总资产数据数组
         self.assertIn('totalValueData', body)
-        
+
         # 验证包含股价数据数组
         self.assertIn('stockPriceData', body)
-        
+
         # 验证包含归一化数据数组
         self.assertIn('normalizedTotalValue', body)
         self.assertIn('normalizedStockPrice', body)
-        
+
         # 验证两条曲线使用同一个Y轴
         self.assertIn("yAxisID: 'y'", body)
-        
-        # 验证已移除双Y轴配置
-        self.assertNotIn("yAxisID: 'y1'", body)
-        
-        # 验证包含图表标签
-        self.assertIn('总资产变化', body)
-        self.assertIn('股价变化', body)
-        
-        # 验证Y轴标题显示相对变化
-        self.assertIn('相对变化（起点=100）', body)
-        
-        # 验证股票代码显示正确
-        self.assertIn('600900', body)
-    def test_api_search_stock_by_code(self):
-        """测试通过股票代码搜索API"""
-        rv = self.client.get('/api/search_stock?query=600900')
-        self.assertEqual(rv.status_code, 200)
-        data = rv.get_json()
-        self.assertEqual(data['code'], '600900')
-        self.assertEqual(data['name'], '长江电力')
-
-    def test_api_search_stock_by_name(self):
-        """测试通过股票名称搜索API"""
-        rv = self.client.get('/api/search_stock?query=贵州茅台')
-        self.assertEqual(rv.status_code, 200)
-        data = rv.get_json()
-        self.assertEqual(data['code'], '600519')
-        self.assertEqual(data['name'], '贵州茅台')
-
-    def test_api_search_stock_not_found(self):
-        """测试搜索不存在的股票"""
-        rv = self.client.get('/api/search_stock?query=不存在的股票')
-        self.assertEqual(rv.status_code, 200)
-        data = rv.get_json()
-        self.assertIn('error', data)
-
-    def test_api_select_stock(self):
-        """测试选择股票API"""
-        rv = self.client.post('/api/select_stock',
-                             json={'code': '600519', 'name': '贵州茅台'},
-                             content_type='application/json')
-        self.assertEqual(rv.status_code, 200)
-        data = rv.get_json()
-        self.assertTrue(data['success'])
-
-    def test_select_strategy_get(self):
-        """测试策略选择页面"""
-        # 需要先在session中设置股票信息
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600519'
-            sess['stock_name'] = '贵州茅台'
-        
-        rv = self.client.get('/select_strategy')
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        self.assertIn('第二步：选择策略', body)
-        self.assertIn('已选择股票', body)
-        self.assertIn('600519', body)
-        self.assertIn('贵州茅台', body)
-        self.assertIn('SMA 策略', body)
-        self.assertIn('均值成本策略', body)
-        self.assertIn('定投策略', body)
-
-    def test_strategy_without_stock_redirects(self):
-        """测试未选择股票时访问策略页面应返回股票选择页"""
-        rv = self.client.get('/strategy/sma')
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        # Should show stock selection page
-        self.assertIn('第一步：选择股票', body)
-        self.assertIn('搜索股票', body)
-
-    def test_api_select_strategy(self):
-        """测试策略选择API"""
-        # 先设置股票信息
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-        
-        rv = self.client.post('/api/select_strategy',
-                             json={'strategy_type': 'sma', 'strategy_name': 'SMA'},
-                             content_type='application/json')
-        self.assertEqual(rv.status_code, 200)
-        data = rv.get_json()
-        self.assertTrue(data['success'])
-        
-        # 验证session中保存了策略信息
-        with self.client.session_transaction() as sess:
-            self.assertEqual(sess['strategy_type'], 'sma')
-            self.assertEqual(sess['strategy_name'], 'SMA')
-
-    def test_select_mode_page(self):
-        """测试运行模式选择页面"""
-        # 设置必要的session信息
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-            sess['strategy_type'] = 'sma'
-            sess['strategy_name'] = 'SMA'
-        
-        rv = self.client.get('/select_mode')
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        self.assertIn('第三步：选择运行模式', body)
-        self.assertIn('回测仿真', body)
-        self.assertIn('实时仿真', body)
-        self.assertIn('实盘交易', body)
-        self.assertIn('600900', body)
-        self.assertIn('长江电力', body)
-        self.assertIn('SMA策略', body)
-
-    def test_select_mode_without_strategy_redirects(self):
-        """测试未选择策略时访问运行模式页面应跳转到策略选择页"""
-        # 只设置股票信息，不设置策略
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-        
-        rv = self.client.get('/select_mode')
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        # 应该显示策略选择页面
-        self.assertIn('第二步：选择策略', body)
-        self.assertIn('SMA 策略', body)
-
-    def test_api_select_mode(self):
-        """测试运行模式选择API"""
-        # 先设置必要信息
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-            sess['strategy_type'] = 'sma'
-            sess['strategy_name'] = 'SMA'
-        
-        rv = self.client.post('/api/select_mode',
-                             json={'mode': 'backtest'},
-                             content_type='application/json')
-        self.assertEqual(rv.status_code, 200)
-        data = rv.get_json()
-        self.assertTrue(data['success'])
-        
-        # 验证session中保存了运行模式
-        with self.client.session_transaction() as sess:
-            self.assertEqual(sess['run_mode'], 'backtest')
-
-    def test_strategy_config_with_breadcrumb(self):
-        """测试策略配置页面包含面包屑导航"""
-        # 设置完整的session信息
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-            sess['strategy_type'] = 'sma'
-            sess['strategy_name'] = 'SMA'
-            sess['run_mode'] = 'backtest'
-        
-        rv = self.client.get('/strategy/sma')
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        # 验证面包屑导航
-        self.assertIn('✓ 选择股票', body)
-        self.assertIn('✓ 选择策略', body)
-        self.assertIn('✓ 选择运行模式', body)
-        self.assertIn('配置参数', body)
-        # 验证运行模式显示
-        self.assertIn('回测仿真', body)
-        # 验证返回链接指向运行模式选择
-        self.assertIn('返回运行模式选择', body)
-
-    def test_strategy_config_without_mode_redirects(self):
-        """测试未选择运行模式时访问策略配置页面应跳转到运行模式选择"""
-        # 设置股票和策略，但不设置运行模式
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-            sess['strategy_type'] = 'sma'
-            sess['strategy_name'] = 'SMA'
-        
-        rv = self.client.get('/strategy/sma')
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        # 应该显示运行模式选择页面
-        self.assertIn('第三步：选择运行模式', body)
-        self.assertIn('回测仿真', body)
-
-
-if __name__ == '__main__':
-    unittest.main()

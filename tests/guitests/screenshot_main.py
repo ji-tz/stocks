@@ -14,8 +14,9 @@ from typing import Dict, Iterable, List, Optional
 
 from playwright.sync_api import sync_playwright
 
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 # 确保项目根目录在 sys.path
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT_DIR)
 
 DEFAULT_PORT = 5000
 DEFAULT_OUTPUT_DIR = "screenshots"
@@ -55,7 +56,7 @@ def _start_flask_server(port: int, max_retries: int = 15, retry_interval: float 
         [sys.executable, "-m", "gui.web"],
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
-        cwd=os.path.dirname(os.path.abspath(__file__)),
+        cwd=ROOT_DIR,
     )
 
     print("等待服务器启动...")
