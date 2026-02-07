@@ -14,6 +14,15 @@ from solver.mean_cost_strategy import MeanCostDecision
 class TestDividendAdjustment(unittest.TestCase):
     """测试分红除权场景"""
 
+    # 测试阈值常量
+    # 短期策略测试（10天数据）：价格涨幅约9%，策略会频繁交易
+    # 允许1%的容差，考虑策略可能在不利时机交易
+    MIN_VALUE_RATIO_SHORT_TERM = 0.99
+    
+    # 长期策略测试（250天数据）：价格涨幅约12.5%，策略会有更多交易机会
+    # 允许5%的容差，考虑更多的交易成本和市场波动
+    MIN_VALUE_RATIO_LONG_TERM = 0.95
+
     def setUp(self):
         """准备测试数据：模拟一个有分红的股票"""
         # 创建一个模拟的分红场景
@@ -63,15 +72,15 @@ class TestDividendAdjustment(unittest.TestCase):
         
         # 前复权数据应该显示合理收益（价格从10.1涨到11.0，约9%涨幅）
         # 考虑交易成本和策略特性，最终价值应该接近初始资金
-        # 允许-1%的容差（考虑策略可能在高点买入低点卖出的情况）
-        MIN_VALUE_RATIO = 0.99  # 允许最多1%的损失
         total_pl = result['realized_pl'] + result['unrealized_pl']
-        self.assertGreater(total_pl, result['init_cash'] * (MIN_VALUE_RATIO - 1), 
-                          f"使用前复权数据的收益不应该低于-{(1-MIN_VALUE_RATIO)*100:.0f}%")
+        min_pl = result['init_cash'] * (self.MIN_VALUE_RATIO_SHORT_TERM - 1)
+        self.assertGreater(total_pl, min_pl, 
+                          f"使用前复权数据的收益不应该低于{(1-self.MIN_VALUE_RATIO_SHORT_TERM)*100:.0f}%")
         
         # 最终总价值应该接近或大于初始资金
-        self.assertGreater(result['total_value'], result['init_cash'] * MIN_VALUE_RATIO,
-                          f"前复权数据：最终总价值应该至少是初始资金的{MIN_VALUE_RATIO*100:.0f}%")
+        min_value = result['init_cash'] * self.MIN_VALUE_RATIO_SHORT_TERM
+        self.assertGreater(result['total_value'], min_value,
+                          f"前复权数据：最终总价值应该至少是初始资金的{self.MIN_VALUE_RATIO_SHORT_TERM*100:.0f}%")
 
     def test_unadjusted_data_shows_incorrect_profit(self):
         """测试不复权数据会导致收益计算不准确（文档测试）
@@ -136,6 +145,10 @@ class TestDividendAdjustment(unittest.TestCase):
 
 class TestRealStockDividendScenario(unittest.TestCase):
     """测试真实股票的分红场景（使用mock数据）"""
+    
+    # 长期策略测试阈值：250天数据，价格涨幅约12.5%
+    # 允许5%的容差，考虑交易成本和市场波动
+    MIN_VALUE_RATIO_LONG_TERM = 0.95
 
     @patch('source.data_provider.AkshareProvider')
     def test_dividend_stock_with_adjusted_data(self, mock_provider_class):
@@ -196,10 +209,10 @@ class TestRealStockDividendScenario(unittest.TestCase):
         
         # 因为是上涨趋势（价格从20涨到~22.5，约12.5%涨幅），
         # 且使用均值成本策略（会在价格上涨时卖出获利），
-        # 考虑交易成本，最终价值应该至少保持在初始资金的95%以上
-        MIN_VALUE_RATIO = 0.95
-        self.assertGreater(result['total_value'], result['init_cash'] * MIN_VALUE_RATIO,
-                          f"在上涨趋势中，最终价值应该至少是初始资金的{MIN_VALUE_RATIO*100:.0f}%")
+        # 考虑交易成本和长期市场波动
+        min_value = result['init_cash'] * self.MIN_VALUE_RATIO_LONG_TERM
+        self.assertGreater(result['total_value'], min_value,
+                          f"在上涨趋势中，最终价值应该至少是初始资金的{self.MIN_VALUE_RATIO_LONG_TERM*100:.0f}%")
 
 
 if __name__ == '__main__':
