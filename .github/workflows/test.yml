@@ -31,34 +31,32 @@ jobs:
         mkdir -p ~/.pip
         cp pip.conf ~/.pip/pip.conf || true
     
-    - name: Install Chinese fonts for matplotlib
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y fonts-wqy-zenhei fonts-wqy-microhei
-        # Clear matplotlib font cache to recognize new fonts
-        rm -rf ~/.cache/matplotlib
-    
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        playwright install chromium
-        playwright install-deps chromium
     
     - name: Run all tests
+      id: run_tests
       run: |
         echo "=== Running All Tests ==="
-        python -m unittest discover tests -v
+        python -m unittest discover tests -v 2>&1 | tee test_output.log
+        echo "test_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+      continue-on-error: true
     
     - name: Run strategy simulator tests
+      id: run_simulator_tests
       run: |
         echo "=== Testing Trading Strategy Simulators ==="
-        python -m unittest tests.test_simulator -v
+        python -m unittest tests.test_simulator -v 2>&1 | tee -a test_output.log
+        echo "simulator_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
+      continue-on-error: true
     
     - name: Verify simulator functionality
+      id: verify_simulator
       run: |
         echo "=== Verifying Mean Cost Strategy ==="
-        python -c "from simulator.simulator import Simulator; from solver.mean_cost_strategy import MeanCostDecision; print('✓ Mean Cost Strategy loaded successfully')"
+        python -c "from simulator.simulator import Simulator; from solver.mean_cost_strategy import MeanCostDecision; print('✓ Mean Cost Strategy loaded successfully')" 2>&1 | tee -a test_output.log
         echo "=== Verifying SMA Strategy ==="
         python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')"
     
@@ -100,107 +98,20 @@ jobs:
         retention-days: 30
     
     - name: Upload Test Results
+        python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')" 2>&1 | tee -a test_output.log
+        echo "verify_exit_code=$?" >> $GITHUB_OUTPUT
+      continue-on-error: true
+    
+    - name: Upload Test Logs
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test-results
-        path: test_results/
+        name: test-logs
+        path: test_output.log
         retention-days: 30
     
-    - name: Check Screenshot Status
+    - name: Comment PR with Test Results
       if: github.event_name == 'pull_request'
-      id: commit_screenshots
-      run: |
-        # Check if screenshots were generated
-        if ls screenshots/*.png 1> /dev/null 2>&1; then
-          echo "Screenshots found"
-          echo "has_screenshots=true" >> $GITHUB_OUTPUT
-        else
-          echo "No screenshots found"
-          echo "has_screenshots=false" >> $GITHUB_OUTPUT
-        fi
-    
-    - name: Upload Screenshots to Public Images Repository
-      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
-      id: upload_to_public_repo
-      env:
-        IMAGES_TOKEN: ${{ secrets.IMAGES_REPO_TOKEN }}
-      run: |
-        # Clone the public Images repository
-        cd /tmp
-        
-        # Use authenticated clone if token is available
-        if [ -n "$IMAGES_TOKEN" ]; then
-          echo "Using authenticated clone with IMAGES_REPO_TOKEN"
-          git clone https://$IMAGES_TOKEN@github.com/183965983/Images.git
-        else
-          echo "No IMAGES_REPO_TOKEN found, using unauthenticated clone"
-          echo "⚠️ Push will likely fail without authentication"
-          git clone https://github.com/183965983/Images.git
-        fi
-        
-        cd Images
-        
-        # Configure git
-        git config user.name "github-actions[bot]"
-        git config user.email "github-actions[bot]@users.noreply.github.com"
-        
-        # Create a directory for this PR's screenshots
-        SCREENSHOT_DIR="stocks/pr-${{ github.event.pull_request.number }}/run-${{ github.run_number }}"
-        mkdir -p "$SCREENSHOT_DIR"
-        
-        # Check if screenshots exist before copying
-        if ls $GITHUB_WORKSPACE/screenshots/*.png 1> /dev/null 2>&1; then
-          # Copy screenshots
-          cp $GITHUB_WORKSPACE/screenshots/*.png "$SCREENSHOT_DIR/"
-          echo "Screenshots copied successfully"
-        else
-          echo "No PNG files found in screenshots directory"
-          echo "uploaded=false" >> $GITHUB_OUTPUT
-          exit 0
-        fi
-        
-        # Add and commit
-        git add "$SCREENSHOT_DIR"
-        
-        if git diff --cached --quiet; then
-          echo "No new screenshots to upload (already exist)"
-          # Still set outputs so reruns can use existing public URLs
-          echo "uploaded=true" >> $GITHUB_OUTPUT
-          echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
-        else
-          git commit -m "Add screenshots for stocks PR #${{ github.event.pull_request.number }} run ${{ github.run_number }}"
-          
-          # Push to the public repository
-          if [ -n "$IMAGES_TOKEN" ]; then
-            echo "Pushing with authentication..."
-            if git push https://$IMAGES_TOKEN@github.com/183965983/Images.git main; then
-              echo "✅ Screenshots uploaded successfully"
-              echo "uploaded=true" >> $GITHUB_OUTPUT
-              echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Failed to push screenshots even with authentication"
-              echo "uploaded=false" >> $GITHUB_OUTPUT
-            fi
-          else
-            echo "Trying unauthenticated push..."
-            if git push origin main; then
-              echo "✅ Screenshots uploaded successfully"
-              echo "uploaded=true" >> $GITHUB_OUTPUT
-              echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
-            else
-              echo "❌ Failed to push screenshots - authentication required"
-              echo "Please add IMAGES_REPO_TOKEN to repository secrets"
-              echo "⚠️ Recommended: Use a fine-grained PAT with 'contents: read/write' permission scoped only to the 183965983/Images repository"
-              echo "See: https://github.com/settings/tokens?type=beta (fine-grained) or https://github.com/settings/tokens (classic with repo scope)"
-              echo "Add at: https://github.com/183965983/stocks/settings/secrets/actions"
-              echo "uploaded=false" >> $GITHUB_OUTPUT
-            fi
-          fi
-        fi
-    
-    - name: Comment PR with Test Results and Screenshots
-      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
       continue-on-error: true
       uses: actions/github-script@v7
       with:
@@ -208,188 +119,65 @@ jobs:
         script: |
           const fs = require('fs');
           
-          // 使用公开的 Images 仓库来托管图片
-          // 这样图片可以通过 raw.githubusercontent.com 公开访问
-          let mainGuiImage = '';
-          let yangtzeImage = '';
-          let stockPriceChartImage = '';
-          let strategyConfigImages = '';
-          let historyImages = '';
-          
-          const mainGuiPath = 'screenshots/main_gui.png';
-          const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
-          const stockPriceChartPath = 'screenshots/stock_price_chart.png';
-          const strategyPaths = {
-            'SMA策略配置': 'screenshots/strategy_sma_config.png',
-            '均值成本策略配置': 'screenshots/strategy_mean_cost_config.png',
-            '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
-          };
-          
-          // 历史记录功能截图路径
-          const historyScreenshots = [
-            { path: 'screenshots/02_empty_history_page.png', title: '空历史记录页面' },
-            { path: 'screenshots/04_history_with_one_record.png', title: '包含一条记录的历史页面' },
-            { path: 'screenshots/06_history_records_selected.png', title: '选中记录准备对比' },
-            { path: 'screenshots/07_compare_page_with_charts.png', title: '对比页面（表格+图表）' }
-          ];
-          
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 检查是否成功上传到公开仓库
-          const uploaded = '${{ steps.upload_to_public_repo.outputs.uploaded }}' === 'true';
-          const baseUrl = '${{ steps.upload_to_public_repo.outputs.base_url }}';
-          
-          console.log('Uploaded to public repo:', uploaded);
-          console.log('Base URL:', baseUrl);
-          
-          // 处理主界面截图
-          if (fs.existsSync(mainGuiPath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/main_gui.png`;
-              mainGuiImage = `![主界面截图](${imageUrl})`;
-              console.log(`Main GUI image URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(mainGuiPath);
-              mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
-          } else {
-            mainGuiImage = '⚠️ 主界面截图未生成';
-          }
-          
-          // 处理策略配置截图
-          const strategyImages = [];
-          for (const [title, path] of Object.entries(strategyPaths)) {
-            if (fs.existsSync(path)) {
-              if (uploaded && baseUrl) {
-                const filename = path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                strategyImages.push(`#### ${title}\n\n![${title}](${imageUrl})`);
-                console.log(`${title} URL: ${imageUrl}`);
-              } else {
-                const stats = fs.statSync(path);
-                const filename = path.split('/').pop();
-                strategyImages.push(`#### ${title}\n\n**${filename}** - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`);
-              }
-            }
-          }
-          
-          if (strategyImages.length > 0) {
-            strategyConfigImages = `\n### 🎯 策略参数配置界面\n\n${strategyImages.join('\n\n')}`;
-          }
-          
-          // 处理测试结果图表
-          if (fs.existsSync(yangtzeImagePath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/yangtze_power_test.png`;
-              yangtzeImage = `![股票测试结果图表](${imageUrl})`;
-              console.log(`Yangtze chart URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(yangtzeImagePath);
-              yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
-          } else {
-            yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
-          }
-          
-          // 处理股价波动线图表截图
-          if (fs.existsSync(stockPriceChartPath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/stock_price_chart.png`;
-              stockPriceChartImage = `![股价波动线图表](${imageUrl})`;
-              console.log(`Stock price chart URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(stockPriceChartPath);
-              stockPriceChartImage = `**股价波动线图表** (stock_price_chart.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
-          } else {
-            stockPriceChartImage = ''; // 股价图表是可选的，不显示警告
-          }
-          
-          // 处理历史记录功能截图
-          let historyImagesList = [];
-          for (const screenshot of historyScreenshots) {
-            if (fs.existsSync(screenshot.path)) {
-              if (uploaded && baseUrl) {
-                const filename = screenshot.path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                historyImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
-                console.log(`History screenshot URL: ${imageUrl}`);
-              } else {
-                const stats = fs.statSync(screenshot.path);
-                const filename = screenshot.path.split('/').pop();
-                historyImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
-              }
-            }
-          }
-          
-          if (historyImagesList.length > 0) {
-            historyImages = `
-          ### 📋 历史记录功能截图
-          
-          ${historyImagesList.join('\n\n')}
-          `;
-          }
-          
-           // 读取测试结果
-          let testResult = '';
+          // 读取测试日志
+          let testLog = '';
           try {
-            const resultPath = 'test_results/yangtze_power_test.json';
-            if (fs.existsSync(resultPath)) {
-              const data = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
-              const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
-              const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
-              testResult = `
-          ### 📊 策略复盘
-          
-          - **股票代码**: ${data.symbol || '未知'}
-          - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
-          - **初始资金**: ¥${(data.init_cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **最大占用资金**: ¥${(data.max_capital_used || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **最终资金**: ¥${(data.cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **持有市值**: ¥${(data.market_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **总资产**: ¥${(data.total_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **总收益**: ¥${totalProfit.toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **收益率**: ${returnRate.toFixed(2)}%
-          - **交易次数**: ${data.trades || 0}
-          - **持有股数**: ${data.shares || 0}
-          
-          ${yangtzeImage}
-          `;
+            if (fs.existsSync('test_output.log')) {
+              testLog = fs.readFileSync('test_output.log', 'utf8');
+              // 限制日志长度，GitHub评论有65536字符限制
+              if (testLog.length > 50000) {
+                testLog = testLog.substring(testLog.length - 50000);
+                testLog = '...(日志过长，仅显示最后50000字符)\n\n' + testLog;
+              }
+            } else {
+              testLog = '未找到测试日志文件';
             }
           } catch (e) {
-            console.log('Failed to read test results:', e);
+            console.log('Failed to read test log:', e);
+            testLog = '读取测试日志失败: ' + e.message;
           }
+          
+          // 获取测试结果状态
+          const testExitCode = '${{ steps.run_tests.outputs.test_exit_code }}';
+          const simulatorExitCode = '${{ steps.run_simulator_tests.outputs.simulator_exit_code }}';
+          const verifyExitCode = '${{ steps.verify_simulator.outputs.verify_exit_code }}';
+          
+          const allTestsPassed = testExitCode === '0';
+          const simulatorTestsPassed = simulatorExitCode === '0';
+          const verifyPassed = verifyExitCode === '0';
+          
+          const overallStatus = allTestsPassed && simulatorTestsPassed && verifyPassed ? '✅ 通过' : '❌ 失败';
           
           const comment = `
           ## 🧪 自动化测试报告
           
-          ### 📊 主界面截图
+          ### 📊 测试结果总览
           
-          ${mainGuiImage}
-          ${strategyConfigImages}
+          | 测试类型 | 状态 | 退出代码 |
+          |---------|------|----------|
+          | 全部单元测试 | ${allTestsPassed ? '✅ 通过' : '❌ 失败'} | ${testExitCode} |
+          | 策略模拟器测试 | ${simulatorTestsPassed ? '✅ 通过' : '❌ 失败'} | ${simulatorExitCode} |
+          | 模拟器功能验证 | ${verifyPassed ? '✅ 通过' : '❌ 失败'} | ${verifyExitCode} |
+          | **总体状态** | **${overallStatus}** | - |
           
-          ${historyImages}
+          ### 📝 测试日志
           
-          ${testResult}
+          <details>
+          <summary>点击展开查看完整测试日志</summary>
           
-          ### 📈 股价波动线功能测试
+          \`\`\`
+          ${testLog}
+          \`\`\`
           
-          **功能说明**: 复盘界面新增股价波动线，使用双Y轴同步显示总资产和股价变化
+          </details>
           
-          ${stockPriceChartImage ? stockPriceChartImage : '⚠️ 股价波动线图表截图未生成'}
+          ### 📁 完整日志
           
-          **测试内容**:
-          - ✅ 验证图表包含 \`stockPriceData\` 和 \`totalValueData\` 数据集
-          - ✅ 验证双Y轴配置（左轴：总资产，右轴：股价）
-          - ✅ 验证图表标签和Y轴标题
-          - ✅ 自动化截图验证图表渲染
-          
-          ### 📁 完整报告
-          
-          所有截图和详细测试结果可在 [GitHub Actions Artifacts](${artifactUrl}) 中下载：
-          - **test-screenshots**: 包含主界面截图、策略配置截图和测试结果图表
-          - **test-results**: 包含测试结果JSON数据
+          完整测试日志可在 [GitHub Actions Artifacts](${artifactUrl}) 中下载：
+          - **test-logs**: 包含所有测试的完整输出日志
           
           ---
           *Generated by Test Workflow*

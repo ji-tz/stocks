@@ -37,11 +37,12 @@
 
 ### 4. 自动化工作流（CI/CD）
 
-项目采用三个独立的 GitHub Actions 工作流：
+项目采用四个独立的 GitHub Actions 工作流：
 
-- Lint：静态检查（Pylint / Flake8 / Mypy）
-- Test：单元测试 + 界面截图 + 集成测试 + PR 评论
-- Package：打包产物 + Release（tag）
+- **Lint**：静态检查（Pylint / Flake8 / Mypy）
+- **Test**：运行单元测试和集成测试，将测试日志评论到PR中
+- **Test GUI**：运行GUI截图测试，将界面截图评论到PR中
+- **Package**：打包产物 + Release（tag）
 
 详情见 [docs/WORKFLOW.md](docs/WORKFLOW.md)。
 
@@ -67,11 +68,12 @@ stocks/
 │   │   └── screenshot_main.py  # GUI截图脚本（统一入口）
 │   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 ├── data/                  # 本地数据缓存
-├── test_yangtze_power.py  # 股票集成测试（支持随机选择）
+├── screenshot_main.py     # GUI截图脚本（统一入口）
 └── .github/
     └── workflows/
         ├── lint.yml       # 代码检视工作流
-        ├── test.yml       # 测试工作流
+        ├── test.yml       # 单元测试和集成测试工作流
+        ├── testgui.yml    # GUI截图测试工作流
         └── package.yml    # 打包工作流
 ```
 
