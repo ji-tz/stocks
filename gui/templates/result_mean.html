@@ -81,7 +81,7 @@
       if (baseValue === null || baseValue === undefined || baseValue <= 0) {
         console.error('❌ 无效的基准总资产值:', baseValue);
         alert('数据错误：无法计算资产变化曲线');
-        throw new Error('Invalid base value for total assets');
+        throw new Error('数据错误：无法计算资产变化曲线');
       }
       
       // 找到第一个有效的股价作为基准
@@ -95,13 +95,17 @@
       
       // 验证股价基准值
       if (basePrice === null) {
-        console.warn('⚠️ 未找到有效的股价数据');
-        alert('警告：股价数据不可用，仅显示总资产曲线');
+        console.warn('⚠️ 未找到有效的股价数据，仅显示总资产曲线');
       }
       
       // 归一化总资产数据
       for (let i = 0; i < totalValueData.length; i++) {
-        normalizedTotalValue.push((totalValueData[i] / baseValue) * 100);
+        const value = totalValueData[i];
+        if (value !== null && value !== undefined) {
+          normalizedTotalValue.push((value / baseValue) * 100);
+        } else {
+          normalizedTotalValue.push(null);
+        }
       }
       
       // 归一化股价数据
