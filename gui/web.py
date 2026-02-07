@@ -1,6 +1,7 @@
 import os
 import sys
-from flask import Flask, render_template, request
+import json
+from flask import Flask, render_template, request, session, jsonify
 
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -8,31 +9,115 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import stocks
 
 app = Flask(__name__, template_folder='templates')
+app.secret_key = 'stocks-quantitative-backtest-secret-key-2024'  # 用于session加密
+
+
+def load_stock_list():
+    """加载股票列表映射"""
+    stock_file = os.path.join(os.path.dirname(__file__), 'stock_list.json')
+    with open(stock_file, 'r', encoding='utf-8') as f:
+        return json.load(f)
 
 
 @app.route('/', methods=['GET'])
 def index():
-    return render_template('index.html')
+    """首页：股票选择"""
+    return render_template('select_stock.html')
+
+
+@app.route('/api/search_stock', methods=['GET'])
+def search_stock():
+    """搜索股票API"""
+    query = request.args.get('query', '').strip()
+    if not query:
+        return jsonify({'error': '请输入股票代码或名称'})
+    
+    stock_list = load_stock_list()
+    
+    # 精确匹配股票代码
+    for stock in stock_list:
+        if stock['code'] == query:
+            return jsonify({'code': stock['code'], 'name': stock['name']})
+    
+    # 精确匹配股票名称
+    for stock in stock_list:
+        if stock['name'] == query:
+            return jsonify({'code': stock['code'], 'name': stock['name']})
+    
+    return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
+
+
+@app.route('/api/select_stock', methods=['POST'])
+def select_stock():
+    """选择股票API"""
+    data = request.get_json()
+    code = data.get('code')
+    name = data.get('name')
+    
+    if not code or not name:
+        return jsonify({'success': False, 'error': '股票代码和名称不能为空'})
+    
+    # 保存到session
+    session['stock_code'] = code
+    session['stock_name'] = name
+    
+    return jsonify({'success': True})
+
+
+@app.route('/select_strategy', methods=['GET'])
+def select_strategy():
+    """策略选择页面"""
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    
+    if not stock_code or not stock_name:
+        # 如果没有选择股票，跳转回首页
+        return render_template('select_stock.html')
+    
+    return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/strategy/sma', methods=['GET'])
 def strategy_sma():
-    return render_template('strategy_sma.html')
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    
+    if not stock_code or not stock_name:
+        return render_template('select_stock.html')
+    
+    return render_template('strategy_sma.html', stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/strategy/mean_cost', methods=['GET'])
 def strategy_mean_cost():
-    return render_template('strategy_mean_cost.html')
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    
+    if not stock_code or not stock_name:
+        return render_template('select_stock.html')
+    
+    return render_template('strategy_mean_cost.html', stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/strategy/fixed_amount', methods=['GET'])
 def strategy_fixed_amount():
-    return render_template('strategy_fixed_amount.html')
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    
+    if not stock_code or not stock_name:
+        return render_template('select_stock.html')
+    
+    return render_template('strategy_fixed_amount.html', stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/run', methods=['POST'])
 def run():
-    symbol = request.form.get('symbol', '600900').strip()
+    # 从session获取股票信息
+    symbol = session.get('stock_code')
+    if not symbol:
+        # 如果session中没有股票信息，回退到从表单获取（向后兼容）
+        symbol = request.form.get('symbol', '600900').strip()
+    
     source = request.form.get('source', 'auto')
     strategy = request.form.get('strategy', 'sma')
     lot = int(request.form.get('lot') or 100)
