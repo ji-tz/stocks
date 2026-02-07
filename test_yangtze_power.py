@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 """
-长江电力（600900）2020-2022定投集成测试
+股票定投集成测试（支持随机股票选择）
 测试定投策略在实际股票上的表现
+默认随机从股票池中选择，也可指定特定股票代码
 """
 import os
 import sys
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # 确保项目根目录在 sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from simulator.simulator import simulate_mean_cost
+from tests.test_utils import get_random_stock_code
 import matplotlib
 matplotlib.use('Agg')  # 使用非交互式后端
 import matplotlib.pyplot as plt
@@ -19,7 +21,7 @@ import pandas as pd
 
 
 def run_yangtze_power_test(
-    symbol: str = "600900",
+    symbol: Optional[str] = None,
     start_date: str = "20200101",
     end_date: str = "20221231",
     lot_size: int = 100,
@@ -27,10 +29,10 @@ def run_yangtze_power_test(
     source: str = "auto"
 ) -> Dict[str, Any]:
     """
-    运行长江电力定投测试
+    运行股票定投测试（支持随机选择）
     
     Args:
-        symbol: 股票代码，默认 600900 (长江电力)
+        symbol: 股票代码，如果为None则随机选择
         start_date: 开始日期
         end_date: 结束日期
         lot_size: 每手股数
@@ -40,8 +42,20 @@ def run_yangtze_power_test(
     Returns:
         测试结果字典
     """
-    print("=" * 60)
-    print("长江电力（600900）2020-2022定投集成测试")
+    # 如果未指定股票代码，随机选择
+    if symbol is None:
+        symbol = get_random_stock_code()
+        print("=" * 60)
+        print(f"随机选择股票: {symbol}")
+    else:
+        print("=" * 60)
+        print(f"指定股票: {symbol}")
+    
+    # 格式化日期范围用于显示
+    start_display = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}" if len(start_date) == 8 else start_date
+    end_display = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}" if len(end_date) == 8 else end_date
+    
+    print(f"股票定投集成测试 ({start_display} - {end_display})")
     print("=" * 60)
     print(f"股票代码: {symbol}")
     print(f"测试期间: {start_date} - {end_date}")
@@ -141,7 +155,8 @@ def save_result_chart(result: Dict[str, Any], output_path: str = "screenshots/ya
         ax1.axhline(y=result.get('init_cash', 0), color='r', linestyle='--', label='初始资金')
         ax1.set_xlabel('日期', fontsize=12)
         ax1.set_ylabel('资产价值 (¥)', fontsize=12)
-        ax1.set_title('长江电力（600900）定投资产变化 (2020-2022)', fontsize=14, fontweight='bold')
+        symbol_display = result.get('symbol', 'Unknown')
+        ax1.set_title(f'{symbol_display} 定投资产变化 (2020-2022)', fontsize=14, fontweight='bold')
         ax1.legend(fontsize=10)
         ax1.grid(True, alpha=0.3)
         ax1.ticklabel_format(style='plain', axis='y')
@@ -205,7 +220,7 @@ if __name__ == "__main__":
         save_result_chart(result)
         save_result_json(result)
         
-        print("\n✓ 长江电力定投集成测试完成!")
+        print("\n✓ 股票定投集成测试完成!")
         
         # 返回成功退出码
         sys.exit(0)

@@ -62,7 +62,7 @@
    - 脚本：`screenshot_main.py`
 
 3. **集成测试**
-   - 长江电力（600900）定投回测测试
+   - 股票定投回测测试（随机从股票池中选择）
    - 测试期间：2020-2022年
    - 生成收益图表和统计数据
 
@@ -120,7 +120,7 @@ stocks/
 ├── tests/                 # 单元测试
 ├── data/                  # 本地数据缓存
 ├── screenshot_main.py     # 主界面截图脚本
-├── test_yangtze_power.py  # 长江电力集成测试
+├── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 └── .github/
     └── workflows/
         ├── lint.yml       # 代码检视工作流
@@ -213,8 +213,11 @@ python main.py
 # 运行所有测试
 python -m unittest discover tests -v
 
-# 运行长江电力集成测试
+# 运行股票集成测试（随机选择）
 python test_yangtze_power.py
+
+# 运行股票集成测试（指定股票）
+python -c "from test_yangtze_power import run_yangtze_power_test; run_yangtze_power_test(symbol='600900')"
 ```
 
 ### 代码检查
@@ -324,7 +327,7 @@ python demo_simulator.py
 测试内容：
 1. **单元测试** - 所有 tests/ 下的测试用例
 2. **策略测试** - 交易策略模拟器测试
-3. **集成测试** - 长江电力定投回测（2020-2022）
+3. **集成测试** - 股票定投回测（随机选择，2020-2022）
 4. **界面测试** - 主界面自动截图
 
 输出产物：
