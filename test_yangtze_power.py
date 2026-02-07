@@ -7,7 +7,7 @@
 import os
 import sys
 import json
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 # 确保项目根目录在 sys.path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -21,7 +21,7 @@ import pandas as pd
 
 
 def run_yangtze_power_test(
-    symbol: str = None,
+    symbol: Optional[str] = None,
     start_date: str = "20200101",
     end_date: str = "20221231",
     lot_size: int = 100,
@@ -55,7 +55,7 @@ def run_yangtze_power_test(
     start_display = f"{start_date[:4]}-{start_date[4:6]}-{start_date[6:]}" if len(start_date) == 8 else start_date
     end_display = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:]}" if len(end_date) == 8 else end_date
     
-    print(f"股票定投集成测试 ({start_display[:4]}-{end_display[:4]})")
+    print(f"股票定投集成测试 ({start_display} - {end_display})")
     print("=" * 60)
     print(f"股票代码: {symbol}")
     print(f"测试期间: {start_date} - {end_date}")

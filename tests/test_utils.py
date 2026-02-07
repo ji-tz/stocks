@@ -37,8 +37,8 @@ def get_random_stock_code(seed: Optional[int] = None, cache_dir: str = "data") -
     Returns:
         股票代码字符串
     """
-    if seed is not None:
-        random.seed(seed)
+    # 使用局部 RNG 避免污染全局随机状态
+    rng = random.Random(seed)
     
     # 检查是否有缓存目录，如果有，优先从有缓存的股票中选择
     if cache_dir and os.path.isdir(cache_dir):
@@ -50,10 +50,10 @@ def get_random_stock_code(seed: Optional[int] = None, cache_dir: str = "data") -
         
         # 如果有缓存的股票，从中随机选择
         if cached_stocks:
-            return random.choice(cached_stocks)
+            return rng.choice(cached_stocks)
     
     # 否则从完整股票池中随机选择
-    return random.choice(STOCK_POOL)
+    return rng.choice(STOCK_POOL)
 
 
 def get_stock_pool() -> List[str]:
