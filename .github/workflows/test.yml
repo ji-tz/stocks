@@ -74,6 +74,18 @@ jobs:
         python test_yangtze_power.py
       continue-on-error: true
     
+    - name: Test Stock Price Chart Feature
+      run: |
+        echo "=== Testing Stock Price Volatility Line Feature ==="
+        python -m unittest tests.test_gui_app.TestGuiRoutes.test_result_page_contains_stock_price_chart -v
+      continue-on-error: true
+    
+    - name: Take Stock Price Chart Screenshot
+      run: |
+        echo "=== Taking Stock Price Chart Screenshot ==="
+        python screenshot_stock_price_chart.py screenshots/stock_price_chart.png
+      continue-on-error: true
+    
     - name: Upload Screenshots
       if: always()
       uses: actions/upload-artifact@v4
@@ -195,9 +207,11 @@ jobs:
           // 这样图片可以通过 raw.githubusercontent.com 公开访问
           let mainGuiImage = '';
           let yangtzeImage = '';
+          let stockPriceChartImage = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
+          const stockPriceChartPath = 'screenshots/stock_price_chart.png';
           
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
@@ -235,6 +249,20 @@ jobs:
             }
           } else {
             yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
+          }
+          
+          // 处理股价波动线图表截图
+          if (fs.existsSync(stockPriceChartPath)) {
+            if (uploaded && baseUrl) {
+              const imageUrl = `${baseUrl}/stock_price_chart.png`;
+              stockPriceChartImage = `![股价波动线图表](${imageUrl})`;
+              console.log(`Stock price chart URL: ${imageUrl}`);
+            } else {
+              const stats = fs.statSync(stockPriceChartPath);
+              stockPriceChartImage = `**股价波动线图表** (stock_price_chart.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
+            }
+          } else {
+            stockPriceChartImage = ''; // 股价图表是可选的，不显示警告
           }
           
            // 读取测试结果
@@ -275,6 +303,18 @@ jobs:
           ${mainGuiImage}
           
           ${testResult}
+          
+          ### 📈 股价波动线功能测试
+          
+          **功能说明**: 复盘界面新增股价波动线，使用双Y轴同步显示总资产和股价变化
+          
+          ${stockPriceChartImage ? stockPriceChartImage : '⚠️ 股价波动线图表截图未生成'}
+          
+          **测试内容**:
+          - ✅ 验证图表包含 \`stockPriceData\` 和 \`totalValueData\` 数据集
+          - ✅ 验证双Y轴配置（左轴：总资产，右轴：股价）
+          - ✅ 验证图表标签和Y轴标题
+          - ✅ 自动化截图验证图表渲染
           
           ### 📁 完整报告
           
