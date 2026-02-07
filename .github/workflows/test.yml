@@ -86,6 +86,7 @@ jobs:
     - name: Commit Screenshots to PR Branch
       if: github.event_name == 'pull_request'
       id: commit_screenshots
+      continue-on-error: true
       run: |
         git config user.name "github-actions[bot]"
         git config user.email "github-actions[bot]@users.noreply.github.com"
@@ -103,48 +104,181 @@ jobs:
         
         # Commit and push to current PR branch
         if [ "$HAS_CHANGES" = true ]; then
-          git commit -m "Add test screenshots from CI run ${{ github.run_number }} [skip ci]"
-          # Push using the head ref to handle detached HEAD state
-          git push origin HEAD:${{ github.head_ref }}
-          echo "has_screenshots=true" >> $GITHUB_OUTPUT
-          echo "Waiting for GitHub to process commit..."
-          sleep 10
+          # Check if there are actual changes to commit
+          if git diff --cached --quiet; then
+            echo "Files already committed, skipping commit"
+            echo "has_screenshots=true" >> $GITHUB_OUTPUT
+          else
+            # Attempt to commit
+            if git commit -m "Add test screenshots from CI run ${{ github.run_number }} [skip ci]"; then
+              echo "Commit successful"
+              # Push using the head ref to handle detached HEAD state
+              if git push origin HEAD:${{ github.head_ref }}; then
+                echo "Push successful"
+                echo "has_screenshots=true" >> $GITHUB_OUTPUT
+                echo "Waiting for GitHub to process commit..."
+                sleep 10
+              else
+                echo "⚠️ Warning: Push failed, screenshots not committed to PR branch"
+                echo "Screenshots will still be available in artifacts"
+                echo "has_screenshots=true" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "⚠️ Warning: Commit failed"
+              echo "has_screenshots=true" >> $GITHUB_OUTPUT
+            fi
+          fi
         else
           echo "No screenshots to commit"
           echo "has_screenshots=false" >> $GITHUB_OUTPUT
         fi
     
+    - name: Debug - Check screenshots and outputs
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "=== Debugging Screenshot Status ==="
+        echo "Event name: ${{ github.event_name }}"
+        echo "Has screenshots output: ${{ steps.commit_screenshots.outputs.has_screenshots }}"
+        echo "Files in screenshots directory:"
+        ls -la screenshots/ || echo "No screenshots directory"
+        echo "Git status:"
+        git status
+    
+    - name: Upload Screenshots to Public Images Repository
+      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
+      id: upload_to_public_repo
+      env:
+        IMAGES_TOKEN: ${{ secrets.IMAGES_REPO_TOKEN }}
+      run: |
+        # Clone the public Images repository
+        cd /tmp
+        
+        # Use authenticated clone if token is available
+        if [ -n "$IMAGES_TOKEN" ]; then
+          echo "Using authenticated clone with IMAGES_REPO_TOKEN"
+          git clone https://$IMAGES_TOKEN@github.com/183965983/Images.git
+        else
+          echo "No IMAGES_REPO_TOKEN found, using unauthenticated clone"
+          echo "⚠️ Push will likely fail without authentication"
+          git clone https://github.com/183965983/Images.git
+        fi
+        
+        cd Images
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create a directory for this PR's screenshots
+        SCREENSHOT_DIR="stocks/pr-${{ github.event.pull_request.number }}/run-${{ github.run_number }}"
+        mkdir -p "$SCREENSHOT_DIR"
+        
+        # Check if screenshots exist before copying
+        if ls $GITHUB_WORKSPACE/screenshots/*.png 1> /dev/null 2>&1; then
+          # Copy screenshots
+          cp $GITHUB_WORKSPACE/screenshots/*.png "$SCREENSHOT_DIR/"
+          echo "Screenshots copied successfully"
+        else
+          echo "No PNG files found in screenshots directory"
+          echo "uploaded=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
+        
+        # Add and commit
+        git add "$SCREENSHOT_DIR"
+        
+        if git diff --cached --quiet; then
+          echo "No new screenshots to upload (already exist)"
+          # Still set outputs so reruns can use existing public URLs
+          echo "uploaded=true" >> $GITHUB_OUTPUT
+          echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
+        else
+          git commit -m "Add screenshots for stocks PR #${{ github.event.pull_request.number }} run ${{ github.run_number }}"
+          
+          # Push to the public repository
+          if [ -n "$IMAGES_TOKEN" ]; then
+            echo "Pushing with authentication..."
+            if git push https://$IMAGES_TOKEN@github.com/183965983/Images.git main; then
+              echo "✅ Screenshots uploaded successfully"
+              echo "uploaded=true" >> $GITHUB_OUTPUT
+              echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Failed to push screenshots even with authentication"
+              echo "uploaded=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Trying unauthenticated push..."
+            if git push origin main; then
+              echo "✅ Screenshots uploaded successfully"
+              echo "uploaded=true" >> $GITHUB_OUTPUT
+              echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
+            else
+              echo "❌ Failed to push screenshots - authentication required"
+              echo "Please add IMAGES_REPO_TOKEN to repository secrets"
+              echo "⚠️ Recommended: Use a fine-grained PAT with 'contents: read/write' permission scoped only to the 183965983/Images repository"
+              echo "See: https://github.com/settings/tokens?type=beta (fine-grained) or https://github.com/settings/tokens (classic with repo scope)"
+              echo "Add at: https://github.com/183965983/stocks/settings/secrets/actions"
+              echo "uploaded=false" >> $GITHUB_OUTPUT
+            fi
+          fi
+        fi
+    
     - name: Comment PR with Test Results and Screenshots
       if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
+      continue-on-error: true
       uses: actions/github-script@v7
       with:
+        github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
-          const path = require('path');
           
-          // 准备截图链接 - 使用当前 PR 分支的 raw 内容链接
+          // 使用公开的 Images 仓库来托管图片
+          // 这样图片可以通过 raw.githubusercontent.com 公开访问
           let mainGuiImage = '';
           let yangtzeImage = '';
           
-          const branch = context.payload.pull_request.head.ref;
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
           
-          const baseUrl = `https://raw.githubusercontent.com/${context.repo.owner}/${context.repo.repo}/${branch}`;
+          const runId = context.runId;
+          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
+          // 检查是否成功上传到公开仓库
+          const uploaded = '${{ steps.upload_to_public_repo.outputs.uploaded }}' === 'true';
+          const baseUrl = '${{ steps.upload_to_public_repo.outputs.base_url }}';
+          
+          console.log('Uploaded to public repo:', uploaded);
+          console.log('Base URL:', baseUrl);
+          
+          // 处理主界面截图
           if (fs.existsSync(mainGuiPath)) {
-            mainGuiImage = `![主界面截图](${baseUrl}/screenshots/main_gui.png?raw=true&t=${Date.now()})`;
+            if (uploaded && baseUrl) {
+              const imageUrl = `${baseUrl}/main_gui.png`;
+              mainGuiImage = `![主界面截图](${imageUrl})`;
+              console.log(`Main GUI image URL: ${imageUrl}`);
+            } else {
+              const stats = fs.statSync(mainGuiPath);
+              mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
+            }
           } else {
-            mainGuiImage = '⚠️ 主界面截图未生成。';
+            mainGuiImage = '⚠️ 主界面截图未生成';
           }
           
+          // 处理测试结果图表
           if (fs.existsSync(yangtzeImagePath)) {
-            yangtzeImage = `![长江电力测试结果图表](${baseUrl}/screenshots/yangtze_power_test.png?raw=true&t=${Date.now()})`;
+            if (uploaded && baseUrl) {
+              const imageUrl = `${baseUrl}/yangtze_power_test.png`;
+              yangtzeImage = `![长江电力测试结果图表](${imageUrl})`;
+              console.log(`Yangtze chart URL: ${imageUrl}`);
+            } else {
+              const stats = fs.statSync(yangtzeImagePath);
+              yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
+            }
           } else {
-            yangtzeImage = '⚠️ 测试结果图表未生成。';
+            yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
           }
           
-          // 读取测试结果
+           // 读取测试结果
           let testResult = '';
           try {
             const resultPath = 'test_results/yangtze_power_test.json';
@@ -153,7 +287,7 @@ jobs:
               const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
               const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
               testResult = `
-          ## 长江电力（600900）2020-2022定投测试结果
+          ### 📈 长江电力（600900）2020-2022定投测试结果
           
           - **股票代码**: ${data.symbol || '600900'}
           - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
@@ -172,9 +306,6 @@ jobs:
           } catch (e) {
             console.log('Failed to read test results:', e);
           }
-          
-          const runId = context.runId;
-          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
           const comment = `
           ## 🧪 自动化测试报告
@@ -195,9 +326,20 @@ jobs:
           *Generated by Test Workflow*
           `;
           
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: comment
-          });
+          console.log('Attempting to create PR comment...');
+          console.log('Issue number:', context.issue.number);
+          console.log('Owner:', context.repo.owner);
+          console.log('Repo:', context.repo.repo);
+          
+          try {
+            const response = await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+            console.log('Comment created successfully:', response.data.html_url);
+          } catch (error) {
+            console.error('Failed to create comment:', error);
+            throw error;
+          }
