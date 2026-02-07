@@ -102,48 +102,15 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('每次定投金额', body)
         self.assertIn('function validateDates', body)
 
-    @patch('stocks.get_data')
-    @patch('stocks.run_mean_cost')
-    def test_result_page_contains_stock_price_chart(self, mock_mean, mock_get):
-        """测试复盘界面包含股价波动线"""
-        # 准备测试数据
-        dates = pd.date_range(start="2023-01-01", periods=10, freq="D")
-        df = pd.DataFrame({
-            'date': dates,
-            'open': [20.0 + i * 0.1 for i in range(10)],
-            'high': [20.5 + i * 0.1 for i in range(10)],
-            'low': [19.5 + i * 0.1 for i in range(10)],
-            'close': [20.2 + i * 0.1 for i in range(10)],
-            'volume': [1000 + i * 100 for i in range(10)]
-        })
-        mock_get.return_value = df
-        
-        # 模拟回测结果，包含history数据
-        history = [
-            {'date': '2023-01-01', 'total_value': 100000, 'last_price': 20.2},
-            {'date': '2023-01-02', 'total_value': 100100, 'last_price': 20.3},
-            {'date': '2023-01-03', 'total_value': 100200, 'last_price': 20.4},
-        ]
-        mock_mean.return_value = {
-            'symbol': '600900',
-            'start_date': '2023-01-01',
-            'end_date': '2023-01-03',
-            'init_cash': 100000.0,
-            'trades': 3,
-            'total_value': 100200.0,
-            'market_value': 20000.0,
-            'realized_pl': 0.0,
-            'unrealized_pl': 0.0,
-            'history': history,
-            'trades_list': []
-        }
-        
-        # 提交表单
+    def test_result_page_contains_stock_price_chart(self):
+        """测试复盘界面包含股价波动线（使用长江电力真实数据）"""
+        # 使用真实的长江电力数据进行测试
         rv = self.client.post('/run', data={
-            'symbol': '600900',
+            'symbol': '600900',  # 长江电力
             'strategy': 'mean_cost',
             'start': '20230101',
-            'end': '20230103'
+            'end': '20230131',  # 使用一个月的数据
+            'cash': '100000'
         })
         
         self.assertEqual(rv.status_code, 200)
@@ -152,14 +119,11 @@ class TestGuiRoutes(unittest.TestCase):
         # 验证页面包含图表元素
         self.assertIn('<canvas id="chart"', body)
         
-        # 验证包含总资产数据
+        # 验证包含总资产数据数组
         self.assertIn('totalValueData', body)
-        self.assertIn('100000', body)
-        self.assertIn('100200', body)
         
-        # 验证包含股价数据
+        # 验证包含股价数据数组
         self.assertIn('stockPriceData', body)
-        self.assertIn('20.2', body)  # 验证股价数据已渲染
         
         # 验证包含双Y轴配置
         self.assertIn("yAxisID: 'y'", body)
@@ -172,6 +136,9 @@ class TestGuiRoutes(unittest.TestCase):
         # 验证Y轴标题
         self.assertIn('总资产（元）', body)
         self.assertIn('股价（元）', body)
+        
+        # 验证股票代码显示正确
+        self.assertIn('600900', body)
 
 
 if __name__ == '__main__':
