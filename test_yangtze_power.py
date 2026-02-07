@@ -101,19 +101,34 @@ def save_result_chart(result: Dict[str, Any], output_path: str = "screenshots/ya
     import matplotlib.font_manager as fm
     
     # 尝试使用中文字体，如果不可用则使用系统默认字体
-    chinese_fonts = ['SimHei', 'Microsoft YaHei', 'Arial Unicode MS', 'WenQuanYi Micro Hei']
+    # 按优先级列出常见中文字体：Windows、macOS、Linux
+    chinese_fonts = [
+        'SimHei',                    # Windows 黑体
+        'Microsoft YaHei',           # Windows 微软雅黑
+        'STHeiti',                   # macOS 黑体
+        'Arial Unicode MS',          # macOS
+        'WenQuanYi Zen Hei',        # Linux 文泉驿正黑
+        'WenQuanYi Micro Hei',      # Linux 文泉驿微米黑
+        'Noto Sans CJK SC',         # Linux Noto 思源黑体
+        'Droid Sans Fallback',      # Android/Linux
+    ]
+    
     available_font = None
+    all_font_names = [f.name for f in fm.fontManager.ttflist]
+    
     for font in chinese_fonts:
-        if font in [f.name for f in fm.fontManager.ttflist]:
+        if font in all_font_names:
             available_font = font
+            print(f"使用中文字体: {available_font}")
             break
     
     if available_font:
         plt.rcParams['font.sans-serif'] = [available_font]
-        plt.rcParams['axes.unicode_minus'] = False
+        plt.rcParams['axes.unicode_minus'] = False  # 解决负号显示问题
     else:
         # 如果没有中文字体，使用默认字体但可能无法正确显示中文
         print("警告: 未找到中文字体，图表中的中文可能无法正确显示")
+        print(f"可用字体示例: {all_font_names[:5]}")
     
     # 图1: 资产价值变化
     history = result.get('history', [])
