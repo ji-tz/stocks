@@ -25,6 +25,17 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('长江电力', body)
         self.assertIn('600519', body)
         self.assertIn('贵州茅台', body)
+        # ensure strategy cards are present
+        self.assertIn('SMA 策略', body)
+        self.assertIn('均值成本策略', body)
+        self.assertIn('定投策略', body)
+        # ensure navigation links are present
+        self.assertIn('/strategy/sma', body)
+        self.assertIn('/strategy/mean_cost', body)
+        self.assertIn('/strategy/fixed_amount', body)
+        # ensure history link is present
+        self.assertIn('历史记录', body)
+        self.assertIn('/history', body)
 
     @patch('stocks.get_data')
     @patch('stocks.run_mean_cost')

@@ -72,6 +72,10 @@ jobs:
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
         python screenshot_strategy_config.py screenshots
+    - name: Take History Feature Screenshots
+      run: |
+        echo "=== Taking History and Compare Feature Screenshots ==="
+        python screenshot_history.py screenshots
       continue-on-error: true
     
     - name: Run Stock Integration Test (Random Selection)
@@ -202,6 +206,7 @@ jobs:
           let mainGuiImage = '';
           let yangtzeImage = '';
           let strategyConfigImages = '';
+          let historyImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
@@ -210,6 +215,14 @@ jobs:
             '均值成本策略配置': 'screenshots/strategy_mean_cost_config.png',
             '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
           };
+          
+          // 历史记录功能截图路径
+          const historyScreenshots = [
+            { path: 'screenshots/02_empty_history_page.png', title: '空历史记录页面' },
+            { path: 'screenshots/04_history_with_one_record.png', title: '包含一条记录的历史页面' },
+            { path: 'screenshots/06_history_records_selected.png', title: '选中记录准备对比' },
+            { path: 'screenshots/07_compare_page_with_charts.png', title: '对比页面（表格+图表）' }
+          ];
           
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
@@ -270,6 +283,31 @@ jobs:
             yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
           }
           
+          // 处理历史记录功能截图
+          let historyImagesList = [];
+          for (const screenshot of historyScreenshots) {
+            if (fs.existsSync(screenshot.path)) {
+              if (uploaded && baseUrl) {
+                const filename = screenshot.path.split('/').pop();
+                const imageUrl = `${baseUrl}/${filename}`;
+                historyImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
+                console.log(`History screenshot URL: ${imageUrl}`);
+              } else {
+                const stats = fs.statSync(screenshot.path);
+                const filename = screenshot.path.split('/').pop();
+                historyImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
+              }
+            }
+          }
+          
+          if (historyImagesList.length > 0) {
+            historyImages = `
+          ### 📋 历史记录功能截图
+          
+          ${historyImagesList.join('\n\n')}
+          `;
+          }
+          
            // 读取测试结果
           let testResult = '';
           try {
@@ -309,6 +347,8 @@ jobs:
           ${strategyConfigImages}
           
           ${testResult}
+          
+          ${historyImages}
           
           ### 📁 完整报告
           
