@@ -69,7 +69,7 @@
         {% endfor %}
       ];
 
-      // 归一化处理：将股价和总资产都转换为以起点为100的百分比形式
+      // 归一化处理：将股价和总资产都转换为以起点为100的指数形式
       // 这样两条曲线的起点就会在同一位置
       const normalizedTotalValue = [];
       const normalizedStockPrice = [];
@@ -77,22 +77,30 @@
       // 找到第一个有效的总资产值作为基准
       const baseValue = totalValueData[0];
       
+      // 验证基准值有效性
+      if (!baseValue || baseValue <= 0) {
+        console.error('❌ 无效的基准总资产值:', baseValue);
+        alert('数据错误：无法计算资产变化曲线');
+      }
+      
       // 找到第一个有效的股价作为基准
       let basePrice = null;
       for (let i = 0; i < stockPriceData.length; i++) {
-        if (stockPriceData[i] !== null) {
+        if (stockPriceData[i] !== null && stockPriceData[i] > 0) {
           basePrice = stockPriceData[i];
           break;
         }
       }
       
       // 归一化总资产数据
-      for (let i = 0; i < totalValueData.length; i++) {
-        normalizedTotalValue.push((totalValueData[i] / baseValue) * 100);
+      if (baseValue > 0) {
+        for (let i = 0; i < totalValueData.length; i++) {
+          normalizedTotalValue.push((totalValueData[i] / baseValue) * 100);
+        }
       }
       
       // 归一化股价数据
-      if (basePrice !== null) {
+      if (basePrice !== null && basePrice > 0) {
         for (let i = 0; i < stockPriceData.length; i++) {
           if (stockPriceData[i] !== null) {
             normalizedStockPrice.push((stockPriceData[i] / basePrice) * 100);
@@ -148,13 +156,13 @@
                   const value = context.parsed.y;
                   const index = context.dataIndex;
                   
-                  // 显示归一化值和原始值
+                  // 显示归一化指数和原始值
                   if (datasetLabel.includes('总资产')) {
-                    return datasetLabel + ': ' + value.toFixed(2) + '% (原始: ' + totalValueData[index].toFixed(2) + ' 元)';
+                    return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + totalValueData[index].toFixed(2) + ' 元)';
                   } else {
                     const originalPrice = stockPriceData[index];
                     if (originalPrice !== null) {
-                      return datasetLabel + ': ' + value.toFixed(2) + '% (原始: ' + originalPrice.toFixed(2) + ' 元)';
+                      return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + originalPrice.toFixed(2) + ' 元)';
                     } else {
                       return datasetLabel + ': 无数据';
                     }
