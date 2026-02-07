@@ -27,11 +27,6 @@ class Account:
         if self.position is None:
             self.position = Position()
 
-    @property
-    def market_value(self) -> float:
-        """市值（需要当前价格，由外部计算）"""
-        return 0.0
-
     def get_total_value(self, current_price: float) -> float:
         """获取总资产价值"""
         market_value = self.position.shares * current_price

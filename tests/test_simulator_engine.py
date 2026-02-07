@@ -230,8 +230,8 @@ class TestSimulatorWithVerbose(unittest.TestCase):
             "volume": [1000] * 5,
         })
 
-        # 使用verbose模式
-        sim = Simulator(lot_size=100, init_cash=50000.0, verbose=False)  # 测试时不打印
+        # 测试verbose参数可以正常使用（但不打印以避免干扰测试输出）
+        sim = Simulator(lot_size=100, init_cash=50000.0, verbose=False)
         strategy = MeanCostDecision()
         result = sim.simulate(df=df, strategy=strategy, symbol="TEST")
 
