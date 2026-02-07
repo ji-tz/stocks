@@ -64,6 +64,8 @@ stocks/
 ├── source/                # 数据源
 │   └── data_provider.py  # 数据提供者
 ├── tests/                 # 单元测试
+│   ├── guitests/          # GUI测试与截图脚本
+│   │   └── screenshot_main.py  # GUI截图脚本（统一入口）
 │   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 ├── data/                  # 本地数据缓存
 ├── screenshot_main.py     # GUI截图脚本（统一入口）
@@ -193,11 +195,11 @@ mypy stocks.py main.py --config-file=mypy.ini
 playwright install chromium
 
 # 运行统一截图脚本（推荐）
-python screenshot_main.py main --output screenshots/main_gui.png
-python screenshot_main.py strategy --output-dir screenshots
-python screenshot_main.py history --output-dir screenshots
-python screenshot_main.py chart --output screenshots/stock_price_chart.png
-python screenshot_main.py all --output-dir screenshots
+python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
+python tests/guitests/screenshot_main.py strategy --output-dir screenshots
+python tests/guitests/screenshot_main.py history --output-dir screenshots
+python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
+python tests/guitests/screenshot_main.py all --output-dir screenshots
 
 ```
 

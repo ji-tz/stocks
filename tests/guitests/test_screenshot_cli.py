@@ -1,7 +1,7 @@
 """截图脚本 CLI 测试"""
 import unittest
 
-from screenshot_main import build_output_plan, resolve_targets
+from tests.guitests.screenshot_main import build_output_plan, resolve_targets
 
 
 class TestScreenshotCli(unittest.TestCase):

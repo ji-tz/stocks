@@ -58,6 +58,46 @@ jobs:
         echo "=== Verifying Mean Cost Strategy ==="
         python -c "from simulator.simulator import Simulator; from solver.mean_cost_strategy import MeanCostDecision; print('✓ Mean Cost Strategy loaded successfully')" 2>&1 | tee -a test_output.log
         echo "=== Verifying SMA Strategy ==="
+        python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')"
+    
+    - name: Take Main GUI Screenshot
+      run: |
+        echo "=== Taking Main GUI Screenshot ==="
+        python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
+      continue-on-error: true
+    
+    - name: Take Strategy Config Screenshots
+      run: |
+        echo "=== Taking Strategy Configuration Screenshots ==="
+        python tests/guitests/screenshot_main.py strategy --output-dir screenshots
+      continue-on-error: true
+    - name: Take History Feature Screenshots
+      run: |
+        echo "=== Taking History and Compare Feature Screenshots ==="
+        python tests/guitests/screenshot_main.py history --output-dir screenshots
+      continue-on-error: true
+    
+    - name: Run Stock Integration Test (Random Selection)
+      run: |
+        echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
+        python -m tests.test_yangtze_power
+      continue-on-error: true
+    
+    - name: Take Stock Price Chart Screenshot
+      run: |
+        echo "=== Taking Stock Price Chart Screenshot ==="
+        python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
+      continue-on-error: true
+    
+    - name: Upload Screenshots
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-screenshots
+        path: screenshots/
+        retention-days: 30
+    
+    - name: Upload Test Results
         python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')" 2>&1 | tee -a test_output.log
         echo "verify_exit_code=$?" >> $GITHUB_OUTPUT
       continue-on-error: true

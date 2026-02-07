@@ -25,9 +25,10 @@
 - `test_cache_utils.py` - 测试缓存工具函数
 
 ### 界面测试
-- `test_gui_app.py` - 测试 Flask Web 界面路由
+- `guitests/test_gui_app.py` - 测试 Flask Web 界面路由
+- `guitests/test_gui_history.py` - 测试历史记录与对比页面路由
+- `guitests/test_screenshot_cli.py` - 截图脚本 CLI 逻辑测试
 - `test_main_run.py` - 测试主程序启动
-- `test_screenshot_cli.py` - 截图脚本 CLI 逻辑测试
 
 ## 运行测试
 
