@@ -96,13 +96,19 @@ class Simulator:
             # 执行交易
             trade_result = None
             if action == 'buy':
-                trade_result = engine.buy(date=date, price=price_open)
+                # 检查策略是否有 calculate_shares 方法（定投策略）
+                buy_shares = None
+                if hasattr(strategy, 'calculate_shares'):
+                    buy_shares = strategy.calculate_shares(price_open, self.lot_size)
+                
+                trade_result = engine.buy(date=date, price=price_open, shares=buy_shares)
                 if trade_result.success:
+                    actual_shares = buy_shares if buy_shares is not None else self.lot_size
                     trades_list.append({
                         'date': date.strftime('%Y-%m-%d'),
                         'action': 'buy',
                         'price': price_open,
-                        'shares': self.lot_size,
+                        'shares': actual_shares,
                         'cash': round(trade_result.cash_after, 2),
                         'shares_after': trade_result.shares_after
                     })
@@ -223,3 +229,43 @@ def simulate_sma(symbol: str = "600900",
     sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     strategy = SmaDecision(period=period, df=df)
     return sim.simulate(df=df, strategy=strategy, symbol=symbol)
+
+
+def simulate_fixed_amount(symbol: str = "600900",
+                         start_date: str = "20250101",
+                         end_date: Optional[str] = None,
+                         fixed_amount: float = 1000.0,
+                         lot_size: int = 100,
+                         init_cash: float = 100000.0,
+                         source: str = "auto",
+                         verbose: bool = False) -> Dict[str, Any]:
+    """运行定投策略回测
+    
+    定投策略：每天投入固定金额购买股票，不考虑市场价格波动。
+    
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期（格式：YYYYMMDD）
+        end_date: 结束日期（格式：YYYYMMDD），默认为今天
+        fixed_amount: 每次投入的固定金额（默认 1000 元）
+        lot_size: 交易手数（默认 100 股）
+        init_cash: 初始资金（默认 100000 元）
+        source: 数据源（默认 "auto"）
+        verbose: 是否打印详细信息（默认 False）
+        
+    Returns:
+        包含回测结果的字典
+    """
+    from solver.fixed_amount_strategy import FixedAmountDecision
+
+    if end_date is None:
+        end_date = datetime.datetime.today().strftime('%Y%m%d')
+
+    df = get_data(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    if df is None:
+        raise RuntimeError("未获取到数据，无法模拟")
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash, verbose=verbose)
+    strategy = FixedAmountDecision(fixed_amount=fixed_amount)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol)
+

@@ -20,7 +20,8 @@
 
 ### 1. 量化回测策略
 - **SMA策略**: 基于简单移动平均线的交易策略
-- **定投策略**: 均值成本定投策略（Mean Cost Dollar-Cost Averaging）
+- **均值成本策略**: 低于成本时买入，高于成本时卖出
+- **定投策略**: 每天投入固定金额，自动计算购买股数，适合长期投资
 
 ### 2. 数据获取
 - 支持 AKShare 和 Baostock 多数据源
@@ -53,7 +54,8 @@ stocks/
 │   └── templates/        # HTML模板
 ├── solver/                # 策略实现
 │   ├── sma_strategy.py   # SMA策略
-│   └── mean_cost_strategy.py  # 定投策略
+│   ├── mean_cost_strategy.py  # 均值成本策略
+│   └── fixed_amount_strategy.py  # 定投策略（固定金额）
 ├── simulator/             # 模拟器
 │   └── simulator.py      # 通用模拟器框架
 ├── source/                # 数据源
@@ -186,9 +188,9 @@ python screenshot_main.py screenshots/main_gui.png
 
 ## 命令行工具
 
-### 定投策略回测 (run_mean_cost.py)
+### 均值成本策略回测 (run_mean_cost.py)
 
-直接从命令行运行定投策略回测：
+直接从命令行运行均值成本策略回测：
 
 ```bash
 # 基本用法（默认：600900长江电力，从2025年1月1日开始）
@@ -220,6 +222,37 @@ python run_mean_cost.py \
  'trades': 20,
  'unrealized_pl': 456.78}
 ```
+
+### 定投策略（Fixed Amount）使用示例
+
+定投策略每天投入固定金额购买股票，无需择时，适合长期投资：
+
+```python
+from simulator.simulator import simulate_fixed_amount
+
+# 运行定投策略回测
+result = simulate_fixed_amount(
+    symbol="600900",           # 股票代码
+    start_date="20230101",     # 开始日期
+    end_date="20231231",       # 结束日期
+    fixed_amount=1000.0,       # 每次投入 1000 元
+    lot_size=100,              # 交易手数（100股为1手）
+    init_cash=100000.0,        # 初始资金
+    verbose=True               # 显示详细日志
+)
+
+# 查看结果
+print(f"总交易次数: {result['trades']}")
+print(f"最终持仓: {result['shares']} 股")
+print(f"总资产: {result['total_value']:.2f} 元")
+print(f"收益率: {(result['total_value'] - result['init_cash']) / result['init_cash'] * 100:.2f}%")
+```
+
+**定投策略的优势：**
+- 🎯 **降低择时风险**：不需要判断市场高低点
+- 📊 **平滑成本**：价格低时买入更多，价格高时买入较少
+- 💡 **简单易行**：无需复杂的技术分析
+- ⏰ **适合长期**：通过时间平滑市场波动
 
 ### 演示脚本 (demo_simulator.py)
 
