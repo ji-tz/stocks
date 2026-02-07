@@ -144,6 +144,46 @@ jobs:
         echo "Git status:"
         git status
     
+    - name: Upload Screenshots to Public Images Repository
+      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
+      id: upload_to_public_repo
+      run: |
+        # Clone the public Images repository
+        cd /tmp
+        git clone https://github.com/183965983/Images.git
+        cd Images
+        
+        # Configure git
+        git config user.name "github-actions[bot]"
+        git config user.email "github-actions[bot]@users.noreply.github.com"
+        
+        # Create a directory for this PR's screenshots
+        SCREENSHOT_DIR="stocks/pr-${{ github.event.pull_request.number }}/run-${{ github.run_number }}"
+        mkdir -p "$SCREENSHOT_DIR"
+        
+        # Copy screenshots
+        cp $GITHUB_WORKSPACE/screenshots/*.png "$SCREENSHOT_DIR/" 2>/dev/null || true
+        
+        # Add and commit
+        git add "$SCREENSHOT_DIR"
+        
+        if git diff --cached --quiet; then
+          echo "No new screenshots to upload"
+          echo "uploaded=false" >> $GITHUB_OUTPUT
+        else
+          git commit -m "Add screenshots for stocks PR #${{ github.event.pull_request.number }} run ${{ github.run_number }}"
+          
+          # Push to the public repository
+          if git push https://${{ secrets.GITHUB_TOKEN }}@github.com/183965983/Images.git main; then
+            echo "Screenshots uploaded successfully"
+            echo "uploaded=true" >> $GITHUB_OUTPUT
+            echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
+          else
+            echo "Failed to push screenshots"
+            echo "uploaded=false" >> $GITHUB_OUTPUT
+          fi
+        fi
+    
     - name: Comment PR with Test Results and Screenshots
       if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
       continue-on-error: true
@@ -154,9 +194,8 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
-          // 使用创建临时评论的方法上传图片到 GitHub
-          // GitHub 会将图片缓存到 user-images.githubusercontent.com
-          // 然后我们删除临时评论，但图片 URL 仍然有效
+          // 使用公开的 Images 仓库来托管图片
+          // 这样图片可以通过 raw.githubusercontent.com 公开访问
           let mainGuiImage = '';
           let yangtzeImage = '';
           
@@ -166,85 +205,19 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 函数：通过临时评论上传图片并获取 URL
-          async function uploadImageViaComment(imagePath, imageName) {
-            try {
-              console.log(`Uploading ${imageName} via temporary comment...`);
-              const imageData = fs.readFileSync(imagePath);
-              const base64Image = imageData.toString('base64');
-              
-              // 创建一个包含图片的临时评论
-              // GitHub 会自动将图片上传到 user-images.githubusercontent.com
-              const tempComment = await github.rest.issues.createComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                issue_number: context.issue.number,
-                body: `![${imageName}](data:image/png;base64,${base64Image})`
-              });
-              
-              console.log(`Temporary comment created: ${tempComment.data.id}`);
-              
-              // 等待 GitHub 处理图片
-              await new Promise(resolve => setTimeout(resolve, 2000));
-              
-              // 获取评论内容以提取 GitHub 生成的图片 URL
-              const comment = await github.rest.issues.getComment({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                comment_id: tempComment.data.id
-              });
-              
-              // 从评论中提取图片 URL
-              // GitHub 会将 base64 图片转换为 user-images.githubusercontent.com URL
-              const imageUrlMatch = comment.data.body.match(/!\[.*?\]\((https:\/\/[^\)]+)\)/);
-              let imageUrl = null;
-              
-              if (imageUrlMatch && imageUrlMatch[1] && !imageUrlMatch[1].startsWith('data:')) {
-                imageUrl = imageUrlMatch[1];
-                console.log(`Extracted image URL: ${imageUrl}`);
-              } else {
-                console.log(`No external URL found, using data URL`);
-                imageUrl = `data:image/png;base64,${base64Image}`;
-              }
-              
-              // 删除临时评论
-              try {
-                await github.rest.issues.deleteComment({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  comment_id: tempComment.data.id
-                });
-                console.log(`Temporary comment deleted`);
-              } catch (deleteError) {
-                console.log(`Failed to delete temporary comment: ${deleteError.message}`);
-              }
-              
-              return imageUrl;
-            } catch (error) {
-              console.error(`Failed to upload ${imageName}:`, error.message);
-              
-              // 备用方案：使用 data URL（但有大小限制）
-              try {
-                const imageData = fs.readFileSync(imagePath);
-                if (imageData.length < 500 * 1024) {  // 小于 500KB
-                  const base64Image = imageData.toString('base64');
-                  console.log(`Using data URL for ${imageName} (${(imageData.length / 1024).toFixed(1)} KB)`);
-                  return `data:image/png;base64,${base64Image}`;
-                }
-              } catch (e) {
-                console.error(`Fallback also failed: ${e.message}`);
-              }
-              
-              return null;
-            }
-          }
+          // 检查是否成功上传到公开仓库
+          const uploaded = '${{ steps.upload_to_public_repo.outputs.uploaded }}' === 'true';
+          const baseUrl = '${{ steps.upload_to_public_repo.outputs.base_url }}';
+          
+          console.log('Uploaded to public repo:', uploaded);
+          console.log('Base URL:', baseUrl);
           
           // 处理主界面截图
           if (fs.existsSync(mainGuiPath)) {
-            const imageUrl = await uploadImageViaComment(mainGuiPath, 'main_gui.png');
-            if (imageUrl) {
+            if (uploaded && baseUrl) {
+              const imageUrl = `${baseUrl}/main_gui.png`;
               mainGuiImage = `![主界面截图](${imageUrl})`;
-              console.log(`Main GUI image ready`);
+              console.log(`Main GUI image URL: ${imageUrl}`);
             } else {
               const stats = fs.statSync(mainGuiPath);
               mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
@@ -255,10 +228,10 @@ jobs:
           
           // 处理测试结果图表
           if (fs.existsSync(yangtzeImagePath)) {
-            const imageUrl = await uploadImageViaComment(yangtzeImagePath, 'yangtze_power_test.png');
-            if (imageUrl) {
+            if (uploaded && baseUrl) {
+              const imageUrl = `${baseUrl}/yangtze_power_test.png`;
               yangtzeImage = `![长江电力测试结果图表](${imageUrl})`;
-              console.log(`Yangtze chart ready`);
+              console.log(`Yangtze chart URL: ${imageUrl}`);
             } else {
               const stats = fs.statSync(yangtzeImagePath);
               yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
