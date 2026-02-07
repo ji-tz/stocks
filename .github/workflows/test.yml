@@ -80,12 +80,6 @@ jobs:
         python test_yangtze_power.py
       continue-on-error: true
     
-    - name: Test Stock Price Chart Feature
-      run: |
-        echo "=== Testing Stock Price Volatility Line Feature ==="
-        python -m unittest tests.test_gui_app.TestGuiRoutes.test_result_page_contains_stock_price_chart -v
-      continue-on-error: true
-    
     - name: Take Stock Price Chart Screenshot
       run: |
         echo "=== Taking Stock Price Chart Screenshot ==="

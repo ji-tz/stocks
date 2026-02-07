@@ -65,7 +65,7 @@
       ];
       const stockPriceData = [
         {% for h in result.history %}
-          {{ h.last_price }},
+          {{ h.last_price if (h.last_price is not none and h.last_price == h.last_price) else 'null' }},
         {% endfor %}
       ];
 
