@@ -19,6 +19,17 @@
 ## 日志与报告
 `verbose=True` 时输出逐日交易日志与最终汇总报告。
 
+## 返回结果字段
+`Simulator.simulate()` 返回包含以下关键字段的字典：
+- `max_capital_used`：最大占用资金（初始资金 - 最小现金余额），表示完成策略所需的最低本金
+- `min_cash`：最小现金余额，投资过程中现金的最低点
+- `total_value`：最终总资产
+- `realized_pl`：已实现盈亏
+- `unrealized_pl`：未实现盈亏
+- `trades`：交易次数
+- `history`：每日资产历史记录
+- `trades_list`：交易明细列表
+
 ## 测试入口
 - `tests/test_simulator.py`
 - `tests/test_simulator_engine.py`

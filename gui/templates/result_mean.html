@@ -19,6 +19,9 @@
       <div class="card"><strong>代码：</strong> {{ result.symbol }}</div>
       <div class="card"><strong>日期：</strong> {{ result.start_date }} → {{ result.end_date }}</div>
       <div class="card"><strong>初始资金：</strong> {{ result.init_cash }}</div>
+      {% if result.max_capital_used is defined %}
+      <div class="card"><strong>最大占用资金：</strong> {{ '%.2f'|format(result.max_capital_used) }}</div>
+      {% endif %}
       {% if result.market_value is defined %}
       <div class="card"><strong>总共动用资金：</strong> {{ '%.2f'|format(result.market_value) }}</div>
       {% endif %}
