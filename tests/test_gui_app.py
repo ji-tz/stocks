@@ -36,9 +36,10 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
         self.assertIn('平均成本策略回测结果', body)
-        # Verify the new "总共动用资金" field is displayed
+        # Verify the new "总共动用资金" field is displayed with correct value
         self.assertIn('总共动用资金', body)
-        self.assertIn('20000.00', body)
+        # Check that the market value appears in the correct context (near the label)
+        self.assertIn('总共动用资金：</strong> 20000.00', body)
         # ensure backend was queried with date range
         mock_get.assert_called()
 
