@@ -14,13 +14,21 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 class TestYangtzePowerDataQuality(unittest.TestCase):
     """测试长江电力数据质量"""
     
+    @classmethod
+    def setUpClass(cls):
+        """检查缓存文件是否存在，如不存在则跳过所有测试"""
+        cls.cache_file = "data/600900.csv"
+        cls.skip_tests = not os.path.exists(cls.cache_file)
+        if cls.skip_tests:
+            print(f"\n⚠️  缓存文件 {cls.cache_file} 不存在，跳过数据质量测试")
+            print("提示: 在本地环境运行清理工具生成缓存: python tools/clean_data_cache.py --symbol 600900 --apply")
+    
     def setUp(self):
         """设置测试数据"""
-        cache_file = "data/600900.csv"
-        if not os.path.exists(cache_file):
-            self.skipTest("缓存文件不存在")
+        if self.skip_tests:
+            self.skipTest(f"缓存文件 {self.cache_file} 不存在")
         
-        self.df = pd.read_csv(cache_file, parse_dates=['date'])
+        self.df = pd.read_csv(self.cache_file, parse_dates=['date'])
         
     def test_no_extreme_price_changes_after_2020(self):
         """测试2020年后没有异常的价格波动（单日涨跌幅不超过30%）"""
