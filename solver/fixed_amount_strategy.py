@@ -35,7 +35,7 @@ class FixedAmountDecision:
             date: 日期（未使用）
             
         Returns:
-            返回 'buy' 表示买入，返回金额信息用于计算购买股数
+            返回 'buy' 表示买入。具体购买股数由 calculate_shares() 方法计算。
         """
         # 定投策略：每天都买入
         return 'buy'
