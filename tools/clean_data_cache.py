@@ -40,16 +40,31 @@ def detect_anomalies(df: pd.DataFrame, symbol: str) -> List[Tuple[int, str]]:
     
     # 检查3: 价格呈现明显的线性递增模式（测试数据特征）
     if len(df) > 10:
-        # 检查连续10天以上的价格线性递增
-        for i in range(len(df) - 10):
+        # 检查连续10天以上的价格线性递增，并标记整个连续区间
+        i = 0
+        while i < len(df) - 10:
             window = df.iloc[i:i+10]
             close_prices = window['close'].values
             # 检查是否为等差数列（差值的方差接近0）
             diffs = close_prices[1:] - close_prices[:-1]
-            if len(set(diffs.round(2))) == 1 and diffs[0] > 0.5:  # 完全等差且每天增长>0.5元
-                for idx in window.index:
-                    anomalies.append((idx, f"价格呈线性递增模式（测试数据特征）"))
-                break
+            if len(set(diffs.round(2))) == 1 and abs(diffs[0]) > 0.5:  # 完全等差且每天变化>0.5元
+                # 找到整个连续的等差数列区间
+                start_idx = i
+                end_idx = i + 10
+                # 继续向后扫描，看是否还有更多等差数列
+                while end_idx < len(df):
+                    next_price = df.iloc[end_idx]['close']
+                    expected_price = df.iloc[end_idx-1]['close'] + diffs[0]
+                    if abs(next_price - expected_price) < 0.1:  # 继续符合等差数列
+                        end_idx += 1
+                    else:
+                        break
+                # 标记整个区间为异常
+                for idx in range(start_idx, end_idx):
+                    anomalies.append((df.index[idx], f"价格呈线性递增模式（测试数据特征）"))
+                i = end_idx  # 跳过这个区间
+            else:
+                i += 1
     
     return anomalies
 
