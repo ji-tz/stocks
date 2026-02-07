@@ -69,6 +69,13 @@
         {% endfor %}
       ];
 
+      // 调试信息
+      console.log('📊 图表数据检查:');
+      console.log('总资产数据点数:', totalValueData.length);
+      console.log('股价数据点数:', stockPriceData.length);
+      console.log('前5个股价:', stockPriceData.slice(0, 5));
+      console.log('非null股价数:', stockPriceData.filter(p => p !== null).length);
+
       const ctx = document.getElementById('chart').getContext('2d');
       new Chart(ctx, {
         type: 'line',
