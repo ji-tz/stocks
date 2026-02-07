@@ -23,6 +23,9 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('/strategy/sma', body)
         self.assertIn('/strategy/mean_cost', body)
         self.assertIn('/strategy/fixed_amount', body)
+        # ensure history link is present
+        self.assertIn('历史记录', body)
+        self.assertIn('/history', body)
 
     @patch('stocks.get_data')
     @patch('stocks.run_mean_cost')

@@ -11,3 +11,4 @@ build/
 .pytest_cache/
 .mypy_cache/
 data/*.csv
+data/backtest_records.json

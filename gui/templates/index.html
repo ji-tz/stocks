@@ -7,6 +7,23 @@
     <style>
       body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
       h1 { color: #1976d2; }
+      .header-actions {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+      }
+      .history-link {
+        padding: 0.6rem 1.2rem;
+        background: #f57c00;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background 0.3s;
+      }
+      .history-link:hover {
+        background: #ef6c00;
+      }
       .strategy-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
       .strategy-card { 
         border: 1px solid #ddd; 
@@ -37,8 +54,13 @@
     </style>
   </head>
   <body>
-    <h1>量化回测平台</h1>
-    <p>选择投资策略，配置参数并运行回测分析。</p>
+    <div class="header-actions">
+      <div>
+        <h1>量化回测平台</h1>
+        <p>选择投资策略，配置参数并运行回测分析。</p>
+      </div>
+      <a href="/history" class="history-link">📊 历史记录</a>
+    </div>
     
     <div class="strategy-cards">
       <div class="strategy-card" onclick="location.href='/strategy/sma'">
