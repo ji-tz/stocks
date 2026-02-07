@@ -56,6 +56,7 @@ class Simulator:
 
         history: List[Dict[str, Any]] = []
         trades_list: List[Dict[str, Any]] = []
+        min_cash = self.init_cash  # 追踪最小现金余额
 
         if use_verbose:
             print(f"\n{'='*100}")
@@ -132,10 +133,16 @@ class Simulator:
                 'market_value': summary['market_value'],
                 'total_value': summary['total_value']
             })
+            
+            # 追踪最小现金余额
+            min_cash = min(min_cash, summary['cash'])
 
         # 生成最终报告
         last_price = float(df.iloc[-1]['close'])
         final_summary = engine.get_summary(last_price)
+        
+        # 计算最大占用资金
+        max_capital_used = self.init_cash - min_cash
 
         if use_verbose:
             print("\n" + "=" * 100)
@@ -143,6 +150,8 @@ class Simulator:
             print("=" * 100)
             print(f"总交易次数: {engine.trade_count}")
             print(f"最终现金: {final_summary['cash']:.2f}")
+            print(f"最小现金余额: {min_cash:.2f}")
+            print(f"最大占用资金: {max_capital_used:.2f}")
             print(f"最终持仓: {final_summary['shares']} 股")
             print(f"平均成本: {final_summary['avg_cost']:.4f}")
             print(f"最新价格: {last_price:.4f}")
@@ -168,6 +177,8 @@ class Simulator:
             'unrealized_pl': final_summary['unrealized_pl'],
             'total_value': final_summary['total_value'],
             'trades': engine.trade_count,
+            'max_capital_used': round(max_capital_used, 2),  # 最大占用资金
+            'min_cash': round(min_cash, 2),  # 最小现金余额（供参考）
             'history': history,
             'trades_list': trades_list,
         }

@@ -129,6 +129,44 @@ class TestMeanCostStrategy(unittest.TestCase):
         has_sell = any(t['action'] == 'sell' for t in result['trades_list'])
         self.assertTrue(has_buy)
         self.assertTrue(has_sell)
+    
+    def test_max_capital_used_tracking(self):
+        """测试最大占用资金的追踪"""
+        # 创建一个简单的场景：持续买入导致现金减少
+        dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
+        df = pd.DataFrame({
+            "date": dates,
+            "open": [100.0, 90.0, 80.0, 70.0, 60.0],  # 持续下跌，会持续买入
+            "high": [101.0, 91.0, 81.0, 71.0, 61.0],
+            "low": [99.0, 89.0, 79.0, 69.0, 59.0],
+            "close": [100.0, 90.0, 80.0, 70.0, 60.0],
+            "volume": [1000] * 5,
+        })
+        
+        init_cash = 50000.0
+        sim = Simulator(lot_size=100, init_cash=init_cash)
+        strategy = MeanCostDecision()
+        result = sim.simulate(df=df, strategy=strategy, symbol="TEST")
+        
+        # 验证返回结果包含最大占用资金
+        self.assertIn('max_capital_used', result)
+        self.assertIn('min_cash', result)
+        
+        # 最大占用资金应该 = 初始资金 - 最小现金
+        self.assertAlmostEqual(
+            result['max_capital_used'],
+            init_cash - result['min_cash'],
+            places=2
+        )
+        
+        # 最大占用资金应该大于0（因为有交易发生）
+        self.assertGreater(result['max_capital_used'], 0)
+        
+        # 最大占用资金不应超过初始资金
+        self.assertLessEqual(result['max_capital_used'], init_cash)
+        
+        # 最小现金应该小于初始资金（因为有买入）
+        self.assertLess(result['min_cash'], init_cash)
 
 
 class TestSmaStrategy(unittest.TestCase):
