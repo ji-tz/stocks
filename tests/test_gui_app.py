@@ -88,54 +88,63 @@ class TestGuiRoutes(unittest.TestCase):
 
     def test_strategy_sma_get(self):
         """测试 SMA 策略配置页面"""
-        # 需要先在session中设置股票信息
+        # 需要先在session中设置完整流程的信息
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'sma'
+            sess['strategy_name'] = 'SMA'
+            sess['run_mode'] = 'backtest'
         
         rv = self.client.get('/strategy/sma')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
-        self.assertIn('SMA 策略回测', body)
+        self.assertIn('第四步：配置参数', body)
         self.assertIn('策略说明', body)
         self.assertIn('SMA 周期', body)
-        self.assertIn('已选择股票', body)
+        self.assertIn('股票', body)
         self.assertIn('600900', body)
         self.assertIn('长江电力', body)
         self.assertIn('function validateDates', body)
 
     def test_strategy_mean_cost_get(self):
         """测试均值成本策略配置页面"""
-        # 需要先在session中设置股票信息
+        # 需要先在session中设置完整流程的信息
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'mean_cost'
+            sess['strategy_name'] = '均值成本'
+            sess['run_mode'] = 'backtest'
         
         rv = self.client.get('/strategy/mean_cost')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
-        self.assertIn('均值成本策略回测', body)
+        self.assertIn('第四步：配置参数', body)
         self.assertIn('策略说明', body)
         self.assertIn('逢低加仓', body)
-        self.assertIn('已选择股票', body)
+        self.assertIn('股票', body)
         self.assertIn('600900', body)
         self.assertIn('长江电力', body)
         self.assertIn('function validateDates', body)
 
     def test_strategy_fixed_amount_get(self):
         """测试定投策略配置页面"""
-        # 需要先在session中设置股票信息
+        # 需要先在session中设置完整流程的信息
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'fixed_amount'
+            sess['strategy_name'] = '定投'
+            sess['run_mode'] = 'backtest'
         
         rv = self.client.get('/strategy/fixed_amount')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
-        self.assertIn('定投策略回测', body)
+        self.assertIn('第四步：配置参数', body)
         self.assertIn('策略说明', body)
         self.assertIn('每次定投金额', body)
-        self.assertIn('已选择股票', body)
+        self.assertIn('股票', body)
         self.assertIn('600900', body)
         self.assertIn('长江电力', body)
         self.assertIn('function validateDates', body)
@@ -277,6 +286,118 @@ class TestGuiRoutes(unittest.TestCase):
         # Should show stock selection page
         self.assertIn('第一步：选择股票', body)
         self.assertIn('搜索股票', body)
+
+    def test_api_select_strategy(self):
+        """测试策略选择API"""
+        # 先设置股票信息
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+        
+        rv = self.client.post('/api/select_strategy',
+                             json={'strategy_type': 'sma', 'strategy_name': 'SMA'},
+                             content_type='application/json')
+        self.assertEqual(rv.status_code, 200)
+        data = rv.get_json()
+        self.assertTrue(data['success'])
+        
+        # 验证session中保存了策略信息
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess['strategy_type'], 'sma')
+            self.assertEqual(sess['strategy_name'], 'SMA')
+
+    def test_select_mode_page(self):
+        """测试运行模式选择页面"""
+        # 设置必要的session信息
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'sma'
+            sess['strategy_name'] = 'SMA'
+        
+        rv = self.client.get('/select_mode')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('第三步：选择运行模式', body)
+        self.assertIn('回测仿真', body)
+        self.assertIn('实时仿真', body)
+        self.assertIn('实盘交易', body)
+        self.assertIn('600900', body)
+        self.assertIn('长江电力', body)
+        self.assertIn('SMA策略', body)
+
+    def test_select_mode_without_strategy_redirects(self):
+        """测试未选择策略时访问运行模式页面应跳转到策略选择页"""
+        # 只设置股票信息，不设置策略
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+        
+        rv = self.client.get('/select_mode')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        # 应该显示策略选择页面
+        self.assertIn('第二步：选择策略', body)
+        self.assertIn('SMA 策略', body)
+
+    def test_api_select_mode(self):
+        """测试运行模式选择API"""
+        # 先设置必要信息
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'sma'
+            sess['strategy_name'] = 'SMA'
+        
+        rv = self.client.post('/api/select_mode',
+                             json={'mode': 'backtest'},
+                             content_type='application/json')
+        self.assertEqual(rv.status_code, 200)
+        data = rv.get_json()
+        self.assertTrue(data['success'])
+        
+        # 验证session中保存了运行模式
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess['run_mode'], 'backtest')
+
+    def test_strategy_config_with_breadcrumb(self):
+        """测试策略配置页面包含面包屑导航"""
+        # 设置完整的session信息
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'sma'
+            sess['strategy_name'] = 'SMA'
+            sess['run_mode'] = 'backtest'
+        
+        rv = self.client.get('/strategy/sma')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        # 验证面包屑导航
+        self.assertIn('✓ 选择股票', body)
+        self.assertIn('✓ 选择策略', body)
+        self.assertIn('✓ 选择运行模式', body)
+        self.assertIn('配置参数', body)
+        # 验证运行模式显示
+        self.assertIn('回测仿真', body)
+        # 验证返回链接指向运行模式选择
+        self.assertIn('返回运行模式选择', body)
+
+    def test_strategy_config_without_mode_redirects(self):
+        """测试未选择运行模式时访问策略配置页面应跳转到运行模式选择"""
+        # 设置股票和策略，但不设置运行模式
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'sma'
+            sess['strategy_name'] = 'SMA'
+        
+        rv = self.client.get('/strategy/sma')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        # 应该显示运行模式选择页面
+        self.assertIn('第三步：选择运行模式', body)
+        self.assertIn('回测仿真', body)
 
 
 if __name__ == '__main__':
