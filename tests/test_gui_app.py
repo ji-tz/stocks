@@ -140,14 +140,51 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('长江电力', body)
         self.assertIn('function validateDates', body)
 
-    def test_result_page_contains_stock_price_chart(self):
-        """测试复盘界面包含股价波动线（使用长江电力真实数据）"""
-        # 使用真实的长江电力数据进行测试
+    @patch('stocks.get_data')
+    @patch('stocks.run_mean_cost')
+    def test_result_page_contains_stock_price_chart(self, mock_run, mock_get_data):
+        """测试复盘界面包含股价波动线（使用mock数据避免污染缓存）"""
+        # Mock数据以避免污染data/600900.csv
+        mock_df = pd.DataFrame({
+            'date': pd.date_range('2023-01-01', periods=20, freq='D'),
+            'open': [22.0 + i*0.1 for i in range(20)],
+            'high': [22.5 + i*0.1 for i in range(20)],
+            'low': [21.5 + i*0.1 for i in range(20)],
+            'close': [22.0 + i*0.1 for i in range(20)],
+            'volume': [1000000 + i*10000 for i in range(20)]
+        })
+        mock_get_data.return_value = mock_df
+        
+        # Mock回测结果 - 包含模板需要的所有字段
+        mock_run.return_value = {
+            'symbol': '600900',
+            'start_date': '2023-01-01',
+            'end_date': '2023-01-31',
+            'init_cash': 100000,
+            'trades': 5,
+            'shares': 100,
+            'cash': 95000,
+            'avg_cost': 22.5,
+            'total_value': 100000,
+            'realized_pl': 500,
+            'unrealized_pl': 200,
+            'market_value': 5000,
+            'max_capital_used': 50000,
+            'trades_list': [
+                {'date': '2023-01-01', 'action': 'buy', 'price': 22.0, 'shares': 100, 'cash': 97800, 'shares_after': 100, 'realized_pl': 0},
+                {'date': '2023-01-05', 'action': 'sell', 'price': 22.5, 'shares': 50, 'cash': 98925, 'shares_after': 50, 'realized_pl': 25},
+            ],
+            'history': [
+                {'date': '2023-01-01', 'total_value': 100000, 'last_price': 22.0},
+                {'date': '2023-01-02', 'total_value': 101000, 'last_price': 22.1},
+            ]
+        }
+        
         rv = self.client.post('/run', data={
-            'symbol': '600900',  # 长江电力
+            'symbol': '600900',
             'strategy': 'mean_cost',
             'start': '20230101',
-            'end': '20230131',  # 使用一个月的数据
+            'end': '20230131',
             'cash': '100000'
         })
         
