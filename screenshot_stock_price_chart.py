@@ -55,14 +55,29 @@ async def capture_stock_price_chart(output_path: str):
                         else:
                             raise
                 
-                # 点击均值成本策略
-                print("🎯 进入均值成本策略页面...")
+                # 第一步：选择股票（使用API）
+                print("🎯 选择股票（长江电力 600900）...")
+                await page.evaluate('''
+                    fetch('/api/select_stock', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({code: '600900', name: '长江电力'})
+                    })
+                ''')
+                await asyncio.sleep(1)
+                
+                # 第二步：导航到策略选择页面
+                print("📋 进入策略选择页面...")
+                await page.goto('http://127.0.0.1:5000/select_strategy', wait_until='networkidle')
+                await asyncio.sleep(1)
+                
+                # 第三步：选择均值成本策略
+                print("💼 选择均值成本策略...")
                 await page.click('text=均值成本策略')
                 await page.wait_for_load_state('networkidle')
                 
-                # 填写表单 - 使用长江电力数据
+                # 第四步：填写表单
                 print("📝 填写回测参数...")
-                await page.fill('input[name="symbol"]', '600900')
                 await page.fill('input[name="start"]', '20230101')
                 await page.fill('input[name="end"]', '20230331')  # 3个月数据足够展示
                 await page.fill('input[name="cash"]', '100000')
