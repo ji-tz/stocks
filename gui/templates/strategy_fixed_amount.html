@@ -28,7 +28,17 @@
   <body>
     <div class="header">
       <h1>🎯 定投策略回测</h1>
-      <a href="/" class="back-link">← 返回首页</a>
+      <a href="/select_strategy" class="back-link">← 返回策略选择</a>
+    </div>
+
+    <div style="background: #e8f5e9; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="color: #666; font-size: 0.9rem;">已选择股票</div>
+        <div style="color: #2e7d32; font-weight: bold; font-size: 1.2rem; margin-top: 0.25rem;">
+          {{ stock_code }} - {{ stock_name }}
+        </div>
+      </div>
+      <a href="/" style="padding: 0.5rem 1rem; background: white; color: #4caf50; border: 1px solid #4caf50; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">重新选择</a>
     </div>
 
     <div class="strategy-info">
@@ -72,11 +82,6 @@
       <h3>回测参数配置</h3>
       <form action="/run" method="post">
         <input type="hidden" name="strategy" value="fixed_amount" />
-        
-        <label>股票代码
-          <input name="symbol" value="600900" required placeholder="例如：600900" />
-          <div class="param-hint">输入A股股票代码，例如：600900（长江电力）、600519（贵州茅台）</div>
-        </label>
 
         <label>每次定投金额（元）
           <input type="number" name="fixed_amount" value="1000" min="100" step="100" required />

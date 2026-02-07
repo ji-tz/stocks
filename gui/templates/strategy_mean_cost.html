@@ -27,7 +27,17 @@
   <body>
     <div class="header">
       <h1>💰 均值成本策略回测</h1>
-      <a href="/" class="back-link">← 返回首页</a>
+      <a href="/select_strategy" class="back-link">← 返回策略选择</a>
+    </div>
+
+    <div style="background: #fff3e0; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <div style="color: #666; font-size: 0.9rem;">已选择股票</div>
+        <div style="color: #e65100; font-weight: bold; font-size: 1.2rem; margin-top: 0.25rem;">
+          {{ stock_code }} - {{ stock_name }}
+        </div>
+      </div>
+      <a href="/" style="padding: 0.5rem 1rem; background: white; color: #ff9800; border: 1px solid #ff9800; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">重新选择</a>
     </div>
 
     <div class="strategy-info">
@@ -63,11 +73,6 @@
       <h3>回测参数配置</h3>
       <form action="/run" method="post">
         <input type="hidden" name="strategy" value="mean_cost" />
-        
-        <label>股票代码
-          <input name="symbol" value="600900" required placeholder="例如：600900" />
-          <div class="param-hint">输入A股股票代码，例如：600900（长江电力）、600519（贵州茅台）</div>
-        </label>
 
         <label>数据源
           <select name="source">

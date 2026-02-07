@@ -68,6 +68,11 @@ jobs:
         python screenshot_main.py screenshots/main_gui.png
       continue-on-error: true
     
+    - name: Take Strategy Config Screenshots
+      run: |
+        echo "=== Taking Strategy Configuration Screenshots ==="
+        python screenshot_strategy_config.py screenshots
+      continue-on-error: true
     - name: Take History Feature Screenshots
       run: |
         echo "=== Taking History and Compare Feature Screenshots ==="
@@ -201,10 +206,16 @@ jobs:
           // 这样图片可以通过 raw.githubusercontent.com 公开访问
           let mainGuiImage = '';
           let yangtzeImage = '';
+          let strategyConfigImages = '';
           let historyImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
+          const strategyPaths = {
+            'SMA策略配置': 'screenshots/strategy_sma_config.png',
+            '均值成本策略配置': 'screenshots/strategy_mean_cost_config.png',
+            '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
+          };
           
           // 历史记录功能截图路径
           const historyScreenshots = [
@@ -236,6 +247,27 @@ jobs:
             }
           } else {
             mainGuiImage = '⚠️ 主界面截图未生成';
+          }
+          
+          // 处理策略配置截图
+          const strategyImages = [];
+          for (const [title, path] of Object.entries(strategyPaths)) {
+            if (fs.existsSync(path)) {
+              if (uploaded && baseUrl) {
+                const filename = path.split('/').pop();
+                const imageUrl = `${baseUrl}/${filename}`;
+                strategyImages.push(`#### ${title}\n\n![${title}](${imageUrl})`);
+                console.log(`${title} URL: ${imageUrl}`);
+              } else {
+                const stats = fs.statSync(path);
+                const filename = path.split('/').pop();
+                strategyImages.push(`#### ${title}\n\n**${filename}** - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`);
+              }
+            }
+          }
+          
+          if (strategyImages.length > 0) {
+            strategyConfigImages = `\n### 🎯 策略参数配置界面\n\n${strategyImages.join('\n\n')}`;
           }
           
           // 处理测试结果图表
@@ -313,6 +345,7 @@ jobs:
           ### 📊 主界面截图
           
           ${mainGuiImage}
+          ${strategyConfigImages}
           
           ${testResult}
           
@@ -321,7 +354,7 @@ jobs:
           ### 📁 完整报告
           
           所有截图和详细测试结果可在 [GitHub Actions Artifacts](${artifactUrl}) 中下载：
-          - **test-screenshots**: 包含主界面截图和测试结果图表
+          - **test-screenshots**: 包含主界面截图、策略配置截图和测试结果图表
           - **test-results**: 包含测试结果JSON数据
           
           ---
