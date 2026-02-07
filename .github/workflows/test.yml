@@ -161,8 +161,16 @@ jobs:
         SCREENSHOT_DIR="stocks/pr-${{ github.event.pull_request.number }}/run-${{ github.run_number }}"
         mkdir -p "$SCREENSHOT_DIR"
         
-        # Copy screenshots
-        cp $GITHUB_WORKSPACE/screenshots/*.png "$SCREENSHOT_DIR/" 2>/dev/null || true
+        # Check if screenshots exist before copying
+        if ls $GITHUB_WORKSPACE/screenshots/*.png 1> /dev/null 2>&1; then
+          # Copy screenshots
+          cp $GITHUB_WORKSPACE/screenshots/*.png "$SCREENSHOT_DIR/"
+          echo "Screenshots copied successfully"
+        else
+          echo "No PNG files found in screenshots directory"
+          echo "uploaded=false" >> $GITHUB_OUTPUT
+          exit 0
+        fi
         
         # Add and commit
         git add "$SCREENSHOT_DIR"
@@ -174,12 +182,15 @@ jobs:
           git commit -m "Add screenshots for stocks PR #${{ github.event.pull_request.number }} run ${{ github.run_number }}"
           
           # Push to the public repository
-          if git push https://${{ secrets.GITHUB_TOKEN }}@github.com/183965983/Images.git main; then
+          # Note: This requires the repository to be public or proper credentials
+          # Using unauthenticated push for public repository
+          if git push origin main; then
             echo "Screenshots uploaded successfully"
             echo "uploaded=true" >> $GITHUB_OUTPUT
             echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
           else
-            echo "Failed to push screenshots"
+            echo "Failed to push screenshots - this may require additional authentication"
+            echo "Consider adding a PAT with repo permissions to secrets.IMAGES_REPO_TOKEN"
             echo "uploaded=false" >> $GITHUB_OUTPUT
           fi
         fi
