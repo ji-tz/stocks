@@ -30,7 +30,7 @@ class SimulatorEngine(BaseEngine):
         self.verbose = verbose
         self.trade_count = 0  # 交易次数
 
-    def buy(self, date: datetime, price: float) -> TradeResult:
+    def buy(self, date: datetime, price: float, shares: Optional[int] = None) -> TradeResult:
         """买入股票
 
         检查资金是否充足，如果充足则执行买入操作。
@@ -38,11 +38,26 @@ class SimulatorEngine(BaseEngine):
         Args:
             date: 交易日期
             price: 买入价格
+            shares: 买入股数（可选）。如果不指定，使用默认的 lot_size
 
         Returns:
             TradeResult: 交易结果，包含是否成功及详细信息
         """
-        cost = price * self.lot_size
+        # 如果没有指定股数，使用默认的 lot_size
+        buy_shares = shares if shares is not None else self.lot_size
+        
+        # 股数必须是正数
+        if buy_shares <= 0:
+            if self.verbose:
+                print(f"[{date.strftime('%Y-%m-%d')}] 买入失败：股数必须为正数 ({buy_shares})")
+            return TradeResult(
+                success=False,
+                message=f"股数必须为正数：{buy_shares}",
+                cash_after=self.account.cash,
+                shares_after=self.account.position.shares
+            )
+        
+        cost = price * buy_shares
 
         # 检查资金是否充足
         if self.account.cash < cost:
@@ -57,7 +72,7 @@ class SimulatorEngine(BaseEngine):
 
         # 执行买入
         self.account.cash -= cost
-        self.account.position.shares += self.lot_size
+        self.account.position.shares += buy_shares
         self.account.position.total_cost += cost
         self.account.position.avg_cost = (
             self.account.position.total_cost / self.account.position.shares
@@ -65,10 +80,10 @@ class SimulatorEngine(BaseEngine):
         )
         self.trade_count += 1
 
-        order = TradeOrder(date=date, action='buy', price=price, shares=self.lot_size)
+        order = TradeOrder(date=date, action='buy', price=price, shares=buy_shares)
 
         if self.verbose:
-            print(f"[{date.strftime('%Y-%m-%d')}] 买入成功：价格 {price:.2f}, 数量 {self.lot_size}, "
+            print(f"[{date.strftime('%Y-%m-%d')}] 买入成功：价格 {price:.2f}, 数量 {buy_shares}, "
                   f"成本 {cost:.2f}, 剩余现金 {self.account.cash:.2f}")
 
         return TradeResult(
