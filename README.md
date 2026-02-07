@@ -34,72 +34,13 @@
 
 ### 4. 自动化工作流（CI/CD）
 
-项目采用三个独立的 GitHub Actions 工作流，实现全面的 CI/CD 流程：
+项目采用三个独立的 GitHub Actions 工作流：
 
-#### 🔍 Lint 工作流 (lint.yml)
-**自动代码检视** - 在每次推送和PR时运行
+- Lint：静态检查（Pylint / Flake8 / Mypy）
+- Test：单元测试 + 界面截图 + 集成测试 + PR 评论
+- Package：打包产物 + Release（tag）
 
-- **Pylint**: Python代码规范检查
-- **Flake8**: 代码风格和语法检查  
-- **Mypy**: 静态类型检查
-
-配置文件：
-- `.pylintrc`: Pylint配置
-- `.flake8`: Flake8配置
-- `mypy.ini`: Mypy配置
-
-#### 🧪 Test 工作流 (test.yml)
-**自动化测试** - 运行所有测试并生成报告
-
-功能包括：
-1. **单元测试**
-   - 运行所有 tests/ 目录下的测试
-   - 策略模拟器专项测试
-   - 验证策略加载功能
-
-2. **界面截图**
-   - 使用 Playwright 自动截取主界面
-   - 脚本：`screenshot_main.py`
-
-3. **集成测试**
-   - 股票定投回测测试（随机从股票池中选择）
-   - 测试期间：2020-2022年
-   - 生成收益图表和统计数据
-
-4. **测试报告**
-   - 自动上传截图到 Artifacts
-   - 上传测试结果 JSON 数据
-   - **在 PR 中自动评论测试结果和截图**
-   - 提供详细的收益数据摘要
-
-测试输出：
-- `screenshots/main_gui.png`: 主界面截图
-- `screenshots/yangtze_power_test.png`: 收益图表
-- `test_results/yangtze_power_test.json`: 详细测试数据
-
-#### 📦 Package 工作流 (package.yml)
-**自动化打包** - 构建发布包和归档产物
-
-打包内容：
-1. **源代码包**
-   - 完整项目源代码压缩包
-   - 自动排除无关文件（.git, __pycache__ 等）
-
-2. **依赖文件**
-   - `requirements.txt`: 项目依赖列表
-   - `requirements-freeze.txt`: 完整版本锁定
-
-3. **文档**
-   - `INSTALL.md`: 详细安装说明
-   - `MANIFEST.md`: 打包清单
-
-4. **测试产物**
-   - 测试截图归档
-   - 测试结果归档
-
-5. **发布支持**
-   - 在 tag 推送时自动创建 GitHub Release
-   - 附带所有打包文件
+详情见 [docs/WORKFLOW.md](docs/WORKFLOW.md)。
 
 ## 项目结构
 
