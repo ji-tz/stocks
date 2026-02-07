@@ -27,6 +27,7 @@
 ### 界面测试
 - `test_gui_app.py` - 测试 Flask Web 界面路由
 - `test_main_run.py` - 测试主程序启动
+- `test_screenshot_cli.py` - 截图脚本 CLI 逻辑测试
 
 ## 运行测试
 

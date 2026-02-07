@@ -65,18 +65,18 @@ jobs:
     - name: Take Main GUI Screenshot
       run: |
         echo "=== Taking Main GUI Screenshot ==="
-        python screenshot_main.py screenshots/main_gui.png
+        python screenshot_main.py main --output screenshots/main_gui.png
       continue-on-error: true
     
     - name: Take Strategy Config Screenshots
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
-        python screenshot_strategy_config.py screenshots
+        python screenshot_main.py strategy --output-dir screenshots
       continue-on-error: true
     - name: Take History Feature Screenshots
       run: |
         echo "=== Taking History and Compare Feature Screenshots ==="
-        python screenshot_history.py screenshots
+        python screenshot_main.py history --output-dir screenshots
       continue-on-error: true
     
     - name: Run Stock Integration Test (Random Selection)
@@ -88,7 +88,7 @@ jobs:
     - name: Take Stock Price Chart Screenshot
       run: |
         echo "=== Taking Stock Price Chart Screenshot ==="
-        python screenshot_stock_price_chart.py screenshots/stock_price_chart.png
+        python screenshot_main.py chart --output screenshots/stock_price_chart.png
       continue-on-error: true
     
     - name: Upload Screenshots
