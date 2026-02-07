@@ -188,8 +188,10 @@ jobs:
         git add "$SCREENSHOT_DIR"
         
         if git diff --cached --quiet; then
-          echo "No new screenshots to upload"
-          echo "uploaded=false" >> $GITHUB_OUTPUT
+          echo "No new screenshots to upload (already exist)"
+          # Still set outputs so reruns can use existing public URLs
+          echo "uploaded=true" >> $GITHUB_OUTPUT
+          echo "base_url=https://raw.githubusercontent.com/183965983/Images/main/$SCREENSHOT_DIR" >> $GITHUB_OUTPUT
         else
           git commit -m "Add screenshots for stocks PR #${{ github.event.pull_request.number }} run ${{ github.run_number }}"
           
@@ -213,7 +215,9 @@ jobs:
             else
               echo "❌ Failed to push screenshots - authentication required"
               echo "Please add IMAGES_REPO_TOKEN to repository secrets"
-              echo "See: https://github.com/183965983/stocks/settings/secrets/actions"
+              echo "⚠️ Recommended: Use a fine-grained PAT with 'contents: read/write' permission scoped only to the 183965983/Images repository"
+              echo "See: https://github.com/settings/tokens?type=beta (fine-grained) or https://github.com/settings/tokens (classic with repo scope)"
+              echo "Add at: https://github.com/183965983/stocks/settings/secrets/actions"
               echo "uploaded=false" >> $GITHUB_OUTPUT
             fi
           fi
@@ -227,7 +231,6 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
-          const path = require('path');
           
           // 使用公开的 Images 仓库来托管图片
           // 这样图片可以通过 raw.githubusercontent.com 公开访问
