@@ -19,6 +19,9 @@
       <div class="card"><strong>代码：</strong> {{ result.symbol }}</div>
       <div class="card"><strong>日期：</strong> {{ result.start_date }} → {{ result.end_date }}</div>
       <div class="card"><strong>初始资金：</strong> {{ result.init_cash }}</div>
+      {% if result.market_value is defined %}
+      <div class="card"><strong>总共动用资金：</strong> {{ '%.2f'|format(result.market_value) }}</div>
+      {% endif %}
       <div class="card"><strong>交易次数：</strong> {{ result.trades }}</div>
       <div class="card"><strong>最终总资产：</strong> {{ result.total_value }}</div>
       <div class="card"><strong>已实现盈亏：</strong> {{ result.realized_pl }}</div>
