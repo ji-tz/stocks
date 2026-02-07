@@ -27,7 +27,7 @@ class BaostockProvider(BaseProvider):
                                           start_date=sd,
                                           end_date=ed,
                                           frequency="d",
-                                          adjustflag="3")
+                                          adjustflag="2")
 
         if rs.error_code != "0":
             bs.logout()
