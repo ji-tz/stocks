@@ -81,6 +81,23 @@ def select_stock():
     return jsonify({'success': True})
 
 
+@app.route('/api/select_strategy', methods=['POST'])
+def select_strategy_api():
+    """选择策略API"""
+    data = request.get_json()
+    strategy_type = data.get('strategy_type')
+    strategy_name = data.get('strategy_name')
+    
+    if not strategy_type or not strategy_name:
+        return jsonify({'success': False, 'error': '策略类型和名称不能为空'})
+    
+    # 保存到session
+    session['strategy_type'] = strategy_type
+    session['strategy_name'] = strategy_name
+    
+    return jsonify({'success': True})
+
+
 @app.route('/select_strategy', methods=['GET'])
 def select_strategy():
     """策略选择页面"""
@@ -94,35 +111,105 @@ def select_strategy():
     return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
 
 
-@app.route('/strategy/sma', methods=['GET'])
-def strategy_sma():
+@app.route('/select_mode', methods=['GET'])
+def select_mode():
+    """运行模式选择页面"""
     stock_code = session.get('stock_code')
     stock_name = session.get('stock_name')
+    strategy_type = session.get('strategy_type')
+    strategy_name = session.get('strategy_name')
     
+    if not stock_code or not stock_name or not strategy_type or not strategy_name:
+        # 如果缺少必要信息，跳转回相应页面
+        if not stock_code or not stock_name:
+            return render_template('select_stock.html')
+        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+    
+    return render_template('select_mode.html', 
+                         stock_code=stock_code, 
+                         stock_name=stock_name,
+                         strategy_type=strategy_type,
+                         strategy_name=strategy_name)
+
+
+@app.route('/api/select_mode', methods=['POST'])
+def select_mode_api():
+    """选择运行模式API"""
+    data = request.get_json()
+    mode = data.get('mode')
+    
+    if not mode:
+        return jsonify({'success': False, 'error': '运行模式不能为空'})
+    
+    # 保存到session
+    session['run_mode'] = mode
+    
+    return jsonify({'success': True})
+
+
+@app.route('/strategy/sma', methods=['GET'])
+def strategy_sma():
+    """SMA策略配置页面"""
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    strategy_type = session.get('strategy_type')
+    run_mode = session.get('run_mode')
+    
+    # 检查是否有必要的信息
     if not stock_code or not stock_name:
         return render_template('select_stock.html')
+    if not strategy_type:
+        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+    if not run_mode:
+        return render_template('select_mode.html', 
+                             stock_code=stock_code, 
+                             stock_name=stock_name,
+                             strategy_type=strategy_type,
+                             strategy_name=session.get('strategy_name', 'SMA'))
     
     return render_template('strategy_sma.html', stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/strategy/mean_cost', methods=['GET'])
 def strategy_mean_cost():
+    """均值成本策略配置页面"""
     stock_code = session.get('stock_code')
     stock_name = session.get('stock_name')
+    strategy_type = session.get('strategy_type')
+    run_mode = session.get('run_mode')
     
     if not stock_code or not stock_name:
         return render_template('select_stock.html')
+    if not strategy_type:
+        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+    if not run_mode:
+        return render_template('select_mode.html', 
+                             stock_code=stock_code, 
+                             stock_name=stock_name,
+                             strategy_type=strategy_type,
+                             strategy_name=session.get('strategy_name', '均值成本'))
     
     return render_template('strategy_mean_cost.html', stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/strategy/fixed_amount', methods=['GET'])
 def strategy_fixed_amount():
+    """定投策略配置页面"""
     stock_code = session.get('stock_code')
     stock_name = session.get('stock_name')
+    strategy_type = session.get('strategy_type')
+    run_mode = session.get('run_mode')
     
     if not stock_code or not stock_name:
         return render_template('select_stock.html')
+    if not strategy_type:
+        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+    if not run_mode:
+        return render_template('select_mode.html', 
+                             stock_code=stock_code, 
+                             stock_name=stock_name,
+                             strategy_type=strategy_type,
+                             strategy_name=session.get('strategy_name', '定投'))
     
     return render_template('strategy_fixed_amount.html', stock_code=stock_code, stock_name=stock_name)
 

@@ -6,10 +6,19 @@
     <title>定投策略 - 量化回测平台</title>
     <style>
       body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
       .header h1 { margin: 0; color: #1976d2; }
       .back-link { color: #1976d2; text-decoration: none; }
       .back-link:hover { text-decoration: underline; }
+      .breadcrumb { background: #f5f5f5; padding: 0.8rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem; }
+      .breadcrumb-item { display: inline-block; color: #666; }
+      .breadcrumb-item.active { color: #1976d2; font-weight: bold; }
+      .breadcrumb-separator { margin: 0 0.5rem; color: #999; }
+      .selected-info-box { background: #e8f5e9; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; }
+      .selected-info-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+      .selected-info-row:last-child { margin-bottom: 0; }
+      .selected-info-label { color: #666; font-size: 0.9rem; }
+      .selected-info-value { color: #2e7d32; font-weight: bold; font-size: 1.1rem; }
       .strategy-info { background: #e8f5e9; border-left: 4px solid #4caf50; padding: 1rem; margin: 1rem 0; }
       .strategy-info h2 { margin-top: 0; color: #2e7d32; font-size: 1.2rem; }
       .strategy-info p { margin: 0.5rem 0; line-height: 1.6; }
@@ -27,18 +36,35 @@
   </head>
   <body>
     <div class="header">
-      <h1>🎯 定投策略回测</h1>
-      <a href="/select_strategy" class="back-link">← 返回策略选择</a>
+      <h1>🎯 第四步：配置参数</h1>
+      <a href="/select_mode" class="back-link">← 返回运行模式选择</a>
+    </div>
+    
+    <div class="breadcrumb">
+      <span class="breadcrumb-item">✓ 选择股票</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item">✓ 选择策略</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item">✓ 选择运行模式</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item active">配置参数</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item">查看结果</span>
     </div>
 
-    <div style="background: #e8f5e9; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1.5rem; display: flex; justify-content: space-between; align-items: center;">
-      <div>
-        <div style="color: #666; font-size: 0.9rem;">已选择股票</div>
-        <div style="color: #2e7d32; font-weight: bold; font-size: 1.2rem; margin-top: 0.25rem;">
-          {{ stock_code }} - {{ stock_name }}
-        </div>
+    <div class="selected-info-box">
+      <div class="selected-info-row">
+        <span class="selected-info-label">股票</span>
+        <span class="selected-info-value">{{ stock_code }} - {{ stock_name }}</span>
       </div>
-      <a href="/" style="padding: 0.5rem 1rem; background: white; color: #4caf50; border: 1px solid #4caf50; border-radius: 4px; text-decoration: none; font-size: 0.9rem;">重新选择</a>
+      <div class="selected-info-row">
+        <span class="selected-info-label">策略</span>
+        <span class="selected-info-value">定投策略</span>
+      </div>
+      <div class="selected-info-row">
+        <span class="selected-info-label">运行模式</span>
+        <span class="selected-info-value">📊 回测仿真</span>
+      </div>
     </div>
 
     <div class="strategy-info">
