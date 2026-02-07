@@ -96,6 +96,7 @@ class TestGuiRoutes(unittest.TestCase):
             sess['strategy_name'] = 'SMA'
             sess['run_mode'] = 'backtest'
         
+
         rv = self.client.get('/strategy/sma')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
@@ -117,6 +118,7 @@ class TestGuiRoutes(unittest.TestCase):
             sess['strategy_name'] = '均值成本'
             sess['run_mode'] = 'backtest'
         
+
         rv = self.client.get('/strategy/mean_cost')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
@@ -138,6 +140,7 @@ class TestGuiRoutes(unittest.TestCase):
             sess['strategy_name'] = '定投'
             sess['run_mode'] = 'backtest'
         
+
         rv = self.client.get('/strategy/fixed_amount')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
