@@ -63,6 +63,7 @@ stocks/
 ├── source/                # 数据源
 │   └── data_provider.py  # 数据提供者
 ├── tests/                 # 单元测试
+│   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 ├── data/                  # 本地数据缓存
 ├── screenshot_main.py     # GUI截图脚本（统一入口）
 ├── test_yangtze_power.py  # 股票集成测试（支持随机选择）
@@ -165,10 +166,10 @@ python main.py
 python -m unittest discover tests -v
 
 # 运行股票集成测试（随机选择）
-python test_yangtze_power.py
+python -m tests.test_yangtze_power
 
 # 运行股票集成测试（指定股票）
-python -c "from test_yangtze_power import run_yangtze_power_test; run_yangtze_power_test(symbol='600900')"
+python -c "from tests.test_yangtze_power import run_yangtze_power_test; run_yangtze_power_test(symbol='600900')"
 ```
 
 ### 代码检查

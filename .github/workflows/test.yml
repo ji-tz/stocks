@@ -82,7 +82,7 @@ jobs:
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
-        python test_yangtze_power.py
+        python -m tests.test_yangtze_power
       continue-on-error: true
     
     - name: Take Stock Price Chart Screenshot
