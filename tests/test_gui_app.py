@@ -30,11 +30,16 @@ class TestGuiRoutes(unittest.TestCase):
         mock_get.return_value = df
         mock_mean.return_value = {
             'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-01-10', 'init_cash': 100000.0,
-            'trades': 1, 'total_value': 100000.0, 'realized_pl': 0.0, 'unrealized_pl': 0.0, 'history': [], 'trades_list': []
+            'trades': 1, 'total_value': 100000.0, 'market_value': 20000.0, 'realized_pl': 0.0, 'unrealized_pl': 0.0, 'history': [], 'trades_list': []
         }
         rv = self.client.post('/run', data={'symbol': '600900', 'strategy': 'mean_cost', 'start': '20230101', 'end': '20231231'})
         self.assertEqual(rv.status_code, 200)
-        self.assertIn('平均成本策略回测结果', rv.data.decode('utf-8'))
+        body = rv.data.decode('utf-8')
+        self.assertIn('平均成本策略回测结果', body)
+        # Verify the new "总共动用资金" field is displayed with correct value
+        self.assertIn('总共动用资金', body)
+        # Check that the market value appears in the correct context (near the label)
+        self.assertIn('总共动用资金：</strong> 20000.00', body)
         # ensure backend was queried with date range
         mock_get.assert_called()
 
