@@ -33,7 +33,7 @@ class AkshareProvider(BaseProvider):
                                         period="daily",
                                         start_date=start_date,
                                         end_date=end_date,
-                                        adjust="",
+                                        adjust="qfq",
                                         timeout=None)
             finally:
                 requests.Session = orig_session
