@@ -50,8 +50,15 @@ flask --app gui.web run
 
 ```bash
 pip install gunicorn
+# 设置安全的secret_key环境变量
+export SECRET_KEY="your-random-secret-key-here"
 gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 ```
+
+**生产环境安全配置：**
+- 务必设置 `SECRET_KEY` 环境变量，使用强随机密钥
+- 可使用 `python -c "import secrets; print(secrets.token_hex(32))"` 生成密钥
+- 不要在生产环境使用默认的 secret_key
 
 ## 用户操作流程
 

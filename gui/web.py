@@ -9,14 +9,36 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import stocks
 
 app = Flask(__name__, template_folder='templates')
-app.secret_key = 'stocks-quantitative-backtest-secret-key-2024'  # 用于session加密
+# 使用环境变量配置secret_key，开发环境使用默认值
+app.secret_key = os.environ.get('SECRET_KEY', 'stocks-quantitative-backtest-secret-key-2024')
 
+# 在应用启动时加载股票列表到内存，避免重复文件IO
+_STOCK_LIST = None
+_STOCK_INDEX = None
 
-def load_stock_list():
-    """加载股票列表映射"""
-    stock_file = os.path.join(os.path.dirname(__file__), 'stock_list.json')
-    with open(stock_file, 'r', encoding='utf-8') as f:
-        return json.load(f)
+def _init_stock_data():
+    """初始化股票数据和索引"""
+    global _STOCK_LIST, _STOCK_INDEX
+    if _STOCK_LIST is None:
+        stock_file = os.path.join(os.path.dirname(__file__), 'stock_list.json')
+        with open(stock_file, 'r', encoding='utf-8') as f:
+            _STOCK_LIST = json.load(f)
+        
+        # 创建索引以支持O(1)查找
+        _STOCK_INDEX = {}
+        for stock in _STOCK_LIST:
+            _STOCK_INDEX[stock['code']] = stock
+            _STOCK_INDEX[stock['name']] = stock
+
+def get_stock_list():
+    """获取股票列表"""
+    _init_stock_data()
+    return _STOCK_LIST
+
+def search_stock_by_query(query: str):
+    """通过代码或名称搜索股票（精确匹配）"""
+    _init_stock_data()
+    return _STOCK_INDEX.get(query)
 
 
 @app.route('/', methods=['GET'])
@@ -32,17 +54,10 @@ def search_stock():
     if not query:
         return jsonify({'error': '请输入股票代码或名称'})
     
-    stock_list = load_stock_list()
-    
-    # 精确匹配股票代码
-    for stock in stock_list:
-        if stock['code'] == query:
-            return jsonify({'code': stock['code'], 'name': stock['name']})
-    
-    # 精确匹配股票名称
-    for stock in stock_list:
-        if stock['name'] == query:
-            return jsonify({'code': stock['code'], 'name': stock['name']})
+    # 使用优化后的索引查找
+    stock = search_stock_by_query(query)
+    if stock:
+        return jsonify({'code': stock['code'], 'name': stock['name']})
     
     return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
 
