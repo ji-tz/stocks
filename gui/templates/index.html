@@ -5,100 +5,67 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>量化回测平台</title>
     <style>
-      body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
-      label { display:block; margin-top: 1rem; }
-      input, select { padding: 0.5rem; width: 100%; max-width: 300px; }
-      button { margin-top: 1rem; padding: 0.6rem 1rem; }
+      body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+      h1 { color: #1976d2; }
+      .strategy-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
+      .strategy-card { 
+        border: 1px solid #ddd; 
+        border-radius: 8px; 
+        padding: 1.5rem; 
+        background: #f9f9f9;
+        cursor: pointer;
+        transition: all 0.3s;
+      }
+      .strategy-card:hover { 
+        box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
+        transform: translateY(-2px);
+        background: #fff;
+      }
+      .strategy-card h3 { margin-top: 0; color: #1976d2; }
+      .strategy-card p { margin: 0.5rem 0; color: #666; line-height: 1.6; }
+      .strategy-card .btn { 
+        display: inline-block;
+        margin-top: 1rem;
+        padding: 0.6rem 1.2rem;
+        background: #1976d2;
+        color: white;
+        text-decoration: none;
+        border-radius: 4px;
+        transition: background 0.3s;
+      }
+      .strategy-card .btn:hover { background: #1565c0; }
     </style>
   </head>
   <body>
     <h1>量化回测平台</h1>
-    <p>输入股票代码并运行回测（示例：600900）。</p>
-    <form action="/run" method="post">
-      <label>股票代码
-        <input name="symbol" value="600900" required />
-      </label>
-      <label>策略
-        <select name="strategy">
-          <option value="sma">SMA 回测（Backtrader）</option>
-          <option value="mean_cost">平均成本日开盘买卖（模拟）</option>
-        </select>
-      </label>
-      <label>数据源
-        <select name="source">
-          <option value="auto">auto</option>
-          <option value="akshare">akshare</option>
-          <option value="baostock">baostock</option>
-        </select>
-      </label>
-      <label>每手股数
-        <input name="lot" value="100" />
-      </label>
-      <label>初始资金
-        <input name="cash" value="100000" />
-      </label>
-      <label>起始日期 (YYYYMMDD 或 YYYY-MM-DD)
-        <input name="start" placeholder="可选，例如 20230101" />
-      </label>
-      <label>结束日期 (YYYYMMDD 或 YYYY-MM-DD)
-        <input name="end" placeholder="可选，例如 20231231" />
-      <button type="submit">运行回测</button>
-    </form>
-    <p id="date-error" style="color:#b00020; font-weight:600; display:none;">日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD</p>
+    <p>选择投资策略，配置参数并运行回测分析。</p>
+    
+    <div class="strategy-cards">
+      <div class="strategy-card" onclick="location.href='/strategy/sma'">
+        <h3>📈 SMA 策略</h3>
+        <p><strong>简单移动平均策略</strong></p>
+        <p>基于移动平均线的趋势跟随策略。当价格突破均线时买入，跌破时卖出。</p>
+        <p>✓ 趋势跟随 | ✓ 简单有效 | ✓ 适合单边行情</p>
+        <a href="/strategy/sma" class="btn">配置并运行 →</a>
+      </div>
+      
+      <div class="strategy-card" onclick="location.href='/strategy/mean_cost'">
+        <h3>💰 均值成本策略</h3>
+        <p><strong>低买高卖策略</strong></p>
+        <p>在价格低于平均成本时加仓，高于成本时减仓。适合震荡市场。</p>
+        <p>✓ 摊低成本 | ✓ 逢低加仓 | ✓ 适合震荡行情</p>
+        <a href="/strategy/mean_cost" class="btn">配置并运行 →</a>
+      </div>
+      
+      <div class="strategy-card" onclick="location.href='/strategy/fixed_amount'">
+        <h3>🎯 定投策略</h3>
+        <p><strong>固定金额投资策略</strong></p>
+        <p>每天投入固定金额买入股票，平滑市场波动，适合长期投资。</p>
+        <p>✓ 降低择时风险 | ✓ 平滑成本 | ✓ 适合长期持有</p>
+        <a href="/strategy/fixed_amount" class="btn">配置并运行 →</a>
+      </div>
+    </div>
 
-    <script>
-      // 简单客户端日期格式校验：支持 YYYYMMDD 或 YYYY-MM-DD
-      function validateDates() {
-        const start = document.querySelector('input[name="start"]').value.trim();
-        const end = document.querySelector('input[name="end"]').value.trim();
-        const re1 = /^\d{8}$/;
-        const re2 = /^\d{4}-\d{2}-\d{2}$/;
-        const errEl = document.getElementById('date-error');
 
-        function ok(s) {
-          return s === '' || re1.test(s) || re2.test(s);
-        }
-
-        if (!ok(start)) {
-          errEl.textContent = '起始日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
-          errEl.style.display = 'block';
-          return false;
-        }
-        if (!ok(end)) {
-          errEl.textContent = '结束日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
-          errEl.style.display = 'block';
-          return false;
-        }
-        // 若两个都有值，且格式正确，尝试比较（将带 - 的格式规范化为 YYYYMMDD 比较）
-        if (start !== '' && end !== '') {
-          const norm = s => s.replace(/-/g, '');
-          if (norm(start) > norm(end)) {
-            errEl.textContent = '起始日期不能晚于结束日期';
-            errEl.style.display = 'block';
-            return false;
-          }
-        }
-
-        errEl.style.display = 'none';
-        return true;
-      }
-
-      // 绑定到表单提交
-      (function(){
-        const form = document.querySelector('form[action="/run"]');
-        if (!form) return;
-        form.addEventListener('submit', function(e){
-          if (!validateDates()) {
-            e.preventDefault();
-            return false;
-          }
-        });
-        // 实时清理提示
-        ['start','end'].forEach(name => {
-          const el = document.querySelector('input[name="' + name + '"]');
-          if (el) el.addEventListener('input', validateDates);
-        });
-      })();
-    </script>
   </body>
 </html>

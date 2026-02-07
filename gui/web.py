@@ -15,6 +15,21 @@ def index():
     return render_template('index.html')
 
 
+@app.route('/strategy/sma', methods=['GET'])
+def strategy_sma():
+    return render_template('strategy_sma.html')
+
+
+@app.route('/strategy/mean_cost', methods=['GET'])
+def strategy_mean_cost():
+    return render_template('strategy_mean_cost.html')
+
+
+@app.route('/strategy/fixed_amount', methods=['GET'])
+def strategy_fixed_amount():
+    return render_template('strategy_fixed_amount.html')
+
+
 @app.route('/run', methods=['POST'])
 def run():
     symbol = request.form.get('symbol', '600900').strip()
@@ -42,9 +57,22 @@ def run():
 
         return render_template('result_mean.html', result=res)
 
+    if strategy == 'fixed_amount':
+        try:
+            fixed_amount = float(request.form.get('fixed_amount') or 1000.0)
+            res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end, 
+                                        fixed_amount=fixed_amount, lot_size=lot, 
+                                        init_cash=cash, source=source)
+        except Exception as e:
+            return render_template('result.html', error=f"模拟运行失败: {e}")
+
+        return render_template('result_mean.html', result=res)
+
     # 默认使用 stocks 提供的 SMA 回测封装，返回统一结构以便前端展示
     try:
-        res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end, lot_size=lot, init_cash=cash)
+        period = int(request.form.get('period') or 20)
+        res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end, 
+                                     lot_size=lot, init_cash=cash, period=period)
     except Exception as e:
         return render_template('result.html', error=f"回测运行失败: {e}")
 

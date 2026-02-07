@@ -13,10 +13,11 @@ from typing import Optional, Dict, Any
 from source.data_provider import get_data as _get_data
 
 try:
-    from simulator.simulator import simulate_mean_cost
+    from simulator.simulator import simulate_mean_cost, simulate_fixed_amount
 except Exception:
     # 兼容性：若 simulator 不可用，保留 None
     simulate_mean_cost = None
+    simulate_fixed_amount = None
 
 
 def init(cache_dir: str = "data") -> None:
@@ -111,13 +112,46 @@ def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_
     return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, lot_size=lot_size, init_cash=init_cash, source=source)
 
 
+def run_fixed_amount(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
+                    fixed_amount: float = 1000.0, lot_size: int = 100, init_cash: float = 100000.0, 
+                    source: object = "auto") -> Dict[str, Any]:
+    """调用定投策略模拟（封装自 simulator.simulator.simulate_fixed_amount）。
+    
+    Args:
+        symbol: 股票代码
+        start_date: 开始日期
+        end_date: 结束日期
+        fixed_amount: 每次定投金额（默认 1000 元）
+        lot_size: 交易手数
+        init_cash: 初始资金
+        source: 数据源
+        
+    Returns:
+        包含回测结果的字典
+    """
+    if simulate_fixed_amount is None:
+        raise RuntimeError("fixed_amount 模块不可用")
+    return simulate_fixed_amount(symbol=symbol, start_date=start_date, end_date=end_date, 
+                                fixed_amount=fixed_amount, lot_size=lot_size, 
+                                init_cash=init_cash, source=source)
+
+
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      start_date: Optional[str] = None, end_date: Optional[str] = None,
-                     lot_size: int = 100, init_cash: float = 100000.0) -> Dict[str, Any]:
+                     lot_size: int = 100, init_cash: float = 100000.0, period: int = 20) -> Dict[str, Any]:
     """使用 Backtrader 运行 SMA 回测并返回统一的展示结果。
 
     仍然会尝试通过 backtrader 运行策略（以保持与现有测试/行为兼容），
     同时使用基于 pandas 的 `simulate_sma` 生成包含 `history`/`trades_list` 的详细结果，便于前端统一显示。
+    
+    Args:
+        symbol: 股票代码
+        source: 数据源
+        start_date: 开始日期
+        end_date: 结束日期
+        lot_size: 交易手数
+        init_cash: 初始资金
+        period: SMA 周期（默认 20）
     """
     try:
         import backtrader as bt
@@ -145,15 +179,6 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
 
     # 基于 pandas 的模拟，产生统一展示结构
     try:
-        # 取策略内默认 period，如不可得则使用 20
-        period = 20
-        if hasattr(SmaStrategy, 'params'):
-            try:
-                # backtrader 的 params 通常不可直接读取为值，这里保守使用 20
-                period = 20
-            except Exception:
-                period = 20
-
         sim_res = simulate_sma(symbol=symbol, df=df, period=period, lot_size=lot_size, init_cash=init_cash)
     except Exception:
         return {
