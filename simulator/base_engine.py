@@ -21,17 +21,17 @@ class Position:
 class Account:
     """账户信息"""
     cash: float = 100000.0  # 现金
-    position: Position = None  # 持仓
-    
+    position: Optional[Position] = None  # 持仓
+
     def __post_init__(self):
         if self.position is None:
             self.position = Position()
-    
+
     @property
     def market_value(self) -> float:
         """市值（需要当前价格，由外部计算）"""
         return 0.0
-    
+
     def get_total_value(self, current_price: float) -> float:
         """获取总资产价值"""
         market_value = self.position.shares * current_price
@@ -60,20 +60,20 @@ class TradeResult:
 
 class BaseEngine(ABC):
     """交易引擎抽象基类
-    
+
     定义交易引擎的统一接口，支持：
     - 买入/卖出操作
     - 查询账户状态
     - 查询持仓信息
-    
+
     子类实现：
     - SimulatorEngine: 模拟交易引擎（回测）
     - RealEngine: 实盘交易引擎（实际交易，预留）
     """
-    
+
     def __init__(self, init_cash: float = 100000.0, lot_size: int = 100):
         """初始化交易引擎
-        
+
         Args:
             init_cash: 初始资金
             lot_size: 交易手数（每次买卖的股数）
@@ -81,55 +81,55 @@ class BaseEngine(ABC):
         self.lot_size = lot_size
         self.account = Account(cash=init_cash)
         self.realized_pl = 0.0  # 累计已实现盈亏
-        
+
     @abstractmethod
     def buy(self, date: datetime, price: float) -> TradeResult:
         """买入股票
-        
+
         Args:
             date: 交易日期
             price: 买入价格
-            
+
         Returns:
             TradeResult: 交易结果
         """
         pass
-    
+
     @abstractmethod
     def sell(self, date: datetime, price: float) -> TradeResult:
         """卖出股票
-        
+
         Args:
             date: 交易日期
             price: 卖出价格
-            
+
         Returns:
             TradeResult: 交易结果
         """
         pass
-    
+
     def get_cash(self) -> float:
         """获取当前现金"""
         return self.account.cash
-    
+
     def get_position(self) -> Position:
         """获取当前持仓"""
         return self.account.position
-    
+
     def get_account(self) -> Account:
         """获取账户信息"""
         return self.account
-    
+
     def get_total_value(self, current_price: float) -> float:
         """获取总资产价值"""
         return self.account.get_total_value(current_price)
-    
+
     def get_summary(self, current_price: float) -> Dict[str, Any]:
         """获取账户摘要
-        
+
         Args:
             current_price: 当前股价
-            
+
         Returns:
             包含账户详细信息的字典
         """
@@ -137,7 +137,7 @@ class BaseEngine(ABC):
         market_value = pos.shares * current_price
         unrealized_pl = ((current_price - pos.avg_cost) * pos.shares) if pos.shares > 0 else 0.0
         total_value = self.account.cash + market_value
-        
+
         return {
             'cash': round(self.account.cash, 2),
             'shares': pos.shares,

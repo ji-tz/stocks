@@ -43,12 +43,12 @@ __all__ = [
     'Simulator',
     'simulate_mean_cost',
     'simulate_sma',
-    
+
     # 引擎接口
     'BaseEngine',
-    'SimulatorEngine', 
+    'SimulatorEngine',
     'RealEngine',
-    
+
     # 数据结构
     'Position',
     'Account',

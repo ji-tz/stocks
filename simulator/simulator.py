@@ -9,7 +9,7 @@ class Simulator:
     """通用模拟器：根据传入的决策器在时间序列上执行买/卖操作。
 
     决策器应实现 `decide(**kwargs)` 方法，返回 'buy' / 'sell' / None。
-    
+
     现已基于新的 SimulatorEngine 架构重构，支持：
     - 更好的代码解耦
     - 详细的每日交易日志
@@ -18,7 +18,7 @@ class Simulator:
 
     def __init__(self, lot_size: int = 100, init_cash: float = 100000.0, verbose: bool = False):
         """初始化模拟器
-        
+
         Args:
             lot_size: 交易手数
             init_cash: 初始资金
@@ -30,7 +30,7 @@ class Simulator:
 
     def simulate(self, df, strategy, symbol: str = "", start_date: Optional[str] = None, end_date: Optional[str] = None, source: str = "auto", verbose: Optional[bool] = None) -> Dict[str, Any]:
         """执行模拟交易
-        
+
         Args:
             df: 包含股票数据的DataFrame
             strategy: 决策策略对象，需实现decide()方法
@@ -39,7 +39,7 @@ class Simulator:
             end_date: 结束日期（可选）
             source: 数据源（可选）
             verbose: 是否打印详细信息（覆盖init时的设置）
-            
+
         Returns:
             包含模拟结果的字典
         """
@@ -53,10 +53,10 @@ class Simulator:
         # 使用新的 SimulatorEngine
         use_verbose = verbose if verbose is not None else self.verbose
         engine = SimulatorEngine(init_cash=self.init_cash, lot_size=self.lot_size, verbose=use_verbose)
-        
+
         history: List[Dict[str, Any]] = []
         trades_list: List[Dict[str, Any]] = []
-        
+
         if use_verbose:
             print(f"\n{'='*100}")
             print(f"开始模拟交易 - 股票: {symbol if symbol else '未知'}")
@@ -77,18 +77,18 @@ class Simulator:
             action = None
             try:
                 action = strategy.decide(
-                    open_price=price_open, 
-                    close_price=price_close, 
-                    avg_cost=avg_cost, 
-                    shares=pos.shares, 
+                    open_price=price_open,
+                    close_price=price_close,
+                    avg_cost=avg_cost,
+                    shares=pos.shares,
                     date=date
                 )
             except TypeError:
                 # 向后兼容：尝试不带 date 参数
                 action = strategy.decide(
-                    open_price=price_open, 
-                    close_price=price_close, 
-                    avg_cost=avg_cost, 
+                    open_price=price_open,
+                    close_price=price_close,
+                    avg_cost=avg_cost,
                     shares=pos.shares
                 )
 
@@ -117,10 +117,10 @@ class Simulator:
                         'shares_after': trade_result.shares_after,
                         'realized_pl': round(engine.realized_pl, 4)
                     })
-            
+
             # 打印每日状态（如果开启verbose）
             engine.print_daily_status(date, price_open, price_close, action)
-            
+
             # 记录历史
             summary = engine.get_summary(price_close)
             history.append({
@@ -136,11 +136,11 @@ class Simulator:
         # 生成最终报告
         last_price = float(df.iloc[-1]['close'])
         final_summary = engine.get_summary(last_price)
-        
+
         if use_verbose:
-            print(f"\n{'='*100}")
-            print(f"模拟交易结束")
-            print(f"{'='*100}")
+            print("\n" + "=" * 100)
+            print("模拟交易结束")
+            print("=" * 100)
             print(f"总交易次数: {engine.trade_count}")
             print(f"最终现金: {final_summary['cash']:.2f}")
             print(f"最终持仓: {final_summary['shares']} 股")
@@ -199,7 +199,6 @@ def simulate_sma(symbol: str = "600900",
                  lot_size: int = 100,
                  init_cash: float = 100000.0):
     from solver.sma_strategy import SmaDecision
-    import pandas as _pd
 
     if df is None:
         raise RuntimeError("需要传入数据 DataFrame 才能模拟")
