@@ -68,6 +68,12 @@ jobs:
         python screenshot_main.py screenshots/main_gui.png
       continue-on-error: true
     
+    - name: Take History Feature Screenshots
+      run: |
+        echo "=== Taking History and Compare Feature Screenshots ==="
+        python screenshot_history.py screenshots
+      continue-on-error: true
+    
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
@@ -195,9 +201,18 @@ jobs:
           // 这样图片可以通过 raw.githubusercontent.com 公开访问
           let mainGuiImage = '';
           let yangtzeImage = '';
+          let historyImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
+          
+          // 历史记录功能截图路径
+          const historyScreenshots = [
+            { path: 'screenshots/02_empty_history_page.png', title: '空历史记录页面' },
+            { path: 'screenshots/04_history_with_one_record.png', title: '包含一条记录的历史页面' },
+            { path: 'screenshots/06_history_records_selected.png', title: '选中记录准备对比' },
+            { path: 'screenshots/07_compare_page_with_charts.png', title: '对比页面（表格+图表）' }
+          ];
           
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
@@ -235,6 +250,31 @@ jobs:
             }
           } else {
             yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
+          }
+          
+          // 处理历史记录功能截图
+          let historyImagesList = [];
+          for (const screenshot of historyScreenshots) {
+            if (fs.existsSync(screenshot.path)) {
+              if (uploaded && baseUrl) {
+                const filename = screenshot.path.split('/').pop();
+                const imageUrl = `${baseUrl}/${filename}`;
+                historyImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
+                console.log(`History screenshot URL: ${imageUrl}`);
+              } else {
+                const stats = fs.statSync(screenshot.path);
+                const filename = screenshot.path.split('/').pop();
+                historyImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
+              }
+            }
+          }
+          
+          if (historyImagesList.length > 0) {
+            historyImages = `
+          ### 📋 历史记录功能截图
+          
+          ${historyImagesList.join('\n\n')}
+          `;
           }
           
            // 读取测试结果
@@ -275,6 +315,8 @@ jobs:
           ${mainGuiImage}
           
           ${testResult}
+          
+          ${historyImages}
           
           ### 📁 完整报告
           
