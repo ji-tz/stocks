@@ -332,7 +332,7 @@ jobs:
               testResult = `
           ### 📊 策略复盘界面
           
-          **测试数据摘要**：
+          **测试数据摘要**:
           - **股票代码**: ${data.symbol || '未知'}
           - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
           - **初始资金**: ¥${(data.init_cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
@@ -345,7 +345,7 @@ jobs:
           - **交易次数**: ${data.trades || 0}
           - **持有股数**: ${data.shares || 0}
           
-          **真实UI界面截图**：
+          **真实UI界面截图**:
           
           ${backtestResultImage}
           `;
