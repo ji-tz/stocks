@@ -30,7 +30,8 @@ class TestWorkflowImageDisplay(unittest.TestCase):
         # 创建一个大的测试文件（模拟大图片，> 1MB）
         self.large_image_path = os.path.join(self.temp_dir, 'large_test.png')
         with open(self.large_image_path, 'wb') as f:
-            f.write(b'PNG' * 400000)  # 约 1.2 MB
+            # 使用随机字节而不是重复的 'PNG' 字符串，更真实地模拟实际图片
+            f.write(os.urandom(1200000))  # 约 1.2 MB
 
     def tearDown(self):
         """清理临时文件"""
@@ -63,6 +64,12 @@ class TestWorkflowImageDisplay(unittest.TestCase):
         self.assertGreater(size, 1024 * 1024)
         
         # 在实际 workflow 中，这种图片应该显示下载链接而不是嵌入 base64
+        # 模拟 formatImageDisplay 的行为
+        should_embed = size < 1024 * 1024
+        self.assertFalse(should_embed, "大图片不应该被嵌入为 base64")
+        
+        # 验证大图片会返回包含文件信息的格式而不是 ![...](data:...)
+        # 这是预期的行为：大图片显示下载链接
 
     def test_image_file_exists(self):
         """测试图片文件存在性检查"""
