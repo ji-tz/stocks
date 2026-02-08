@@ -153,6 +153,12 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 - 显示面包屑导航（选择股票 → 选择策略 → 选择运行模式 → **设置时间段** → **配置参数** → 查看结果）
 - 显示已选择的股票、策略和运行模式信息
 - 提供"返回时间段设置"链接
+- **✨ 新增：实时计算显示**
+  - 💡 自动获取股票最新价格
+  - 💰 实时显示"每手金额"（股价 × 每手股数）
+  - 📊 实时显示"资金一共支持的手数"（初始资金 ÷ 每手金额）
+  - 🔄 参数调整时自动更新计算结果
+  - ⚡ 无需提交表单即可预览资金配置是否合理
 
 **可配置参数：**
 - ~~股票代码（已在第一步选择）~~
@@ -170,6 +176,9 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 **页面特点：**
 - 显示面包屑导航和已选择信息
 - 提供"返回时间段设置"链接
+- **✨ 新增：实时计算显示**（同SMA策略）
+  - 实时显示每手金额和资金支持手数
+  - 参数调整时自动更新
 
 **可配置参数：**
 - ~~股票代码（已在第一步选择）~~
@@ -186,6 +195,9 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 **页面特点：**
 - 显示面包屑导航和已选择信息
 - 提供"返回时间段设置"链接
+- **✨ 新增：实时计算显示**（同SMA策略）
+  - 实时显示每手金额和资金支持手数
+  - 参数调整时自动更新
 
 **可配置参数：**
 - ~~股票代码（已在第一步选择）~~
@@ -285,6 +297,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 | `/` | GET | 股票选择页面（首页） |
 | `/api/search_stock` | GET | 股票搜索API |
 | `/api/select_stock` | POST | 选择股票API（保存到session） |
+| `/api/stock_price/<stock_code>` | GET | **获取股票最新价格API（新增）** |
 | `/select_strategy` | GET | 策略选择页面 |
 | `/api/select_strategy` | POST | 选择策略API（保存到session） |
 | `/select_mode` | GET | 运行模式选择页面 |
@@ -469,6 +482,91 @@ zoom: {
 3. **资金充足**：确保初始资金足够支持策略运行，避免资金不足导致交易失败
 4. **回测时间**：数据量大时回测可能需要较长时间，请耐心等待
 5. **浏览器兼容**：建议使用现代浏览器（Chrome、Firefox、Safari、Edge）
+6. **实时计算**：策略配置页面会自动获取股票最新价格用于计算，使用的是缓存数据的最新收盘价
+
+## 实时计算功能（v2.1新增）
+
+### 功能说明
+
+在所有策略参数配置页面（SMA、均值成本、定投），新增了实时计算功能，帮助用户在提交回测前预览资金配置是否合理。
+
+### 功能特性
+
+1. **自动获取价格**
+   - 页面加载时自动调用 `/api/stock_price/<stock_code>` API
+   - 返回股票缓存数据中的最新收盘价
+   - 显示价格对应的日期供参考
+
+2. **实时计算显示**
+   - 💰 **每手金额** = 股票价格 × 每手股数
+   - 📊 **资金支持手数** = floor(初始资金 ÷ 每手金额)
+   - 🔄 参数调整时自动重新计算（监听 `input` 事件）
+
+3. **视觉反馈**
+   - 计算结果显示在黄色高亮区域，醒目易见
+   - 当资金不足购买一手时，手数显示为红色警告
+   - 当资金充足时，手数显示为绿色正常
+
+4. **安全实现**
+   - 使用 `{{ stock_code | tojson }}` 防止XSS攻击
+   - 使用 `encodeURIComponent()` 进行URL编码
+   - API调用失败时友好提示错误信息
+
+### 技术实现
+
+**后端API**（`gui/web.py`）：
+```python
+@app.route('/api/stock_price/<stock_code>', methods=['GET'])
+def get_stock_price(stock_code):
+    """获取股票最新价格API"""
+    df = stocks.get_data(symbol=stock_code, source='auto', cache_dir='data')
+    latest_price = float(df.iloc[-1]['close'])
+    latest_date = str(df.iloc[-1]['date'].date())
+    return jsonify({'price': latest_price, 'date': latest_date, 'stock_code': stock_code})
+```
+
+**前端JavaScript**（策略模板）：
+```javascript
+// 获取股票价格
+function fetchStockPrice() {
+  const url = '/api/stock_price/' + encodeURIComponent(stockCode);
+  fetch(url)
+    .then(response => response.json())
+    .then(data => {
+      latestPrice = data.price;
+      updateCalculations();
+    });
+}
+
+// 实时计算
+function updateCalculations() {
+  const lot = parseInt(lotInput.value) || 100;
+  const cash = parseFloat(cashInput.value) || 0;
+  const lotAmount = latestPrice * lot;
+  const affordableLots = Math.floor(cash / lotAmount);
+  // 更新显示...
+}
+
+// 监听参数变化
+lotInput.addEventListener('input', updateCalculations);
+cashInput.addEventListener('input', updateCalculations);
+```
+
+### 使用示例
+
+1. 进入任意策略配置页面（如SMA策略）
+2. 等待1-2秒，实时计算区域自动显示
+3. 修改"每手股数"或"初始资金"参数
+4. 观察"每手金额"和"资金支持手数"实时更新
+5. 根据计算结果调整参数，确保资金充足
+
+### 截图示例
+
+![实时计算功能截图](https://github.com/user-attachments/assets/d0fd95b7-ee6c-4a68-a310-5701792b4412)
+
+*图：SMA策略配置页面的实时计算功能，显示每手金额2510.00元，资金支持39手*
+
+
 
 ## 相关模块
 
