@@ -243,7 +243,7 @@
 
         // 更新策略名称显示
         const strategyElement = document.getElementById('strategy-name');
-        const strategy = '{{ strategy }}';
+        const strategy = {{ strategy|tojson }};
         if (strategyNames[strategy]) {
             strategyElement.textContent = strategyNames[strategy];
         }
