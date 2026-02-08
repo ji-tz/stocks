@@ -415,17 +415,21 @@ with sync_playwright() as p:
     assert page.url == 'http://127.0.0.1:5000/strategy/sma'
     
     browser.close()
+```
 
-  ### GUI 截图脚本
+**测试稳定性说明**：
+- 关键 UI 元素添加了 `data-testid` 属性以提高测试稳定性
+- 历史记录按钮使用 `data-testid="history-link"` 选择器
+- 推荐使用 `data-testid` 或 CSS 类选择器，而非文本选择器（避免 emoji 和文本变化导致的不稳定）
 
-  推荐使用统一入口脚本：
+### GUI 截图脚本
 
-  ```bash
-  python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-  python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-  python tests/guitests/screenshot_main.py history --output-dir screenshots
-  ```
+推荐使用统一入口脚本：
 
+```bash
+python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
+python tests/guitests/screenshot_main.py strategy --output-dir screenshots
+python tests/guitests/screenshot_main.py history --output-dir screenshots
 ```
 
 ## 依赖
