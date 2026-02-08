@@ -19,6 +19,21 @@
 ## 日志与报告
 `verbose=True` 时输出逐日交易日志与最终汇总报告。
 
+## 进度回调支持（新功能）
+`Simulator.simulate()` 和相关函数支持 `progress_callback` 参数：
+- 回调函数签名：`def callback(current: int, total: int) -> None`
+- 在处理每一天数据后调用，报告当前进度
+- 用于Web界面实时显示回测进度，避免长时间无响应
+- 示例：
+  ```python
+  def progress_callback(current, total):
+      percentage = int(current / total * 100)
+      print(f"进度: {percentage}%")
+  
+  sim = Simulator(lot_size=100, init_cash=100000)
+  result = sim.simulate(df=df, strategy=strategy, progress_callback=progress_callback)
+  ```
+
 ## 返回结果字段
 `Simulator.simulate()` 返回包含以下关键字段的字典：
 - `max_capital_used`：最大占用资金（初始资金 - 最小现金余额），表示完成策略所需的最低本金
@@ -33,4 +48,5 @@
 ## 测试入口
 - `tests/test_simulator.py`
 - `tests/test_simulator_engine.py`
+- `tests/test_backtest_progress.py` - 进度回调测试
 - `demo_simulator.py`
