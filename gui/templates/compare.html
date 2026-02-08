@@ -422,7 +422,7 @@
             legend: {
               position: 'top',
               onClick: function(e, legendItem, legend) {
-                // 默认行为：切换数据集可见性
+                // 切换数据集可见性
                 const index = legendItem.datasetIndex;
                 const ci = legend.chart;
                 if (ci.isDatasetVisible(index)) {
@@ -445,7 +445,7 @@
               zoom: {
                 wheel: {
                   enabled: true,
-                  speed: 0.1
+                  speed: 0.15
                 },
                 pinch: {
                   enabled: true
