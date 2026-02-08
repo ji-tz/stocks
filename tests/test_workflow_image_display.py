@@ -30,7 +30,7 @@ class TestWorkflowImageDisplay(unittest.TestCase):
         # 创建一个大的测试文件（模拟大图片，> 1MB）
         self.large_image_path = os.path.join(self.temp_dir, 'large_test.png')
         with open(self.large_image_path, 'wb') as f:
-            # 使用随机字节而不是重复的 'PNG' 字符串，更真实地模拟实际图片
+            # 使用随机字节模拟真实图片文件
             f.write(os.urandom(1200000))  # 约 1.2 MB
 
     def tearDown(self):
