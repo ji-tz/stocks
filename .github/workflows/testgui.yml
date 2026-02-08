@@ -169,7 +169,7 @@ jobs:
             { path: 'screenshots/workflow/05_mean_cost_strategy.png', title: '步骤5：进入策略配置界面' },
             { path: 'screenshots/workflow/06_strategy_params.png', title: '步骤6：配置策略参数' },
             { path: 'screenshots/workflow/07_backtest_progress.png', title: '步骤7：回测进行中' },
-            { path: 'screenshots/workflow/08_backtest_result.png', title: '步骤8：复盘结果' }
+            { path: 'screenshots/workflow/08_backtest_result.png', title: '步骤8：回测结果展示' }
           ];
 
           const workflowImagesList = [];
@@ -186,9 +186,9 @@ jobs:
           
           // 处理回测结果UI截图
           if (fs.existsSync(backtestResultPath)) {
-            backtestResultImage = formatImageDisplay(backtestResultPath, '策略复盘界面截图', artifactUrl);
+            backtestResultImage = formatImageDisplay(backtestResultPath, '回测结果界面截图', artifactUrl);
           } else {
-            backtestResultImage = '⚠️ 策略复盘界面截图未生成(可能是回测步骤失败或超时)';
+            backtestResultImage = '⚠️ 回测结果界面截图未生成(可能是回测步骤失败或超时)';
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
           }
           
@@ -201,7 +201,7 @@ jobs:
               const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
               const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
               testResult = `
-          ### 📊 策略复盘界面
+          ### 📊 回测结果界面
           
           **测试数据摘要**:
           - **股票代码**: ${data.symbol || '未知'}
