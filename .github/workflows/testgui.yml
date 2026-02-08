@@ -126,6 +126,9 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
+          const runId = context.runId;
+          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+          
           // 函数：将图片转换为 base64 data URL（用于小图片）
           function imageToDataUrl(imagePath) {
             try {
@@ -145,7 +148,7 @@ jobs:
           }
           
           // 函数：格式化图片显示（使用 base64 或回退到文件信息）
-          function formatImageDisplay(imagePath, title) {
+          function formatImageDisplay(imagePath, title, artifactUrl) {
             if (!fs.existsSync(imagePath)) {
               return `⚠️ ${title}未生成`;
             }
@@ -188,20 +191,17 @@ jobs:
             { path: 'screenshots/07_compare_page_with_charts.png', title: '对比页面（表格+图表）' }
           ];
           
-          const runId = context.runId;
-          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-          
           console.log('Processing screenshots...');
           console.log('Artifact URL:', artifactUrl);
           
           // 处理主界面截图
-          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图');
+          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
           
           // 处理策略配置截图
           const strategyImages = [];
           for (const [title, imagePath] of Object.entries(strategyPaths)) {
             if (fs.existsSync(imagePath)) {
-              const imageDisplay = formatImageDisplay(imagePath, title);
+              const imageDisplay = formatImageDisplay(imagePath, title, artifactUrl);
               strategyImages.push(`#### ${title}\n\n${imageDisplay}`);
             }
           }
@@ -225,7 +225,7 @@ jobs:
           const workflowImagesList = [];
           for (const screenshot of workflowScreenshots) {
             if (fs.existsSync(screenshot.path)) {
-              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title);
+              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title, artifactUrl);
               workflowImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
             }
           }
@@ -236,7 +236,7 @@ jobs:
           
           // 处理回测结果UI截图
           if (fs.existsSync(backtestResultPath)) {
-            backtestResultImage = formatImageDisplay(backtestResultPath, '策略复盘界面截图');
+            backtestResultImage = formatImageDisplay(backtestResultPath, '策略复盘界面截图', artifactUrl);
           } else {
             backtestResultImage = '⚠️ 策略复盘界面截图未生成(可能是回测步骤失败或超时)';
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
@@ -246,7 +246,7 @@ jobs:
           let historyImagesList = [];
           for (const screenshot of historyScreenshots) {
             if (fs.existsSync(screenshot.path)) {
-              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title);
+              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title, artifactUrl);
               historyImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
             }
           }
