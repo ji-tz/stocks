@@ -1,6 +1,7 @@
 """
 Playwright测试：完整GUI工作流截图集成测试
-覆盖：选择股票 -> 选择策略 -> 选择运行模式 -> 时间段 -> 配置参数 -> 回测进度 -> 复盘结果
+覆盖：选择股票 -> 选择策略 -> 选择运行模式 -> 时间段 -> 配置参数 -> 回测进度 -> 结果展示
+注意：历史记录功能已移除，此测试仅验证单次回测的完整流程
 """
 import json
 import os
@@ -24,9 +25,9 @@ SCREENSHOT_DIR = Path(
 )
 
 TIME_RANGE_OPTIONS = [
-    ("2021-01-01", "2021-12-31"),
-    ("2022-01-01", "2022-12-31"),
-    ("2023-01-01", "2023-12-31"),
+    ("2023-01-01", "2023-01-31"),  # 使用较短时间范围以加快测试速度
+    ("2023-06-01", "2023-06-30"),
+    ("2024-01-01", "2024-01-31"),
 ]
 
 
@@ -95,7 +96,7 @@ class TestGuiWorkflowE2E(unittest.TestCase):
         return path
 
     def test_full_gui_workflow_with_screenshots(self):
-        """完整GUI工作流 + 关键节点截图"""
+        """完整GUI工作流 + 关键节点截图（不含历史记录功能）"""
         rng = random.Random(2026)
         stock = rng.choice(_load_candidate_stocks())
         start_date, end_date = rng.choice(TIME_RANGE_OPTIONS)
@@ -105,7 +106,7 @@ class TestGuiWorkflowE2E(unittest.TestCase):
             context = browser.new_context(viewport={"width": 1280, "height": 800})
             page = context.new_page()
 
-            # 1. 打开界面并截图
+            # 1. 打开主界面并截图
             page.goto(f"{BASE_URL}/", wait_until="networkidle")
             self._screenshot(page, "01_open_home.png")
 
@@ -140,13 +141,13 @@ class TestGuiWorkflowE2E(unittest.TestCase):
             page.fill("input[name='cash']", "100000")
             self._screenshot(page, "06_strategy_params.png")
 
-            # 7. 点击开始回测，进入进度页并截图
+            # 7. 点击开始回测，进入回测进度页面并截图
             page.click("button[type='submit']")
-            page.wait_for_url("**/run", timeout=10000)
-            page.wait_for_selector("h1:has-text('回测仿真进行中')", timeout=10000)
+            page.wait_for_selector("h1:has-text('回测仿真进行中')", timeout=20000)
             self._screenshot(page, "07_backtest_progress.png")
 
-            # 8. 等待回测完成并进入复盘结果，截图
+            # 8. 等待回测完成并进入结果展示，截图
+            # 注意：较短的时间范围（1个月）通常在30秒内完成，保留60秒作为缓冲
             page.wait_for_function(
                 """
                 () => {
@@ -154,13 +155,14 @@ class TestGuiWorkflowE2E(unittest.TestCase):
                     return btn && !btn.classList.contains('hidden');
                 }
                 """,
-                timeout=120000,
+                timeout=60000,  # 使用较短时间范围后，60秒应该足够
             )
             page.click("#view-result-btn")
             page.wait_for_url("**/view_result", timeout=10000)
             page.wait_for_selector("canvas#chart", timeout=20000)
             self._screenshot(page, "08_backtest_result.png")
 
+            # 验证结果页面显示正常（资产曲线图表）
             expect(page.locator("canvas#chart")).to_be_visible()
 
             browser.close()

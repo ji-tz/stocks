@@ -49,43 +49,26 @@ jobs:
       run: |
         echo "=== Taking Main GUI Screenshot ==="
         python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-      continue-on-error: true
     
     - name: Take Strategy Config Screenshots
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
         python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-      continue-on-error: true
-    
-    - name: Take History Feature Screenshots
-      run: |
-        echo "=== Taking History and Compare Feature Screenshots ==="
-        python tests/guitests/screenshot_main.py history --output-dir screenshots
-      continue-on-error: true
-    
-    - name: Take Stock Price Chart Screenshot
-      run: |
-        echo "=== Taking Stock Price Chart Screenshot ==="
-        python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
-      continue-on-error: true
     
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
         python tests/guitests/screenshot_time_range.py --output-dir screenshots
-      continue-on-error: true
 
     - name: Run GUI Workflow Screenshot Test
       run: |
         echo "=== Running GUI Workflow Screenshot Test ==="
         python -m unittest tests.guitests.test_gui_workflow_e2e -v
-      continue-on-error: true
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
         python -m tests.test_yangtze_power
-      continue-on-error: true
     
     - name: Upload Screenshots
       if: always()
@@ -118,19 +101,36 @@ jobs:
     
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
-      continue-on-error: true
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
+          const path = require('path');
           
-          // 使用公开的 Images 仓库来托管图片
-          // 这样图片可以通过 raw.githubusercontent.com 公开访问
+          const runId = context.runId;
+          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+          
+          // 函数：生成指向 artifact 的图片 Markdown
+          function formatImageDisplay(imagePath, title, artifactUrl) {
+            if (!fs.existsSync(imagePath)) {
+              return `⚠️ ${title}未生成`;
+            }
+            
+            const stats = fs.statSync(imagePath);
+            const sizeKB = (stats.size / 1024).toFixed(1);
+            const filename = path.basename(imagePath);
+            
+            // 生成指向 artifact 文件的相对路径
+            const artifactImageUrl = `${artifactUrl}#:~:text=${encodeURIComponent(filename)}`;
+            
+            // 返回 Markdown 图片语法，链接指向 artifact
+            return `![${title}](${artifactImageUrl})\n\n*${filename} - ${sizeKB} KB - 图片存储在 [Artifacts](${artifactUrl}) 中*`;
+          }
+          
           let mainGuiImage = '';
           let backtestResultImage = '';
           let strategyConfigImages = '';
-          let historyImages = '';
           let workflowImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
@@ -141,52 +141,18 @@ jobs:
             '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
           };
           
-          // 历史记录功能截图路径
-          const historyScreenshots = [
-            { path: 'screenshots/02_empty_history_page.png', title: '空历史记录页面' },
-            { path: 'screenshots/04_history_with_one_record.png', title: '包含一条记录的历史页面' },
-            { path: 'screenshots/06_history_records_selected.png', title: '选中记录准备对比' },
-            { path: 'screenshots/07_compare_page_with_charts.png', title: '对比页面（表格+图表）' }
-          ];
-          
-          const runId = context.runId;
-          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-          
-          // 检查是否成功上传到公开仓库
-          const uploaded = '${{ steps.upload_to_public_repo.outputs.uploaded }}' === 'true';
-          const baseUrl = '${{ steps.upload_to_public_repo.outputs.base_url }}';
-          
-          console.log('Uploaded to public repo:', uploaded);
-          console.log('Base URL:', baseUrl);
+          console.log('Processing screenshots...');
+          console.log('Artifact URL:', artifactUrl);
           
           // 处理主界面截图
-          if (fs.existsSync(mainGuiPath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/main_gui.png`;
-              mainGuiImage = `![主界面截图](${imageUrl})`;
-              console.log(`Main GUI image URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(mainGuiPath);
-              mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
-          } else {
-            mainGuiImage = '⚠️ 主界面截图未生成';
-          }
+          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
           
           // 处理策略配置截图
           const strategyImages = [];
-          for (const [title, path] of Object.entries(strategyPaths)) {
-            if (fs.existsSync(path)) {
-              if (uploaded && baseUrl) {
-                const filename = path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                strategyImages.push(`#### ${title}\n\n![${title}](${imageUrl})`);
-                console.log(`${title} URL: ${imageUrl}`);
-              } else {
-                const stats = fs.statSync(path);
-                const filename = path.split('/').pop();
-                strategyImages.push(`#### ${title}\n\n**${filename}** - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`);
-              }
+          for (const [title, imagePath] of Object.entries(strategyPaths)) {
+            if (fs.existsSync(imagePath)) {
+              const imageDisplay = formatImageDisplay(imagePath, title, artifactUrl);
+              strategyImages.push(`#### ${title}\n\n${imageDisplay}`);
             }
           }
           
@@ -203,21 +169,14 @@ jobs:
             { path: 'screenshots/workflow/05_mean_cost_strategy.png', title: '步骤5：进入策略配置界面' },
             { path: 'screenshots/workflow/06_strategy_params.png', title: '步骤6：配置策略参数' },
             { path: 'screenshots/workflow/07_backtest_progress.png', title: '步骤7：回测进行中' },
-            { path: 'screenshots/workflow/08_backtest_result.png', title: '步骤8：复盘结果' }
+            { path: 'screenshots/workflow/08_backtest_result.png', title: '步骤8：回测结果展示' }
           ];
 
           const workflowImagesList = [];
           for (const screenshot of workflowScreenshots) {
             if (fs.existsSync(screenshot.path)) {
-              if (uploaded && baseUrl) {
-                const filename = screenshot.path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                workflowImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
-              } else {
-                const stats = fs.statSync(screenshot.path);
-                const filename = screenshot.path.split('/').pop();
-                workflowImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
-              }
+              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title, artifactUrl);
+              workflowImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
             }
           }
 
@@ -227,42 +186,10 @@ jobs:
           
           // 处理回测结果UI截图
           if (fs.existsSync(backtestResultPath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/03_backtest_result_mean_cost.png`;
-              backtestResultImage = `![策略复盘界面截图](${imageUrl})`;
-              console.log(`Backtest result UI screenshot URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(backtestResultPath);
-              backtestResultImage = `**策略复盘界面截图** (03_backtest_result_mean_cost.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
+            backtestResultImage = formatImageDisplay(backtestResultPath, '回测结果界面截图', artifactUrl);
           } else {
-            backtestResultImage = '⚠️ 策略复盘界面截图未生成(可能是回测步骤失败或超时)';
+            backtestResultImage = '⚠️ 回测结果界面截图未生成(可能是回测步骤失败或超时)';
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
-          }
-          
-          // 处理历史记录功能截图
-          let historyImagesList = [];
-          for (const screenshot of historyScreenshots) {
-            if (fs.existsSync(screenshot.path)) {
-              if (uploaded && baseUrl) {
-                const filename = screenshot.path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                historyImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
-                console.log(`History screenshot URL: ${imageUrl}`);
-              } else {
-                const stats = fs.statSync(screenshot.path);
-                const filename = screenshot.path.split('/').pop();
-                historyImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
-              }
-            }
-          }
-          
-          if (historyImagesList.length > 0) {
-            historyImages = `
-          ### 📋 历史记录功能截图
-          
-          ${historyImagesList.join('\n\n')}
-          `;
           }
           
            // 读取测试结果
@@ -274,7 +201,7 @@ jobs:
               const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
               const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
               testResult = `
-          ### 📊 策略复盘界面
+          ### 📊 回测结果界面
           
           **测试数据摘要**:
           - **股票代码**: ${data.symbol || '未知'}
@@ -306,8 +233,6 @@ jobs:
           ${mainGuiImage}
           ${strategyConfigImages}
           ${workflowImages}
-          
-          ${historyImages}
           
           ${testResult}
           

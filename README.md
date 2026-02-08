@@ -32,8 +32,6 @@
 - Flask Web应用，提供友好的操作界面
 - 可视化回测结果展示
 - 支持自定义参数配置
-- **历史记录管理**：自动保存最多20条回测记录
-- **回测对比功能**：并排对比多个回测记录的收益率、资产曲线等关键指标
 
 ### 4. 自动化工作流（CI/CD）
 
@@ -197,8 +195,6 @@ playwright install chromium
 # 运行统一截图脚本（推荐）
 python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
 python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-python tests/guitests/screenshot_main.py history --output-dir screenshots
-python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
 python tests/guitests/screenshot_main.py all --output-dir screenshots
 
 ```
@@ -292,7 +288,7 @@ python demo_simulator.py
 
 ## GitHub Actions 工作流
 
-项目配置了三个独立的 CI/CD 工作流，分工明确，互不干扰：
+项目配置了四个独立的 CI/CD 工作流，分工明确，互不干扰：
 
 ### 1. 🔍 Lint 工作流 (`.github/workflows/lint.yml`)
 
@@ -319,14 +315,34 @@ python demo_simulator.py
 1. **单元测试** - 所有 tests/ 下的测试用例
 2. **策略测试** - 交易策略模拟器测试
 3. **集成测试** - 股票定投回测（随机选择，2020-2022）
-4. **界面测试** - 主界面自动截图
 
 输出产物：
-- 测试截图上传到 Artifacts
 - 测试结果 JSON 上传到 Artifacts
-- **自动在 PR 中评论测试报告**（包含截图和收益数据）
+- **自动在 PR 中评论测试报告**（包含测试日志）
 
-### 3. 📦 Package 工作流 (`.github/workflows/package.yml`)
+### 3. 🖼️ Test GUI 工作流 (`.github/workflows/testgui.yml`)
+
+**GUI 截图测试** - 专注于界面截图和可视化反馈
+
+触发条件：
+- 推送到 main 分支
+- 创建 Pull Request
+
+测试内容：
+1. **主界面截图** - 应用主界面
+2. **策略配置截图** - SMA、均值成本、定投策略配置界面
+3. **完整工作流截图** - 从选股到回测的完整流程
+4. **股票集成测试** - 随机选择股票进行回测
+
+输出产物：
+- GUI 截图上传到 Artifacts（保留30天）
+- 测试结果 JSON 上传到 Artifacts
+- **自动在 PR 中评论 GUI 测试报告**（包含截图和收益数据）
+- **图片显示方式**：
+  - 小于 1MB 的图片使用 base64 编码直接嵌入评论显示
+  - 大于 1MB 的图片提供 Artifacts 下载链接
+
+### 4. 📦 Package 工作流 (`.github/workflows/package.yml`)
 
 **打包和发布** - 构建发布包
 
@@ -350,7 +366,8 @@ python demo_simulator.py
 ### 工作流权限
 
 - **Lint**: 无需特殊权限
-- **Test**: `contents: write`, `pull-requests: write`（用于提交截图和评论PR）
+- **Test**: `contents: write`, `pull-requests: write`（用于评论测试日志到PR）
+- **Test GUI**: `contents: write`, `pull-requests: write`（用于评论截图到PR）
 - **Package**: `contents: write`（用于创建 Release）
 
 ## 环境要求

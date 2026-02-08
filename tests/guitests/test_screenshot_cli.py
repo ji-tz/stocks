@@ -12,8 +12,6 @@ class TestScreenshotCli(unittest.TestCase):
         targets = resolve_targets("all", run_all=True)
         self.assertIn("main", targets)
         self.assertIn("strategy", targets)
-        self.assertIn("history", targets)
-        self.assertIn("chart", targets)
 
     def test_resolve_targets_single(self):
         """单个目标应只返回自身"""
@@ -22,22 +20,18 @@ class TestScreenshotCli(unittest.TestCase):
 
     def test_build_output_plan_defaults(self):
         """默认输出路径应符合约定"""
-        plan = build_output_plan(["main", "chart", "strategy", "history"], output_dir="shots")
+        plan = build_output_plan(["main", "strategy"], output_dir="shots")
         self.assertEqual(plan["main"], "shots/main_gui.png")
-        self.assertEqual(plan["chart"], "shots/stock_price_chart.png")
         self.assertEqual(plan["strategy"], "shots")
-        self.assertEqual(plan["history"], "shots")
 
     def test_build_output_plan_override(self):
         """覆盖输出路径应生效"""
         plan = build_output_plan(
-            ["main", "chart"],
+            ["main"],
             output_dir="shots",
             output_main="custom/main.png",
-            output_chart="custom/chart.png",
         )
         self.assertEqual(plan["main"], "custom/main.png")
-        self.assertEqual(plan["chart"], "custom/chart.png")
 
 
 if __name__ == "__main__":
