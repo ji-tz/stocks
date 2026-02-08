@@ -12,7 +12,7 @@ import time
 import subprocess
 from typing import Dict, Iterable, List, Optional
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import sync_playwright, TimeoutError as PlaywrightTimeoutError
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 # 确保项目根目录在 sys.path
@@ -108,6 +108,17 @@ def _set_stock_session(page, base_url: str, stock_code: str, stock_name: str) ->
         {"code": stock_code, "name": stock_name},
     )
     time.sleep(1)
+
+
+def _click_history_link(page) -> None:
+    """点击历史记录链接，使用稳定的选择器（优先 data-testid，fallback 到 class）"""
+    try:
+        page.locator('[data-testid="history-link"]').click(timeout=5000)
+    except PlaywrightTimeoutError:
+        # Fallback: 使用 class 选择器
+        page.locator('.history-link').click(timeout=5000)
+
+    page.wait_for_load_state("networkidle", timeout=30000)
 
 
 def take_main_gui_screenshot(output_path: str = "screenshots/main_gui.png", port: int = DEFAULT_PORT) -> str:
@@ -238,9 +249,8 @@ def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEF
             print(f"  ✓ 保存到: {screenshot_path}")
 
             print("\n[2/7] 截图：空历史记录页面")
-            # 直接导航到历史记录页面（避免点击选择器不稳定问题）
-            page.goto(f"{base_url}/history", wait_until="networkidle", timeout=30000)
-            time.sleep(1)
+            # 通过点击首页历史记录按钮进入历史页面
+            _click_history_link(page)
             screenshot_path = os.path.join(output_dir, "02_empty_history_page.png")
             page.screenshot(path=screenshot_path, full_page=True)
             screenshots_taken.append(screenshot_path)
@@ -280,8 +290,9 @@ def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEF
             print(f"  ✓ 回测完成，保存到: {screenshot_path}")
 
             print("\n[4/7] 截图：包含一条记录的历史页面")
-            page.goto(f"{base_url}/history", wait_until="networkidle")
-            time.sleep(1)
+            # 先回到首页，再通过历史记录按钮进入
+            page.goto(f"{base_url}/", wait_until="networkidle", timeout=30000)
+            _click_history_link(page)
             screenshot_path = os.path.join(output_dir, "04_history_with_one_record.png")
             page.screenshot(path=screenshot_path, full_page=True)
             screenshots_taken.append(screenshot_path)
@@ -322,8 +333,9 @@ def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEF
             print(f"  ✓ 回测完成，保存到: {screenshot_path}")
 
             print("\n[6/7] 截图：包含两条记录的历史页面（选中状态）")
-            page.goto(f"{base_url}/history", wait_until="networkidle")
-            time.sleep(1)
+            # 先回到首页，再通过历史记录按钮进入
+            page.goto(f"{base_url}/", wait_until="networkidle", timeout=30000)
+            _click_history_link(page)
 
             checkboxes = page.query_selector_all(".record-checkbox")
             if len(checkboxes) >= 2:
