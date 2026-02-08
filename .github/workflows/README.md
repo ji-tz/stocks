@@ -23,8 +23,8 @@
 - 集成测试结果：`test_results/yangtze_power_test.json`
 - Artifacts：`gui-screenshots`、`gui-test-results`（保留30天）
 - **PR评论显示方式**：
-  - 小于 1MB 的图片：使用 base64 编码直接嵌入评论中显示
-  - 大于 1MB 的图片：显示文件信息和 Artifacts 下载链接
+  - 小于 500KB 的图片：使用 base64 编码直接嵌入评论中显示
+  - 大于 500KB 的图片：显示文件信息和 Artifacts 下载链接
 
 ### package.yml
 - 打包文件（90天）
@@ -49,14 +49,16 @@ Lint + Test + Test GUI + Package（并行）
 
 为了在 PR 评论中正常显示截图，`testgui.yml` 使用以下机制：
 
-1. **小图片（< 1MB）**：转换为 base64 Data URL 直接嵌入 Markdown
+1. **小图片（< 500KB）**：转换为 base64 Data URL 直接嵌入 Markdown
    - 优点：图片直接显示在评论中，无需额外点击
-   - 缺点：评论内容较大，但仍在 GitHub 限制内
+   - 缺点：评论内容较大，但仍在 GitHub 限制内（65536字符）
    
-2. **大图片（≥ 1MB）**：显示文件信息和下载链接
+2. **大图片（≥ 500KB）**：显示文件信息和下载链接
    - 提供文件名、大小和 Artifacts 下载链接
    - 避免评论内容过大
 
-3. **回退机制**：如果图片不存在，显示警告信息
+3. **回退机制**：如果图片不存在或编码失败，显示警告信息
 
-这种方式解决了之前引用不存在的 `upload_to_public_repo` 步骤导致图片无法显示的问题。
+4. **详细日志**：处理过程输出详细日志，便于调试
+
+这种方式解决了 GitHub Markdown 不支持直接显示 artifact 中图片的问题。
