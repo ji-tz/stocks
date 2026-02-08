@@ -49,43 +49,31 @@ jobs:
       run: |
         echo "=== Taking Main GUI Screenshot ==="
         python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-      continue-on-error: true
     
     - name: Take Strategy Config Screenshots
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
         python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-      continue-on-error: true
     
     - name: Take History Feature Screenshots
       run: |
         echo "=== Taking History and Compare Feature Screenshots ==="
         python tests/guitests/screenshot_main.py history --output-dir screenshots
-      continue-on-error: true
-    
-    - name: Take Stock Price Chart Screenshot
-      run: |
-        echo "=== Taking Stock Price Chart Screenshot ==="
-        python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
-      continue-on-error: true
     
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
         python tests/guitests/screenshot_time_range.py --output-dir screenshots
-      continue-on-error: true
 
     - name: Run GUI Workflow Screenshot Test
       run: |
         echo "=== Running GUI Workflow Screenshot Test ==="
         python -m unittest tests.guitests.test_gui_workflow_e2e -v
-      continue-on-error: true
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
         python -m tests.test_yangtze_power
-      continue-on-error: true
     
     - name: Upload Screenshots
       if: always()
@@ -118,7 +106,6 @@ jobs:
     
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
-      continue-on-error: true
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -129,25 +116,7 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 函数：将图片转换为 base64 data URL（用于小图片）
-          function imageToDataUrl(imagePath) {
-            try {
-              if (!fs.existsSync(imagePath)) {
-                return null;
-              }
-              const imageBuffer = fs.readFileSync(imagePath);
-              const base64Image = imageBuffer.toString('base64');
-              // 检测图片格式
-              const ext = path.extname(imagePath).toLowerCase();
-              const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
-              return `data:${mimeType};base64,${base64Image}`;
-            } catch (error) {
-              console.log(`Error converting image to data URL ${imagePath}: ${error.message}`);
-              return null;
-            }
-          }
-          
-          // 函数：格式化图片显示（使用 base64 或回退到文件信息）
+          // 函数：生成指向 artifact 的图片 Markdown
           function formatImageDisplay(imagePath, title, artifactUrl) {
             if (!fs.existsSync(imagePath)) {
               return `⚠️ ${title}未生成`;
@@ -157,16 +126,11 @@ jobs:
             const sizeKB = (stats.size / 1024).toFixed(1);
             const filename = path.basename(imagePath);
             
-            // 如果图片小于 1MB，使用 base64 嵌入
-            if (stats.size < 1024 * 1024) {
-              const dataUrl = imageToDataUrl(imagePath);
-              if (dataUrl) {
-                return `![${title}](${dataUrl})\n\n*${filename} - ${sizeKB} KB*`;
-              }
-            }
+            // 生成指向 artifact 文件的相对路径
+            const artifactImageUrl = `${artifactUrl}#:~:text=${encodeURIComponent(filename)}`;
             
-            // 否则显示文件信息和下载链接
-            return `**${title}** (${filename}) - ${sizeKB} KB - [从 Artifacts 下载](${artifactUrl})`;
+            // 返回 Markdown 图片语法，链接指向 artifact
+            return `![${title}](${artifactImageUrl})\n\n*${filename} - ${sizeKB} KB - 图片存储在 [Artifacts](${artifactUrl}) 中*`;
           }
           
           let mainGuiImage = '';

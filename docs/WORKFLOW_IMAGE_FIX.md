@@ -1,5 +1,54 @@
 # Workflow 图片显示修复文档
 
+## 最新变更（v2.0）
+
+### 2024年更新：图片链接指向 Artifacts
+
+**变更说明：**
+- 不再使用 base64 编码嵌入图片到 PR 评论中
+- 改用 Markdown 图片语法，链接指向 GitHub Actions Artifacts
+- 所有截图文件仍存储在 artifacts 中供下载
+
+**优点：**
+1. ✅ 评论体积更小，不受 GitHub 65536 字符限制
+2. ✅ 支持任意大小的图片
+3. ✅ 图片加载更快（按需加载）
+4. ✅ Artifacts 保留 30 天，足够审查使用
+
+**实现方式：**
+```javascript
+// 生成指向 artifact 文件的图片链接
+function formatImageDisplay(imagePath, title, artifactUrl) {
+  const filename = path.basename(imagePath);
+  const artifactImageUrl = `${artifactUrl}#:~:text=${encodeURIComponent(filename)}`;
+  return `![${title}](${artifactImageUrl})\n\n*${filename} - ${sizeKB} KB - 图片存储在 [Artifacts](${artifactUrl}) 中*`;
+}
+```
+
+### 2024年更新：删除 Stock Price Chart 测试
+
+**删除内容：**
+- 删除 `screenshot_main.py` 中的 `chart` 目标
+- 删除 `capture_stock_price_chart()` 函数（标记为废弃）
+- 删除 workflow 中的 "Take Stock Price Chart Screenshot" 步骤
+- 废弃 `screenshot_stock_price_chart.py` 文件
+
+**原因：**
+- 该截图与其他测试重复
+- 增加了 CI 运行时间
+- 维护成本高
+
+### 2024年更新：GUI 测试失败应终止 workflow
+
+**变更说明：**
+- 移除所有 GUI 测试步骤的 `continue-on-error: true`
+- GUI 测试失败将导致整个 workflow 失败
+- 提高测试的严格性和可靠性
+
+---
+
+## 原始问题（v1.0 - 已解决）
+
 ## 问题描述
 
 在 PR 中，`testgui.yml` workflow 自动生成的评论不包含截图图片，只显示文件信息和下载链接。

@@ -66,36 +66,25 @@ jobs:
       run: |
         echo "=== Taking Main GUI Screenshot ==="
         python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-      continue-on-error: true
     
     - name: Take Strategy Config Screenshots
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
         python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-      continue-on-error: true
     - name: Take History Feature Screenshots
       run: |
         echo "=== Taking History and Compare Feature Screenshots ==="
         python tests/guitests/screenshot_main.py history --output-dir screenshots
-      continue-on-error: true
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
         python -m tests.test_yangtze_power
-      continue-on-error: true
-    
-    - name: Take Stock Price Chart Screenshot
-      run: |
-        echo "=== Taking Stock Price Chart Screenshot ==="
-        python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
-      continue-on-error: true
     
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
         python tests/guitests/screenshot_time_range.py --output-dir screenshots
-      continue-on-error: true
     
     - name: Upload Screenshots
       if: always()

@@ -131,10 +131,14 @@ class TestWorkflowConfiguration(unittest.TestCase):
         self.assertIn('Comment PR with Screenshots', content)
         self.assertIn('actions/github-script@v7', content)
         self.assertIn('formatImageDisplay', content)
-        self.assertIn('imageToDataUrl', content)
         
-        # 验证不再引用不存在的 upload_to_public_repo 步骤
-        self.assertNotIn('steps.upload_to_public_repo.outputs.uploaded', content)
+        # 验证不再使用 base64 编码方案
+        self.assertNotIn('imageToDataUrl', content)
+        self.assertNotIn('base64Image', content)
+        
+        # 验证使用 artifact 链接方案
+        self.assertIn('artifactImageUrl', content)
+        self.assertIn('encodeURIComponent(filename)', content)
 
     def test_test_workflow_exists(self):
         """测试 test.yml 文件存在"""

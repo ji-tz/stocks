@@ -424,7 +424,6 @@ with sync_playwright() as p:
   python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
   python tests/guitests/screenshot_main.py strategy --output-dir screenshots
   python tests/guitests/screenshot_main.py history --output-dir screenshots
-  python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
   ```
 
 ```

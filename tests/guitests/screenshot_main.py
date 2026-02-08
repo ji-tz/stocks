@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 GUI 截图统一脚本
-支持：主界面 / 策略配置 / 资产曲线 / 历史记录对比
+支持：主界面 / 策略配置 / 历史记录对比
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ sys.path.insert(0, ROOT_DIR)
 
 DEFAULT_PORT = 5000
 DEFAULT_OUTPUT_DIR = "screenshots"
-AVAILABLE_TARGETS = ["main", "strategy", "history", "chart"]
+AVAILABLE_TARGETS = ["main", "strategy", "history"]
 
 
 def resolve_targets(target: Optional[str], run_all: bool = False) -> List[str]:
@@ -36,15 +36,12 @@ def build_output_plan(
     targets: Iterable[str],
     output_dir: str,
     output_main: Optional[str] = None,
-    output_chart: Optional[str] = None,
 ) -> Dict[str, str]:
     """构建输出路径规划"""
     plan: Dict[str, str] = {}
     for target in targets:
         if target == "main":
             plan[target] = output_main or os.path.join(output_dir, "main_gui.png")
-        elif target == "chart":
-            plan[target] = output_chart or os.path.join(output_dir, "stock_price_chart.png")
         elif target in ("strategy", "history"):
             plan[target] = output_dir
     return plan
@@ -209,75 +206,11 @@ def take_strategy_config_screenshots(output_dir: str = "screenshots", port: int 
 
 
 def capture_stock_price_chart(output_path: str = "screenshots/stock_price_chart.png", port: int = DEFAULT_PORT) -> str:
-    """截取复盘界面的股价波动线图表"""
-    _ensure_dir(os.path.dirname(output_path))
-    print("启动 Flask 服务器...")
-    flask_process = _start_flask_server(port)
-
-    try:
-        with sync_playwright() as p:
-            print("启动浏览器...")
-            browser = p.chromium.launch(headless=True)
-            context = browser.new_context(viewport={"width": 1400, "height": 900})
-            page = context.new_page()
-
-            base_url = f"http://127.0.0.1:{port}"
-            _set_stock_session(page, base_url, "600900", "长江电力")
-
-            print("进入均值成本策略页面...")
-            page.goto(f"{base_url}/strategy/mean_cost", wait_until="networkidle", timeout=30000)
-            time.sleep(1)
-
-            print("填写回测参数...")
-            page.fill('input[name="symbol"]', "600900")
-            page.fill('input[name="start"]', "20230101")
-            page.fill('input[name="end"]', "20230331")
-            page.fill('input[name="cash"]', "100000")
-
-            print("提交回测...")
-            page.click('button[type="submit"]')
-
-            print("等待回测完成...")
-            page.wait_for_url("**/run", timeout=60000)
-            page.wait_for_load_state("networkidle")
-
-            print("等待图表渲染...")
-            page.wait_for_selector("canvas#chart", state="visible", timeout=10000)
-            time.sleep(3)
-
-            page.evaluate(
-                "document.querySelector('canvas#chart').scrollIntoView({behavior: 'smooth', block: 'center'})"
-            )
-            time.sleep(1)
-
-            chart_element = page.query_selector("canvas#chart")
-            if not chart_element:
-                raise RuntimeError("未找到图表元素")
-
-            box = chart_element.bounding_box()
-            if not box:
-                raise RuntimeError("无法获取图表位置")
-
-            print(f"截图保存到: {output_path}")
-            page.screenshot(
-                path=output_path,
-                clip={
-                    "x": max(0, box["x"] - 20),
-                    "y": max(0, box["y"] - 80),
-                    "width": min(box["width"] + 40, 1400),
-                    "height": min(box["height"] + 100, 900),
-                },
-            )
-
-            context.close()
-            browser.close()
-            print("截图完成!")
-            return output_path
-    except Exception as e:
-        print(f"截图失败: {e}")
-        raise
-    finally:
-        _stop_flask_server(flask_process)
+    """
+    已废弃：此功能已被移除
+    Stock Price Chart 截图功能已从 GUI 测试中删除
+    """
+    raise NotImplementedError("Stock Price Chart screenshot has been removed from GUI tests")
 
 
 def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEFAULT_PORT) -> List[str]:
@@ -452,8 +385,6 @@ def run_targets(
             take_strategy_config_screenshots(output_plan[target], port=port)
         elif target == "history":
             test_history_and_compare_ui(output_plan[target], port=port)
-        elif target == "chart":
-            capture_stock_price_chart(output_plan[target], port=port)
 
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
@@ -482,7 +413,7 @@ def main(argv: Optional[List[str]] = None) -> int:
 
     output_dir = args.output_dir or DEFAULT_OUTPUT_DIR
     targets = resolve_targets(args.target, run_all=args.target == "all")
-    output_plan = build_output_plan(targets, output_dir, output_main=args.output, output_chart=args.output)
+    output_plan = build_output_plan(targets, output_dir, output_main=args.output)
     run_targets(targets, output_plan, port=args.port)
     return 0
 
