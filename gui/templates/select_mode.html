@@ -166,8 +166,8 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            // 跳转到策略配置页面
-            window.location.href = '/strategy/{{ strategy_type }}';
+            // 跳转到时间段设置页面（新增步骤）
+            window.location.href = '/select_time_range';
           } else {
             alert('保存运行模式失败：' + (data.error || '未知错误'));
           }

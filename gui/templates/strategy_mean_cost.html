@@ -35,8 +35,8 @@
   </head>
   <body>
     <div class="header">
-      <h1>💰 第四步：配置参数</h1>
-      <a href="/select_mode" class="back-link">← 返回运行模式选择</a>
+      <h1>💰 第五步：配置参数</h1>
+      <a href="/select_time_range" class="back-link">← 返回时间段设置</a>
     </div>
     
     <div class="breadcrumb">
@@ -45,6 +45,8 @@
       <span class="breadcrumb-item">✓ 选择策略</span>
       <span class="breadcrumb-separator">→</span>
       <span class="breadcrumb-item">✓ 选择运行模式</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item">✓ 设置时间段</span>
       <span class="breadcrumb-separator">→</span>
       <span class="breadcrumb-item active">配置参数</span>
       <span class="breadcrumb-separator">→</span>
@@ -119,71 +121,17 @@
           <div class="param-hint">回测初始资金，建议至少 50000 元（支持多次加仓）</div>
         </label>
 
-        <label>起始日期（可选）
-          <input type="text" name="start" placeholder="例如：20230101 或 2023-01-01" />
-          <div class="param-hint">格式：YYYYMMDD 或 YYYY-MM-DD，留空则使用全部历史数据</div>
-        </label>
-
-        <label>结束日期（可选）
-          <input type="text" name="end" placeholder="例如：20231231 或 2023-12-31" />
-          <div class="param-hint">格式：YYYYMMDD 或 YYYY-MM-DD，留空则使用最新数据</div>
-        </label>
-
-        <div class="date-error" id="date-error">日期格式错误</div>
-
         <button type="submit">🚀 开始回测</button>
       </form>
     </div>
 
     <script>
-      // 日期格式校验
-      function validateDates() {
-        const start = document.querySelector('input[name="start"]').value.trim();
-        const end = document.querySelector('input[name="end"]').value.trim();
-        const re1 = /^\d{8}$/;
-        const re2 = /^\d{4}-\d{2}-\d{2}$/;
-        const errEl = document.getElementById('date-error');
-
-        function ok(s) {
-          return s === '' || re1.test(s) || re2.test(s);
-        }
-
-        if (!ok(start)) {
-          errEl.textContent = '起始日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
-          errEl.style.display = 'block';
-          return false;
-        }
-        if (!ok(end)) {
-          errEl.textContent = '结束日期格式错误，请使用 YYYYMMDD 或 YYYY-MM-DD';
-          errEl.style.display = 'block';
-          return false;
-        }
-        if (start !== '' && end !== '') {
-          const norm = s => s.replace(/-/g, '');
-          if (norm(start) > norm(end)) {
-            errEl.textContent = '起始日期不能晚于结束日期';
-            errEl.style.display = 'block';
-            return false;
-          }
-        }
-
-        errEl.style.display = 'none';
-        return true;
-      }
-
-      // 绑定表单提交验证
+      // 表单验证（移除了日期验证，因为时间段已在上一步设置）
       const form = document.querySelector('form');
       if (form) {
         form.addEventListener('submit', function(e) {
-          if (!validateDates()) {
-            e.preventDefault();
-            return false;
-          }
-        });
-        
-        ['start', 'end'].forEach(name => {
-          const el = document.querySelector('input[name="' + name + '"]');
-          if (el) el.addEventListener('input', validateDates);
+          // 基本表单验证已由HTML5处理
+          return true;
         });
       }
     </script>
