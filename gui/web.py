@@ -1,14 +1,15 @@
 import os
 import sys
 import json
-from flask import Flask, render_template, request, session, jsonify
-from flask import Flask, render_template, request, jsonify
+import threading
+from flask import Flask, render_template, request, session, jsonify, Response
 
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import stocks
 import backtest_records
+from gui.backtest_progress import get_progress_manager
 
 app = Flask(__name__, template_folder='templates')
 # 使用环境变量配置secret_key，开发环境使用默认值
@@ -300,78 +301,126 @@ def run():
     strategy = request.form.get('strategy', 'sma')
     lot = int(request.form.get('lot') or 100)
     cash = float(request.form.get('cash') or 100000.0)
+    start = request.form.get('start') or None
+    end = request.form.get('end') or None
+    
+    # 在启动线程前提取所有需要的表单参数（避免request context问题）
+    fixed_amount = float(request.form.get('fixed_amount') or 1000.0) if strategy == 'fixed_amount' else None
+    period = int(request.form.get('period') or 20) if strategy == 'sma' else None
 
+    # 创建回测任务
+    progress_mgr = get_progress_manager()
+    task_id = progress_mgr.create_task()
+    
+    # 创建进度回调函数
+    def progress_callback(current, total):
+        progress_mgr.update_progress(task_id, current, total)
+    
+    # 在后台线程执行回测
+    def run_backtest():
+        try:
+            # 根据策略类型执行回测（各策略内部自行获取所需数据）
+            if strategy == 'mean_cost':
+                res = stocks.run_mean_cost(symbol=symbol, start_date=start, end_date=end, 
+                                          lot_size=lot, init_cash=cash, source=source,
+                                          progress_callback=progress_callback)
+                # 保存回测记录
+                backtest_records.add_record(
+                    strategy='mean_cost',
+                    symbol=symbol,
+                    parameters={'start': start, 'end': end, 'lot': lot, 'cash': cash, 'source': source},
+                    result=res
+                )
+            elif strategy == 'fixed_amount':
+                res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end, 
+                                            fixed_amount=fixed_amount, lot_size=lot, 
+                                            init_cash=cash, source=source,
+                                            progress_callback=progress_callback)
+                # 保存回测记录
+                backtest_records.add_record(
+                    strategy='fixed_amount',
+                    symbol=symbol,
+                    parameters={'start': start, 'end': end, 'fixed_amount': fixed_amount, 'lot': lot, 'cash': cash, 'source': source},
+                    result=res
+                )
+            else:  # sma
+                res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end, 
+                                             lot_size=lot, init_cash=cash, period=period,
+                                             progress_callback=progress_callback)
+                # 保存回测记录
+                backtest_records.add_record(
+                    strategy='sma',
+                    symbol=symbol,
+                    parameters={'start': start, 'end': end, 'period': period, 'lot': lot, 'cash': cash, 'source': source},
+                    result=res
+                )
+            
+            # 设置任务结果
+            progress_mgr.set_result(task_id, res)
+            
+        except Exception as e:
+            # 设置任务错误
+            progress_mgr.set_error(task_id, str(e))
+    
+    # 启动后台线程
+    thread = threading.Thread(target=run_backtest, daemon=True)
+    thread.start()
+    
+    # 返回进度页面
+    return render_template('backtest_progress.html', task_id=task_id, symbol=symbol, strategy=strategy)
+
+
+@app.route('/api/progress/<task_id>')
+def progress_stream(task_id):
+    """SSE端点：推送回测进度"""
+    progress_mgr = get_progress_manager()
+    
+    def generate():
+        for event in progress_mgr.get_events(task_id):
+            yield f"data: {json.dumps(event)}\n\n"
+        
+        # 清理任务数据（延迟清理，确保客户端能接收到最后的消息）
+        import time
+        time.sleep(1)
+        progress_mgr.cleanup_task(task_id)
+    
+    return Response(generate(), mimetype='text/event-stream')
+
+
+@app.route('/api/result/<task_id>')
+def get_result(task_id):
+    """获取回测结果"""
+    progress_mgr = get_progress_manager()
+    task = progress_mgr.get_task(task_id)
+    
+    if not task:
+        return jsonify({'error': '任务不存在'}), 404
+    
+    if task['status'] == 'error':
+        return jsonify({'error': task['error']}), 500
+    
+    if task['status'] != 'completed':
+        return jsonify({'error': '任务未完成'}), 400
+    
+    return jsonify({'result': task['result']})
+
+
+@app.route('/view_result', methods=['POST'])
+def view_result():
+    """查看回测结果"""
+    result_json = request.form.get('result_json')
+    if not result_json:
+        return render_template('result.html', error='无法获取回测结果')
+    
     try:
-        # 使用后端提供的统一接口获取数据（可传入日期范围）
-        if start or end:
-            df = stocks.get_data(symbol=symbol, source=source, start_date=start or None, end_date=end or None)
+        res = json.loads(result_json)
+        # 使用详细模板显示结果
+        if isinstance(res, dict) and ('trades_list' in res or 'history' in res):
+            return render_template('result_mean.html', result=res)
         else:
-            df = stocks.get_data(symbol=symbol, source=source)
+            return render_template('result.html', error='回测结果格式不正确')
     except Exception as e:
-        return render_template('result.html', error=str(e))
-
-    if strategy == 'mean_cost':
-        try:
-            res = stocks.run_mean_cost(symbol=symbol, start_date=start, end_date=end, lot_size=lot, init_cash=cash, source=source)
-        except Exception as e:
-            return render_template('result.html', error=f"模拟运行失败: {e}")
-
-        # 保存回测记录
-        backtest_records.add_record(
-            strategy='mean_cost',
-            symbol=symbol,
-            parameters={'start': start, 'end': end, 'lot': lot, 'cash': cash, 'source': source},
-            result=res
-        )
-
-        return render_template('result_mean.html', result=res)
-
-    if strategy == 'fixed_amount':
-        try:
-            fixed_amount = float(request.form.get('fixed_amount') or 1000.0)
-            res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end, 
-                                        fixed_amount=fixed_amount, lot_size=lot, 
-                                        init_cash=cash, source=source)
-        except Exception as e:
-            return render_template('result.html', error=f"模拟运行失败: {e}")
-
-        # 保存回测记录
-        backtest_records.add_record(
-            strategy='fixed_amount',
-            symbol=symbol,
-            parameters={'start': start, 'end': end, 'fixed_amount': fixed_amount, 'lot': lot, 'cash': cash, 'source': source},
-            result=res
-        )
-
-        return render_template('result_mean.html', result=res)
-
-    # 默认使用 stocks 提供的 SMA 回测封装，返回统一结构以便前端展示
-    try:
-        period = int(request.form.get('period') or 20)
-        res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end, 
-                                     lot_size=lot, init_cash=cash, period=period)
-    except Exception as e:
-        return render_template('result.html', error=f"回测运行失败: {e}")
-
-    # 保存回测记录
-    backtest_records.add_record(
-        strategy='sma',
-        symbol=symbol,
-        parameters={'start': start, 'end': end, 'period': period, 'lot': lot, 'cash': cash, 'source': source},
-        result=res
-    )
-
-    # 如果返回了详细的交易流水（兼容 simulate_* 接口），使用详细模板；否则回退到摘要模板以兼容旧行为或测试桩
-    if isinstance(res, dict) and ('trades_list' in res or 'history' in res):
-        return render_template('result_mean.html', result=res)
-
-    rows = len(df)
-    start = res.get('start_date', '') if isinstance(res, dict) else ''
-    end = res.get('end_date', '') if isinstance(res, dict) else ''
-    init_value = res.get('init_cash') if isinstance(res, dict) else None
-    final_value = res.get('final_cash') if isinstance(res, dict) else None
-
-    return render_template('result.html', symbol=symbol, source=source, rows=rows, start=start, end=end, init=init_value, final=final_value)
+        return render_template('result.html', error=f'解析结果失败: {e}')
 
 
 @app.route('/history', methods=['GET'])

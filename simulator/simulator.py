@@ -1,5 +1,5 @@
 import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Callable
 
 from source.data_provider import get_data
 from simulator.simulator_engine import SimulatorEngine
@@ -28,7 +28,7 @@ class Simulator:
         self.init_cash = float(init_cash)
         self.verbose = verbose
 
-    def simulate(self, df, strategy, symbol: str = "", start_date: Optional[str] = None, end_date: Optional[str] = None, source: str = "auto", verbose: Optional[bool] = None) -> Dict[str, Any]:
+    def simulate(self, df, strategy, symbol: str = "", start_date: Optional[str] = None, end_date: Optional[str] = None, source: str = "auto", verbose: Optional[bool] = None, progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
         """执行模拟交易
 
         Args:
@@ -39,6 +39,7 @@ class Simulator:
             end_date: 结束日期（可选）
             source: 数据源（可选）
             verbose: 是否打印详细信息（覆盖init时的设置）
+            progress_callback: 进度回调函数，参数为(当前索引, 总数)
 
         Returns:
             包含模拟结果的字典
@@ -57,6 +58,7 @@ class Simulator:
         history: List[Dict[str, Any]] = []
         trades_list: List[Dict[str, Any]] = []
         min_cash = self.init_cash  # 追踪最小现金余额
+        total_rows = len(df)  # 总数据行数
 
         if use_verbose:
             print(f"\n{'='*100}")
@@ -65,7 +67,15 @@ class Simulator:
             print(f"数据范围: {df['date'].iloc[0].strftime('%Y-%m-%d')} 至 {df['date'].iloc[-1].strftime('%Y-%m-%d')}")
             print(f"{'='*100}\n")
 
-        for _, row in df.iterrows():
+        for idx, (_, row) in enumerate(df.iterrows(), start=1):
+            # 调用进度回调
+            if progress_callback:
+                try:
+                    progress_callback(idx, total_rows)
+                except Exception as e:
+                    # 记录回调错误但不中断模拟
+                    if use_verbose:
+                        print(f"警告: 进度回调失败 - {e}")
             price_open = float(row['open'])
             price_close = float(row['close'])
             date = row['date']
@@ -195,7 +205,8 @@ def simulate_mean_cost(symbol: str = "600900",
                        end_date: Optional[str] = None,
                        lot_size: int = 100,
                        init_cash: float = 100000.0,
-                       source: str = "auto") -> Dict[str, Any]:
+                       source: str = "auto",
+                       progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
     from solver.mean_cost_strategy import MeanCostDecision
 
     if end_date is None:
@@ -207,14 +218,15 @@ def simulate_mean_cost(symbol: str = "600900",
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     strategy = MeanCostDecision()
-    return sim.simulate(df=df, strategy=strategy, symbol=symbol)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback)
 
 
 def simulate_sma(symbol: str = "600900",
                  df=None,
                  period: int = 20,
                  lot_size: int = 100,
-                 init_cash: float = 100000.0):
+                 init_cash: float = 100000.0,
+                 progress_callback: Optional[Callable[[int, int], None]] = None):
     from solver.sma_strategy import SmaDecision
 
     if df is None:
@@ -228,7 +240,7 @@ def simulate_sma(symbol: str = "600900",
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     strategy = SmaDecision(period=period, df=df)
-    return sim.simulate(df=df, strategy=strategy, symbol=symbol)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback)
 
 
 def simulate_fixed_amount(symbol: str = "600900",
@@ -238,7 +250,8 @@ def simulate_fixed_amount(symbol: str = "600900",
                          lot_size: int = 100,
                          init_cash: float = 100000.0,
                          source: str = "auto",
-                         verbose: bool = False) -> Dict[str, Any]:
+                         verbose: bool = False,
+                         progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
     """运行定投策略回测
     
     定投策略：每天投入固定金额购买股票，不考虑市场价格波动。
@@ -267,5 +280,5 @@ def simulate_fixed_amount(symbol: str = "600900",
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash, verbose=verbose)
     strategy = FixedAmountDecision(fixed_amount=fixed_amount)
-    return sim.simulate(df=df, strategy=strategy, symbol=symbol)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback)
 
