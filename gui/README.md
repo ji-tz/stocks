@@ -418,9 +418,11 @@ with sync_playwright() as p:
 ```
 
 **测试稳定性说明**：
-- 关键 UI 元素添加了 `data-testid` 属性以提高测试稳定性
-- 历史记录按钮使用 `data-testid="history-link"` 选择器
-- 推荐使用 `data-testid` 或 CSS 类选择器，而非文本选择器（避免 emoji 和文本变化导致的不稳定）
+- 关键 UI 元素添加了 `data-testid` 属性以提高 E2E 交互测试的稳定性
+- 历史记录按钮使用 `data-testid="history-link"` 选择器（供交互测试使用）
+- **截图测试**：推荐使用 `page.goto()` 直接导航，避免点击操作的不确定性
+- **交互测试**：推荐使用 `data-testid` 或 CSS 类选择器，而非文本选择器（避免 emoji 和文本变化导致的不稳定）
+- 详见 `tests/guitests/screenshot_main.py` 中的实现
 
 ### GUI 截图脚本
 

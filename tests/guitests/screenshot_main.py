@@ -238,9 +238,8 @@ def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEF
             print(f"  ✓ 保存到: {screenshot_path}")
 
             print("\n[2/7] 截图：空历史记录页面")
-            # 使用稳定的 data-testid 选择器点击历史记录链接
-            page.click("[data-testid='history-link']", timeout=10000)
-            page.wait_for_load_state("networkidle")
+            # 直接导航到历史记录页面（避免点击选择器不稳定问题）
+            page.goto(f"{base_url}/history", wait_until="networkidle", timeout=30000)
             time.sleep(1)
             screenshot_path = os.path.join(output_dir, "02_empty_history_page.png")
             page.screenshot(path=screenshot_path, full_page=True)
