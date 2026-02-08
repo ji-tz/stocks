@@ -124,9 +124,84 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
+          const path = require('path');
           
-          // 使用公开的 Images 仓库来托管图片
-          // 这样图片可以通过 raw.githubusercontent.com 公开访问
+          // 函数：上传图片到 GitHub 作为 issue attachment 并返回 URL
+          async function uploadImage(imagePath) {
+            try {
+              if (!fs.existsSync(imagePath)) {
+                console.log(`Image not found: ${imagePath}`);
+                return null;
+              }
+              
+              const imageBuffer = fs.readFileSync(imagePath);
+              const base64Image = imageBuffer.toString('base64');
+              const filename = path.basename(imagePath);
+              
+              // 使用 GitHub API 上传图片作为 issue attachment
+              // 注意：这需要先创建一个临时评论，然后上传附件
+              const response = await github.rest.repos.uploadReleaseAsset({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                // 使用 issue number 作为标识
+                name: filename,
+                data: imageBuffer,
+              }).catch(err => {
+                console.log(`Failed to upload via release asset API: ${err.message}`);
+                return null;
+              });
+              
+              if (response && response.data && response.data.browser_download_url) {
+                return response.data.browser_download_url;
+              }
+              
+              return null;
+            } catch (error) {
+              console.log(`Error uploading image ${imagePath}: ${error.message}`);
+              return null;
+            }
+          }
+          
+          // 函数：将图片转换为 base64 data URL（用于小图片）
+          function imageToDataUrl(imagePath) {
+            try {
+              if (!fs.existsSync(imagePath)) {
+                return null;
+              }
+              const imageBuffer = fs.readFileSync(imagePath);
+              const base64Image = imageBuffer.toString('base64');
+              // 检测图片格式
+              const ext = path.extname(imagePath).toLowerCase();
+              const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+              return `data:${mimeType};base64,${base64Image}`;
+            } catch (error) {
+              console.log(`Error converting image to data URL ${imagePath}: ${error.message}`);
+              return null;
+            }
+          }
+          
+          // 函数：格式化图片显示（使用 base64 或回退到文件信息）
+          function formatImageDisplay(imagePath, title) {
+            if (!fs.existsSync(imagePath)) {
+              return `⚠️ ${title}未生成`;
+            }
+            
+            const stats = fs.statSync(imagePath);
+            const sizeKB = (stats.size / 1024).toFixed(1);
+            const filename = path.basename(imagePath);
+            
+            // 如果图片小于 1MB，使用 base64 嵌入
+            if (stats.size < 1024 * 1024) {
+              const dataUrl = imageToDataUrl(imagePath);
+              if (dataUrl) {
+                return `![${title}](${dataUrl})\n\n*${filename} - ${sizeKB} KB*`;
+              }
+            }
+            
+            // 否则显示文件信息和下载链接
+            return `**${title}** (${filename}) - ${sizeKB} KB - [从 Artifacts 下载](${artifactUrl})`;
+          }
+          
           let mainGuiImage = '';
           let backtestResultImage = '';
           let strategyConfigImages = '';
@@ -152,41 +227,18 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 检查是否成功上传到公开仓库
-          const uploaded = '${{ steps.upload_to_public_repo.outputs.uploaded }}' === 'true';
-          const baseUrl = '${{ steps.upload_to_public_repo.outputs.base_url }}';
-          
-          console.log('Uploaded to public repo:', uploaded);
-          console.log('Base URL:', baseUrl);
+          console.log('Processing screenshots...');
+          console.log('Artifact URL:', artifactUrl);
           
           // 处理主界面截图
-          if (fs.existsSync(mainGuiPath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/main_gui.png`;
-              mainGuiImage = `![主界面截图](${imageUrl})`;
-              console.log(`Main GUI image URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(mainGuiPath);
-              mainGuiImage = `**主界面截图** (main_gui.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
-          } else {
-            mainGuiImage = '⚠️ 主界面截图未生成';
-          }
+          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图');
           
           // 处理策略配置截图
           const strategyImages = [];
-          for (const [title, path] of Object.entries(strategyPaths)) {
-            if (fs.existsSync(path)) {
-              if (uploaded && baseUrl) {
-                const filename = path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                strategyImages.push(`#### ${title}\n\n![${title}](${imageUrl})`);
-                console.log(`${title} URL: ${imageUrl}`);
-              } else {
-                const stats = fs.statSync(path);
-                const filename = path.split('/').pop();
-                strategyImages.push(`#### ${title}\n\n**${filename}** - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`);
-              }
+          for (const [title, imagePath] of Object.entries(strategyPaths)) {
+            if (fs.existsSync(imagePath)) {
+              const imageDisplay = formatImageDisplay(imagePath, title);
+              strategyImages.push(`#### ${title}\n\n${imageDisplay}`);
             }
           }
           
@@ -209,15 +261,8 @@ jobs:
           const workflowImagesList = [];
           for (const screenshot of workflowScreenshots) {
             if (fs.existsSync(screenshot.path)) {
-              if (uploaded && baseUrl) {
-                const filename = screenshot.path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                workflowImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
-              } else {
-                const stats = fs.statSync(screenshot.path);
-                const filename = screenshot.path.split('/').pop();
-                workflowImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
-              }
+              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title);
+              workflowImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
             }
           }
 
@@ -227,14 +272,7 @@ jobs:
           
           // 处理回测结果UI截图
           if (fs.existsSync(backtestResultPath)) {
-            if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/03_backtest_result_mean_cost.png`;
-              backtestResultImage = `![策略复盘界面截图](${imageUrl})`;
-              console.log(`Backtest result UI screenshot URL: ${imageUrl}`);
-            } else {
-              const stats = fs.statSync(backtestResultPath);
-              backtestResultImage = `**策略复盘界面截图** (03_backtest_result_mean_cost.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
-            }
+            backtestResultImage = formatImageDisplay(backtestResultPath, '策略复盘界面截图');
           } else {
             backtestResultImage = '⚠️ 策略复盘界面截图未生成(可能是回测步骤失败或超时)';
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
@@ -244,16 +282,8 @@ jobs:
           let historyImagesList = [];
           for (const screenshot of historyScreenshots) {
             if (fs.existsSync(screenshot.path)) {
-              if (uploaded && baseUrl) {
-                const filename = screenshot.path.split('/').pop();
-                const imageUrl = `${baseUrl}/${filename}`;
-                historyImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
-                console.log(`History screenshot URL: ${imageUrl}`);
-              } else {
-                const stats = fs.statSync(screenshot.path);
-                const filename = screenshot.path.split('/').pop();
-                historyImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
-              }
+              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title);
+              historyImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
             }
           }
           
