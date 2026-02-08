@@ -301,8 +301,6 @@ def run():
     strategy = request.form.get('strategy', 'sma')
     lot = int(request.form.get('lot') or 100)
     cash = float(request.form.get('cash') or 100000.0)
-    start = request.form.get('start') or None
-    end = request.form.get('end') or None
     
     # 在启动线程前提取所有需要的表单参数（避免request context问题）
     fixed_amount = float(request.form.get('fixed_amount') or 1000.0) if strategy == 'fixed_amount' else None

@@ -1,3 +1,6 @@
+import json
+import re
+import time
 import unittest
 from unittest.mock import patch
 
@@ -8,6 +11,28 @@ import pandas as pd
 class TestGuiRoutes(unittest.TestCase):
     def setUp(self):
         self.client = app.test_client()
+
+    def _extract_task_id(self, body: str) -> str:
+        match = re.search(r"const taskId = '([^']+)'", body)
+        self.assertIsNotNone(match, '未找到taskId')
+        return match.group(1)
+
+    def _wait_for_task_completion(self, task_id: str, expect_error: bool = False, timeout: float = 2.0):
+        deadline = time.time() + timeout
+        last_status = None
+        last_body = None
+        while time.time() < deadline:
+            resp = self.client.get(f'/api/result/{task_id}')
+            last_status = resp.status_code
+            last_body = resp.get_json()
+            if expect_error:
+                if resp.status_code == 500:
+                    return last_body
+            else:
+                if resp.status_code == 200:
+                    return last_body
+            time.sleep(0.05)
+        self.fail(f'回测任务未在{timeout}s内完成, status={last_status}, body={last_body}')
 
     def test_index_get(self):
         """测试股票选择首页"""
@@ -53,6 +78,8 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('600900', body)  # Stock code should be shown
         # Verify SSE connection setup is present
         self.assertIn('EventSource', body)
+        task_id = self._extract_task_id(body)
+        self._wait_for_task_completion(task_id)
 
     @patch('stocks.get_data')
     @patch('stocks.run_sma_backtest')
@@ -74,76 +101,8 @@ class TestGuiRoutes(unittest.TestCase):
         # Now expect progress page instead of result page
         body = rv.data.decode('utf-8')
         self.assertIn('回测仿真进行中', body)
-        """测试股票选择首页 - 真实浏览器访问"""
-        print("\n🧪 测试：股票选择首页")
-        
-        # 访问首页
-        self.page.goto(self.base_url, wait_until="networkidle", timeout=30000)
-        
-        # 验证页面标题和关键元素
-        page_content = self.page.content()
-        self.assertIn('量化回测平台', page_content)
-        self.assertIn('第一步：选择股票', page_content)
-        self.assertIn('搜索股票', page_content)
-        self.assertIn('热门股票', page_content)
-        
-        # 验证热门股票卡片
-        self.assertIn('600900', page_content)
-        self.assertIn('长江电力', page_content)
-        self.assertIn('600519', page_content)
-        self.assertIn('贵州茅台', page_content)
-        
-        print("✅ 首页元素验证通过")
-
-    @patch('stocks.get_data')
-    @patch('stocks.run_mean_cost')
-    def test_run_mean_cost_post(self, mock_mean, mock_get):
-        # Set stock in session
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-
-        # return a minimal dataframe required by the view
-        dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
-        df = pd.DataFrame({
-            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
-            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
-        })
-        mock_get.return_value = df
-        mock_mean.return_value = {
-            'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-01-10', 'init_cash': 100000.0,
-            'trades': 1, 'total_value': 100000.0, 'market_value': 20000.0, 'realized_pl': 0.0, 'unrealized_pl': 0.0, 'history': [], 'trades_list': []
-        }
-        rv = self.client.post('/run', data={'strategy': 'mean_cost', 'start': '20230101', 'end': '20231231'})
-        self.assertEqual(rv.status_code, 200)
-        body = rv.data.decode('utf-8')
-        self.assertIn('平均成本策略回测结果', body)
-        # Verify the new "总共动用资金" field is displayed with correct value
-        self.assertIn('总共动用资金', body)
-        # Check that the market value appears in the correct context (near the label)
-        self.assertIn('总共动用资金：</strong> 20000.00', body)
-        # ensure backend was queried with date range
-        mock_get.assert_called()
-
-    @patch('stocks.get_data')
-    @patch('stocks.run_sma_backtest')
-    def test_run_sma_post(self, mock_sma, mock_get):
-        # Set stock in session
-        with self.client.session_transaction() as sess:
-            sess['stock_code'] = '600900'
-            sess['stock_name'] = '长江电力'
-
-        dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
-        df = pd.DataFrame({
-            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
-            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
-        })
-        mock_get.return_value = df
-        mock_sma.return_value = {'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-01-10', 'init_cash': 100000.0, 'final_cash': 100500.0}
-        rv = self.client.post('/run', data={'strategy': 'sma', 'start': '20230101', 'end': '20231231'})
-        self.assertEqual(rv.status_code, 200)
-        self.assertIn('回测结果', rv.data.decode('utf-8'))
-        mock_get.assert_called()
+        task_id = self._extract_task_id(body)
+        self._wait_for_task_completion(task_id)
 
     def test_run_post_invalid_date_shows_error(self):
         # Set stock in session
@@ -153,7 +112,12 @@ class TestGuiRoutes(unittest.TestCase):
 
         rv = self.client.post('/run', data={'strategy': 'sma', 'start': 'invalid-date'})
         self.assertEqual(rv.status_code, 200)
-        self.assertIn('发生错误', rv.data.decode('utf-8'))
+        body = rv.data.decode('utf-8')
+        self.assertIn('回测仿真进行中', body)
+        task_id = self._extract_task_id(body)
+        error_body = self._wait_for_task_completion(task_id, expect_error=True)
+        self.assertIn('error', error_body)
+        self.assertIn('日期格式', error_body['error'])
 
     def test_strategy_sma_get(self):
         """测试 SMA 策略配置页面"""
@@ -230,23 +194,9 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertNotIn('起始日期', body)
         self.assertNotIn('结束日期', body)
 
-    @patch('stocks.get_data')
-    @patch('stocks.run_mean_cost')
-    def test_result_page_contains_stock_price_chart(self, mock_run, mock_get_data):
+    def test_result_page_contains_stock_price_chart(self):
         """测试复盘界面包含股价波动线（使用mock数据避免污染缓存）"""
-        # Mock数据以避免污染data/600900.csv
-        mock_df = pd.DataFrame({
-            'date': pd.date_range('2023-01-01', periods=20, freq='D'),
-            'open': [22.0 + i*0.1 for i in range(20)],
-            'high': [22.5 + i*0.1 for i in range(20)],
-            'low': [21.5 + i*0.1 for i in range(20)],
-            'close': [22.0 + i*0.1 for i in range(20)],
-            'volume': [1000000 + i*10000 for i in range(20)]
-        })
-        mock_get_data.return_value = mock_df
-
-        # Mock回测结果 - 包含模板需要的所有字段
-        mock_run.return_value = {
+        mock_result = {
             'symbol': '600900',
             'start_date': '2023-01-01',
             'end_date': '2023-01-31',
@@ -270,13 +220,7 @@ class TestGuiRoutes(unittest.TestCase):
             ]
         }
 
-        rv = self.client.post('/run', data={
-            'symbol': '600900',
-            'strategy': 'mean_cost',
-            'start': '20230101',
-            'end': '20230131',
-            'cash': '100000'
-        })
+        rv = self.client.post('/view_result', data={'result_json': json.dumps(mock_result, ensure_ascii=False)})
 
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')

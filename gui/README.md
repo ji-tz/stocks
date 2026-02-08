@@ -138,7 +138,7 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 **数据格式：**
 - 前端使用HTML5 date输入（YYYY-MM-DD格式）
 - 提交到后端时自动转换为YYYYMMDD格式
-- 保存在session中供后续回测使用
+- 保存在session中，/run 回测时优先读取该时间段
 
 ### 4. SMA 策略配置页面 (`/strategy/sma`)
 

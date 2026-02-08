@@ -1,7 +1,9 @@
 """测试历史记录和对比功能的GUI路由"""
+import json
+import re
+import time
 import unittest
 from unittest.mock import patch, MagicMock
-import json
 
 from gui.web import app
 import backtest_records
@@ -15,6 +17,24 @@ class TestHistoryAndCompareRoutes(unittest.TestCase):
         self.client = app.test_client()
         # 清空测试前的记录
         backtest_records.clear_all()
+
+    def _extract_task_id(self, body: str) -> str:
+        match = re.search(r"const taskId = '([^']+)'", body)
+        self.assertIsNotNone(match, '未找到taskId')
+        return match.group(1)
+
+    def _wait_for_task_completion(self, task_id: str, timeout: float = 2.0):
+        deadline = time.time() + timeout
+        last_status = None
+        last_body = None
+        while time.time() < deadline:
+            resp = self.client.get(f'/api/result/{task_id}')
+            last_status = resp.status_code
+            last_body = resp.get_json()
+            if resp.status_code in (200, 500):
+                return last_body
+            time.sleep(0.05)
+        self.fail(f'回测任务未在{timeout}s内完成, status={last_status}, body={last_body}')
 
     def tearDown(self):
         """测试后清理"""
@@ -219,6 +239,8 @@ class TestHistoryAndCompareRoutes(unittest.TestCase):
         })
 
         self.assertEqual(response.status_code, 200)
+        task_id = self._extract_task_id(response.data.decode('utf-8'))
+        self._wait_for_task_completion(task_id)
 
         # 验证记录已保存
         records = backtest_records.get_records()

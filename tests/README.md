@@ -30,6 +30,7 @@
   - 模拟真实用户点击、填写表单、页面导航等操作
   - 测试完整的用户流程：选择股票 → 选择策略 → 选择运行模式 → 配置参数 → 查看结果
   - 验证页面元素、URL跳转、客户端验证等
+  - 回测启动为异步进度页，结果页通过 `/api/result/<task_id>` 和 `/view_result` 获取
 - `guitests/test_gui_history.py` - 测试历史记录与对比页面路由
 - `guitests/test_screenshot_cli.py` - 截图脚本 CLI 逻辑测试
 - `test_main_run.py` - 测试主程序启动
