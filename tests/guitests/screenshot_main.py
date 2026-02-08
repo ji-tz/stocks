@@ -110,14 +110,6 @@ def _set_stock_session(page, base_url: str, stock_code: str, stock_name: str) ->
     time.sleep(1)
 
 
-def _click_history_link(page) -> None:
-    """
-    已废弃：历史记录功能已被移除
-    此函数保留仅用于兼容性，不会被调用
-    """
-    raise NotImplementedError("History feature has been removed from GUI")
-
-
 def take_main_gui_screenshot(output_path: str = "screenshots/main_gui.png", port: int = DEFAULT_PORT) -> str:
     """启动 Flask 应用，打开主界面并截图"""
     _ensure_dir(os.path.dirname(output_path))
@@ -219,14 +211,6 @@ def capture_stock_price_chart(output_path: str = "screenshots/stock_price_chart.
     Stock Price Chart 截图功能已从 GUI 测试中删除
     """
     raise NotImplementedError("Stock Price Chart screenshot has been removed from GUI tests")
-
-
-def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEFAULT_PORT) -> List[str]:
-    """
-    已废弃：历史记录功能已被移除
-    此函数保留仅用于兼容性，不会被调用
-    """
-    raise NotImplementedError("History and compare features have been removed from GUI")
 
 
 def run_targets(
