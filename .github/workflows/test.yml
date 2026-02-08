@@ -171,3 +171,17 @@ jobs:
             console.error('Failed to create comment:', error);
             throw error;
           }
+    
+    - name: Check Test Results
+      if: always()
+      run: |
+        echo "Checking test results..."
+        if [ "${{ steps.run_tests.outputs.test_exit_code }}" != "0" ]; then
+          echo "❌ 单元测试失败 (退出代码: ${{ steps.run_tests.outputs.test_exit_code }})"
+          exit 1
+        fi
+        if [ "${{ steps.run_simulator_tests.outputs.simulator_exit_code }}" != "0" ]; then
+          echo "❌ 策略模拟器测试失败 (退出代码: ${{ steps.run_simulator_tests.outputs.simulator_exit_code }})"
+          exit 1
+        fi
+        echo "✅ 所有测试通过"
