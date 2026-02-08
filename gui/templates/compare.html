@@ -5,6 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>回测记录对比</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
     <style>
       body { 
         font-family: Arial, sans-serif; 
@@ -103,6 +105,39 @@
         margin-top: 2rem;
         position: relative;
         height: 400px;
+        padding: 1rem;
+        background: #f9f9f9;
+        border-radius: 8px;
+      }
+      .chart-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .chart-btn {
+        padding: 0.5rem 1rem;
+        background: #1976d2;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: background 0.3s;
+      }
+      .chart-btn:hover {
+        background: #1565c0;
+      }
+      .chart-btn:active {
+        background: #0d47a1;
+      }
+      .chart-help {
+        color: #666;
+        font-size: 0.85rem;
+        padding: 0.5rem;
+        background: #fff;
+        border-radius: 4px;
+        border-left: 3px solid #1976d2;
       }
       .empty-state {
         text-align: center;
@@ -323,6 +358,13 @@
     <div class="compare-section">
       <h2>资产曲线对比</h2>
       <div class="chart-container">
+        <div class="chart-toolbar">
+          <button class="chart-btn" onclick="resetCompareZoom()">🔄 重置缩放</button>
+          <button class="chart-btn" onclick="downloadCompareChart()">💾 导出图片</button>
+          <div class="chart-help">
+            💡 提示：使用鼠标滚轮缩放，拖拽平移，点击图例切换显示
+          </div>
+        </div>
         <canvas id="compareChart"></canvas>
       </div>
     </div>
@@ -363,7 +405,7 @@
       ];
 
       const ctx = document.getElementById('compareChart').getContext('2d');
-      new Chart(ctx, {
+      const compareChart = new Chart(ctx, {
         type: 'line',
         data: {
           labels: labels,
@@ -379,12 +421,45 @@
           plugins: {
             legend: {
               position: 'top',
+              onClick: function(e, legendItem, legend) {
+                // 默认行为：切换数据集可见性
+                const index = legendItem.datasetIndex;
+                const ci = legend.chart;
+                if (ci.isDatasetVisible(index)) {
+                  ci.hide(index);
+                  legendItem.hidden = true;
+                } else {
+                  ci.show(index);
+                  legendItem.hidden = false;
+                }
+              }
             },
             tooltip: {
               callbacks: {
                 label: function(context) {
                   return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' 元';
                 }
+              }
+            },
+            zoom: {
+              zoom: {
+                wheel: {
+                  enabled: true,
+                  speed: 0.1
+                },
+                pinch: {
+                  enabled: true
+                },
+                mode: 'x'
+              },
+              pan: {
+                enabled: true,
+                mode: 'x',
+                modifierKey: null
+              },
+              limits: {
+                x: {min: 'original', max: 'original'},
+                y: {min: 'original', max: 'original'}
               }
             }
           },
@@ -409,6 +484,20 @@
           }
         }
       });
+
+      // 重置缩放功能
+      function resetCompareZoom() {
+        compareChart.resetZoom();
+      }
+
+      // 导出图表为图片
+      function downloadCompareChart() {
+        const url = compareChart.toBase64Image();
+        const link = document.createElement('a');
+        link.download = '回测对比_{{ records|length }}条记录.png';
+        link.href = url;
+        link.click();
+      }
     </script>
     {% endif %}
 
