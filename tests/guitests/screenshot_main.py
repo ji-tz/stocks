@@ -314,12 +314,26 @@ def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEF
             print(f"  ✓ 保存到: {screenshot_path}")
 
             print("\n[3/7] 运行回测：均值成本策略")
+            # 先设置时间段（通过API，等待响应完成）
+            page.evaluate("""
+                async () => {
+                    const response = await fetch('/api/select_time_range', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({start: '20250101', end: '20250131'})
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to set time range');
+                    }
+                    return await response.json();
+                }
+            """)
+            time.sleep(0.5)
+            
             page.goto(f"{base_url}/strategy/mean_cost", wait_until="networkidle")
             time.sleep(1)
 
-            page.fill('input[name="symbol"]', "600900")
-            page.fill('input[name="start"]', "20250101")
-            page.fill('input[name="end"]', "20250131")
+            # 只填写策略页面实际存在的字段
             page.fill('input[name="cash"]', "50000")
 
             print("  提交回测请求...")
@@ -341,12 +355,26 @@ def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEF
             print(f"  ✓ 保存到: {screenshot_path}")
 
             print("\n[5/7] 运行回测：定投策略")
+            # 先设置时间段（通过API，等待响应完成）
+            page.evaluate("""
+                async () => {
+                    const response = await fetch('/api/select_time_range', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({start: '20250101', end: '20250131'})
+                    });
+                    if (!response.ok) {
+                        throw new Error('Failed to set time range');
+                    }
+                    return await response.json();
+                }
+            """)
+            time.sleep(0.5)
+            
             page.goto(f"{base_url}/strategy/fixed_amount", wait_until="networkidle")
             time.sleep(1)
 
-            page.fill('input[name="symbol"]', "600900")
-            page.fill('input[name="start"]', "20250101")
-            page.fill('input[name="end"]', "20250131")
+            # 只填写策略页面实际存在的字段
             page.fill('input[name="fixed_amount"]', "1000")
             page.fill('input[name="cash"]', "50000")
 

@@ -91,6 +91,12 @@ jobs:
         python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
       continue-on-error: true
     
+    - name: Take Time Range Selection Screenshots
+      run: |
+        echo "=== Taking Time Range Selection Screenshots ==="
+        python tests/guitests/screenshot_time_range.py --output-dir screenshots
+      continue-on-error: true
+    
     - name: Upload Screenshots
       if: always()
       uses: actions/upload-artifact@v4
