@@ -279,7 +279,8 @@ jobs:
               backtestResultImage = `**策略复盘界面截图** (03_backtest_result_mean_cost.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
           } else {
-            backtestResultImage = ''; // 回测结果截图是可选的，不显示警告
+            backtestResultImage = '⚠️ 策略复盘界面截图未生成（可能是回测步骤失败或超时）';
+            console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
           }
           
           // 处理股价波动线图表截图
@@ -293,7 +294,8 @@ jobs:
               stockPriceChartImage = `**股价波动线图表** (stock_price_chart.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
           } else {
-            stockPriceChartImage = ''; // 股价图表是可选的，不显示警告
+            stockPriceChartImage = ''; // 留空，模板中有fallback处理
+            console.log('Warning: Stock price chart screenshot not found at:', stockPriceChartPath);
           }
           
           // 处理历史记录功能截图
