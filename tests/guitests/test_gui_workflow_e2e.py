@@ -143,7 +143,10 @@ class TestGuiWorkflowE2E(unittest.TestCase):
 
             # 7. 点击开始回测，进入回测进度页面并截图
             page.click("button[type='submit']")
-            # 等待页面内容加载（不需要URL变化，因为是POST到/run但返回的是同一URL）
+            # 等待表单提交后的加载完成
+            # 给服务器一些时间处理POST请求并返回新页面
+            page.wait_for_load_state("networkidle", timeout=15000)
+            # 现在等待页面内容加载（不需要URL变化，因为是POST到/run但返回的是同一URL）
             page.wait_for_selector("h1:has-text('回测仿真进行中')", timeout=20000)
             self._screenshot(page, "07_backtest_progress.png")
 
