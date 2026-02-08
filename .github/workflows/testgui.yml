@@ -74,6 +74,12 @@ jobs:
         echo "=== Taking Time Range Selection Screenshots ==="
         python tests/guitests/screenshot_time_range.py --output-dir screenshots
       continue-on-error: true
+
+    - name: Run GUI Workflow Screenshot Test
+      run: |
+        echo "=== Running GUI Workflow Screenshot Test ==="
+        python -m unittest tests.guitests.test_gui_workflow_e2e -v
+      continue-on-error: true
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
@@ -125,6 +131,7 @@ jobs:
           let backtestResultImage = '';
           let strategyConfigImages = '';
           let historyImages = '';
+          let workflowImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const backtestResultPath = 'screenshots/03_backtest_result_mean_cost.png';
@@ -185,6 +192,37 @@ jobs:
           
           if (strategyImages.length > 0) {
             strategyConfigImages = `\n### 🎯 策略参数配置界面\n\n${strategyImages.join('\n\n')}`;
+          }
+
+          // 处理完整工作流截图
+          const workflowScreenshots = [
+            { path: 'screenshots/workflow/01_open_home.png', title: '步骤1：打开界面' },
+            { path: 'screenshots/workflow/02_select_strategy.png', title: '步骤2：选择股票后进入策略选择' },
+            { path: 'screenshots/workflow/03_select_mode.png', title: '步骤3：选择策略进入运行模式' },
+            { path: 'screenshots/workflow/04_select_time_range.png', title: '步骤4：选择回测模式进入时间段' },
+            { path: 'screenshots/workflow/05_mean_cost_strategy.png', title: '步骤5：进入策略配置界面' },
+            { path: 'screenshots/workflow/06_strategy_params.png', title: '步骤6：配置策略参数' },
+            { path: 'screenshots/workflow/07_backtest_progress.png', title: '步骤7：回测进行中' },
+            { path: 'screenshots/workflow/08_backtest_result.png', title: '步骤8：复盘结果' }
+          ];
+
+          const workflowImagesList = [];
+          for (const screenshot of workflowScreenshots) {
+            if (fs.existsSync(screenshot.path)) {
+              if (uploaded && baseUrl) {
+                const filename = screenshot.path.split('/').pop();
+                const imageUrl = `${baseUrl}/${filename}`;
+                workflowImagesList.push(`**${screenshot.title}**\n\n![${screenshot.title}](${imageUrl})`);
+              } else {
+                const stats = fs.statSync(screenshot.path);
+                const filename = screenshot.path.split('/').pop();
+                workflowImagesList.push(`**${screenshot.title}** (${filename}) - ${(stats.size / 1024).toFixed(1)} KB`);
+              }
+            }
+          }
+
+          if (workflowImagesList.length > 0) {
+            workflowImages = `\n### 🧭 完整工作流截图\n\n${workflowImagesList.join('\n\n')}`;
           }
           
           // 处理回测结果UI截图
@@ -267,6 +305,7 @@ jobs:
           
           ${mainGuiImage}
           ${strategyConfigImages}
+          ${workflowImages}
           
           ${historyImages}
           

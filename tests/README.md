@@ -32,6 +32,7 @@
   - 验证页面元素、URL跳转、客户端验证等
   - 回测启动为异步进度页，结果页通过 `/api/result/<task_id>` 和 `/view_result` 获取
 - `guitests/test_gui_history.py` - 测试历史记录与对比页面路由
+- `guitests/test_gui_workflow_e2e.py` - 完整GUI工作流截图集成测试（含随机股票与时间段）
 - `guitests/test_screenshot_cli.py` - 截图脚本 CLI 逻辑测试
 - `test_main_run.py` - 测试主程序启动
 
