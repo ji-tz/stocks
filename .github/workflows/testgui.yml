@@ -201,13 +201,13 @@ jobs:
           // 使用公开的 Images 仓库来托管图片
           // 这样图片可以通过 raw.githubusercontent.com 公开访问
           let mainGuiImage = '';
-          let yangtzeImage = '';
+          let backtestResultImage = '';
           let stockPriceChartImage = '';
           let strategyConfigImages = '';
           let historyImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
-          const yangtzeImagePath = 'screenshots/yangtze_power_test.png';
+          const backtestResultPath = 'screenshots/03_backtest_result_mean_cost.png';
           const stockPriceChartPath = 'screenshots/stock_price_chart.png';
           const strategyPaths = {
             'SMA策略配置': 'screenshots/strategy_sma_config.png',
@@ -268,18 +268,18 @@ jobs:
             strategyConfigImages = `\n### 🎯 策略参数配置界面\n\n${strategyImages.join('\n\n')}`;
           }
           
-          // 处理测试结果图表
-          if (fs.existsSync(yangtzeImagePath)) {
+          // 处理回测结果UI截图
+          if (fs.existsSync(backtestResultPath)) {
             if (uploaded && baseUrl) {
-              const imageUrl = `${baseUrl}/yangtze_power_test.png`;
-              yangtzeImage = `![股票测试结果图表](${imageUrl})`;
-              console.log(`Yangtze chart URL: ${imageUrl}`);
+              const imageUrl = `${baseUrl}/03_backtest_result_mean_cost.png`;
+              backtestResultImage = `![策略复盘界面截图](${imageUrl})`;
+              console.log(`Backtest result UI screenshot URL: ${imageUrl}`);
             } else {
-              const stats = fs.statSync(yangtzeImagePath);
-              yangtzeImage = `**测试结果图表** (yangtze_power_test.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
+              const stats = fs.statSync(backtestResultPath);
+              backtestResultImage = `**策略复盘界面截图** (03_backtest_result_mean_cost.png) - ${(stats.size / 1024).toFixed(1)} KB - [从 Artifacts 下载](${artifactUrl})`;
             }
           } else {
-            yangtzeImage = ''; // 测试结果图表是可选的，不显示警告
+            backtestResultImage = ''; // 回测结果截图是可选的，不显示警告
           }
           
           // 处理股价波动线图表截图
@@ -330,8 +330,9 @@ jobs:
               const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
               const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
               testResult = `
-          ### 📊 策略复盘
+          ### 📊 策略复盘界面
           
+          **测试数据摘要**：
           - **股票代码**: ${data.symbol || '未知'}
           - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
           - **初始资金**: ¥${(data.init_cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
@@ -344,7 +345,9 @@ jobs:
           - **交易次数**: ${data.trades || 0}
           - **持有股数**: ${data.shares || 0}
           
-          ${yangtzeImage}
+          **真实UI界面截图**：
+          
+          ${backtestResultImage}
           `;
             }
           } catch (e) {
