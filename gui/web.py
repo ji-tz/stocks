@@ -8,7 +8,6 @@ from flask import Flask, render_template, request, session, jsonify, Response
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import stocks
-import backtest_records
 from gui.backtest_progress import get_progress_manager
 
 app = Flask(__name__, template_folder='templates')
@@ -351,36 +350,15 @@ def run():
                 res = stocks.run_mean_cost(symbol=symbol, start_date=start, end_date=end,
                                           lot_size=lot, init_cash=cash, source=source,
                                           progress_callback=progress_callback)
-                # 保存回测记录
-                backtest_records.add_record(
-                    strategy='mean_cost',
-                    symbol=symbol,
-                    parameters={'start': start, 'end': end, 'lot': lot, 'cash': cash, 'source': source},
-                    result=res
-                )
             elif strategy == 'fixed_amount':
                 res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end,
                                             fixed_amount=fixed_amount, lot_size=lot,
                                             init_cash=cash, source=source,
                                             progress_callback=progress_callback)
-                # 保存回测记录
-                backtest_records.add_record(
-                    strategy='fixed_amount',
-                    symbol=symbol,
-                    parameters={'start': start, 'end': end, 'fixed_amount': fixed_amount, 'lot': lot, 'cash': cash, 'source': source},
-                    result=res
-                )
             else:  # sma
                 res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end,
                                              lot_size=lot, init_cash=cash, period=period,
                                              progress_callback=progress_callback)
-                # 保存回测记录
-                backtest_records.add_record(
-                    strategy='sma',
-                    symbol=symbol,
-                    parameters={'start': start, 'end': end, 'period': period, 'lot': lot, 'cash': cash, 'source': source},
-                    result=res
-                )
 
             # 设置任务结果
             progress_mgr.set_result(task_id, res)
@@ -448,54 +426,6 @@ def view_result():
             return render_template('result.html', error='回测结果格式不正确')
     except Exception as e:
         return render_template('result.html', error=f'解析结果失败: {e}')
-
-
-@app.route('/history', methods=['GET'])
-def history():
-    """历史记录列表页面"""
-    records = backtest_records.get_records()
-    return render_template('history.html', records=records)
-
-
-@app.route('/compare', methods=['GET'])
-def compare():
-    """对比页面"""
-    # 从查询参数获取要对比的记录ID列表
-    record_ids = request.args.getlist('ids')
-
-    # 获取记录详情
-    records = []
-    for record_id in record_ids:
-        record = backtest_records.get_record(record_id)
-        if record:
-            records.append(record)
-
-    return render_template('compare.html', records=records)
-
-
-@app.route('/api/records', methods=['GET'])
-def api_records():
-    """获取记录列表的JSON API"""
-    records = backtest_records.get_records()
-    return jsonify({'records': records})
-
-
-@app.route('/api/record/<record_id>', methods=['GET'])
-def api_record(record_id):
-    """获取单条记录的JSON API"""
-    record = backtest_records.get_record(record_id)
-    if record:
-        return jsonify(record)
-    return jsonify({'error': 'Record not found'}), 404
-
-
-@app.route('/api/record/<record_id>', methods=['DELETE'])
-def api_delete_record(record_id):
-    """删除记录的JSON API"""
-    success = backtest_records.delete_record(record_id)
-    if success:
-        return jsonify({'success': True})
-    return jsonify({'success': False, 'error': 'Record not found'}), 404
 
 
 if __name__ == '__main__':

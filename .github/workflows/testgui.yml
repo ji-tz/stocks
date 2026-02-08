@@ -55,11 +55,6 @@ jobs:
         echo "=== Taking Strategy Configuration Screenshots ==="
         python tests/guitests/screenshot_main.py strategy --output-dir screenshots
     
-    - name: Take History Feature Screenshots
-      run: |
-        echo "=== Taking History and Compare Feature Screenshots ==="
-        python tests/guitests/screenshot_main.py history --output-dir screenshots
-    
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
@@ -136,7 +131,6 @@ jobs:
           let mainGuiImage = '';
           let backtestResultImage = '';
           let strategyConfigImages = '';
-          let historyImages = '';
           let workflowImages = '';
           
           const mainGuiPath = 'screenshots/main_gui.png';
@@ -146,14 +140,6 @@ jobs:
             '均值成本策略配置': 'screenshots/strategy_mean_cost_config.png',
             '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
           };
-          
-          // 历史记录功能截图路径
-          const historyScreenshots = [
-            { path: 'screenshots/02_empty_history_page.png', title: '空历史记录页面' },
-            { path: 'screenshots/04_history_with_one_record.png', title: '包含一条记录的历史页面' },
-            { path: 'screenshots/06_history_records_selected.png', title: '选中记录准备对比' },
-            { path: 'screenshots/07_compare_page_with_charts.png', title: '对比页面（表格+图表）' }
-          ];
           
           console.log('Processing screenshots...');
           console.log('Artifact URL:', artifactUrl);
@@ -206,23 +192,6 @@ jobs:
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
           }
           
-          // 处理历史记录功能截图
-          let historyImagesList = [];
-          for (const screenshot of historyScreenshots) {
-            if (fs.existsSync(screenshot.path)) {
-              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title, artifactUrl);
-              historyImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
-            }
-          }
-          
-          if (historyImagesList.length > 0) {
-            historyImages = `
-          ### 📋 历史记录功能截图
-          
-          ${historyImagesList.join('\n\n')}
-          `;
-          }
-          
            // 读取测试结果
           let testResult = '';
           try {
@@ -264,8 +233,6 @@ jobs:
           ${mainGuiImage}
           ${strategyConfigImages}
           ${workflowImages}
-          
-          ${historyImages}
           
           ${testResult}
           

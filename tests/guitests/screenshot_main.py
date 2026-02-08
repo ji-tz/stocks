@@ -20,7 +20,7 @@ sys.path.insert(0, ROOT_DIR)
 
 DEFAULT_PORT = 5000
 DEFAULT_OUTPUT_DIR = "screenshots"
-AVAILABLE_TARGETS = ["main", "strategy", "history"]
+AVAILABLE_TARGETS = ["main", "strategy"]
 
 
 def resolve_targets(target: Optional[str], run_all: bool = False) -> List[str]:
@@ -42,7 +42,7 @@ def build_output_plan(
     for target in targets:
         if target == "main":
             plan[target] = output_main or os.path.join(output_dir, "main_gui.png")
-        elif target in ("strategy", "history"):
+        elif target == "strategy":
             plan[target] = output_dir
     return plan
 
@@ -111,14 +111,11 @@ def _set_stock_session(page, base_url: str, stock_code: str, stock_name: str) ->
 
 
 def _click_history_link(page) -> None:
-    """点击历史记录链接，使用稳定的选择器（优先 data-testid，fallback 到 class）"""
-    try:
-        page.locator('[data-testid="history-link"]').click(timeout=5000)
-    except PlaywrightTimeoutError:
-        # Fallback: 使用 class 选择器
-        page.locator('.history-link').click(timeout=5000)
-
-    page.wait_for_load_state("networkidle", timeout=30000)
+    """
+    已废弃：历史记录功能已被移除
+    此函数保留仅用于兼容性，不会被调用
+    """
+    raise NotImplementedError("History feature has been removed from GUI")
 
 
 def take_main_gui_screenshot(output_path: str = "screenshots/main_gui.png", port: int = DEFAULT_PORT) -> str:
@@ -225,162 +222,11 @@ def capture_stock_price_chart(output_path: str = "screenshots/stock_price_chart.
 
 
 def test_history_and_compare_ui(output_dir: str = "screenshots", port: int = DEFAULT_PORT) -> List[str]:
-    """测试历史记录和对比功能的完整流程"""
-    _ensure_dir(output_dir)
-    print("启动 Flask 服务器...")
-    flask_process = _start_flask_server(port)
-
-    screenshots_taken: List[str] = []
-
-    try:
-        with sync_playwright() as p:
-            print("\n启动浏览器...")
-            browser = p.chromium.launch(headless=True)
-            page = browser.new_page(viewport={"width": 1280, "height": 800})
-
-            base_url = f"http://127.0.0.1:{port}"
-
-            print("\n[1/7] 截图：首页（带历史记录按钮）")
-            page.goto(f"{base_url}/", wait_until="networkidle", timeout=30000)
-            time.sleep(1)
-            screenshot_path = os.path.join(output_dir, "01_homepage_with_history_button.png")
-            page.screenshot(path=screenshot_path, full_page=True)
-            screenshots_taken.append(screenshot_path)
-            print(f"  ✓ 保存到: {screenshot_path}")
-
-            print("\n[2/7] 截图：空历史记录页面")
-            # 通过点击首页历史记录按钮进入历史页面
-            _click_history_link(page)
-            screenshot_path = os.path.join(output_dir, "02_empty_history_page.png")
-            page.screenshot(path=screenshot_path, full_page=True)
-            screenshots_taken.append(screenshot_path)
-            print(f"  ✓ 保存到: {screenshot_path}")
-
-            print("\n[3/7] 运行回测：均值成本策略")
-            # 先设置时间段（通过API，等待响应完成）
-            page.evaluate("""
-                async () => {
-                    const response = await fetch('/api/select_time_range', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({start: '20250101', end: '20250131'})
-                    });
-                    if (!response.ok) {
-                        throw new Error('Failed to set time range');
-                    }
-                    return await response.json();
-                }
-            """)
-            time.sleep(0.5)
-            
-            page.goto(f"{base_url}/strategy/mean_cost", wait_until="networkidle")
-            time.sleep(1)
-
-            # 只填写策略页面实际存在的字段
-            page.fill('input[name="cash"]', "50000")
-
-            print("  提交回测请求...")
-            page.click('button[type="submit"]')
-            page.wait_for_load_state("networkidle", timeout=60000)
-            time.sleep(2)
-
-            screenshot_path = os.path.join(output_dir, "03_backtest_result_mean_cost.png")
-            page.screenshot(path=screenshot_path, full_page=True)
-            screenshots_taken.append(screenshot_path)
-            print(f"  ✓ 回测完成，保存到: {screenshot_path}")
-
-            print("\n[4/7] 截图：包含一条记录的历史页面")
-            # 先回到首页，再通过历史记录按钮进入
-            page.goto(f"{base_url}/", wait_until="networkidle", timeout=30000)
-            _click_history_link(page)
-            screenshot_path = os.path.join(output_dir, "04_history_with_one_record.png")
-            page.screenshot(path=screenshot_path, full_page=True)
-            screenshots_taken.append(screenshot_path)
-            print(f"  ✓ 保存到: {screenshot_path}")
-
-            print("\n[5/7] 运行回测：定投策略")
-            # 先设置时间段（通过API，等待响应完成）
-            page.evaluate("""
-                async () => {
-                    const response = await fetch('/api/select_time_range', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({start: '20250101', end: '20250131'})
-                    });
-                    if (!response.ok) {
-                        throw new Error('Failed to set time range');
-                    }
-                    return await response.json();
-                }
-            """)
-            time.sleep(0.5)
-            
-            page.goto(f"{base_url}/strategy/fixed_amount", wait_until="networkidle")
-            time.sleep(1)
-
-            # 只填写策略页面实际存在的字段
-            page.fill('input[name="fixed_amount"]', "1000")
-            page.fill('input[name="cash"]', "50000")
-
-            print("  提交回测请求...")
-            page.click('button[type="submit"]')
-            page.wait_for_load_state("networkidle", timeout=60000)
-            time.sleep(2)
-
-            screenshot_path = os.path.join(output_dir, "05_backtest_result_fixed_amount.png")
-            page.screenshot(path=screenshot_path, full_page=True)
-            screenshots_taken.append(screenshot_path)
-            print(f"  ✓ 回测完成，保存到: {screenshot_path}")
-
-            print("\n[6/7] 截图：包含两条记录的历史页面（选中状态）")
-            # 先回到首页，再通过历史记录按钮进入
-            page.goto(f"{base_url}/", wait_until="networkidle", timeout=30000)
-            _click_history_link(page)
-
-            checkboxes = page.query_selector_all(".record-checkbox")
-            if len(checkboxes) >= 2:
-                checkboxes[0].check()
-                checkboxes[1].check()
-                time.sleep(0.5)
-
-            screenshot_path = os.path.join(output_dir, "06_history_records_selected.png")
-            page.screenshot(path=screenshot_path, full_page=True)
-            screenshots_taken.append(screenshot_path)
-            print(f"  ✓ 保存到: {screenshot_path}")
-
-            print("\n[7/7] 截图：对比页面")
-            if len(checkboxes) >= 2:
-                page.click("#compareBtn")
-                page.wait_for_load_state("networkidle", timeout=30000)
-                time.sleep(3)
-
-                screenshot_path = os.path.join(output_dir, "07_compare_page_with_charts.png")
-                page.screenshot(path=screenshot_path, full_page=True)
-                screenshots_taken.append(screenshot_path)
-                print(f"  ✓ 保存到: {screenshot_path}")
-            else:
-                print("  ⚠ 跳过对比页面（记录不足）")
-
-            browser.close()
-
-    except Exception as e:
-        print(f"\n❌ 测试过程中出错: {e}")
-        import traceback
-
-        traceback.print_exc()
-        raise
-    finally:
-        _stop_flask_server(flask_process)
-
-    print("\n" + "=" * 80)
-    print("✅ GUI测试和截图完成!")
-    print("=" * 80)
-    print(f"\n共生成 {len(screenshots_taken)} 张截图：")
-    for i, path in enumerate(screenshots_taken, 1):
-        print(f"  {i}. {path}")
-    print()
-
-    return screenshots_taken
+    """
+    已废弃：历史记录功能已被移除
+    此函数保留仅用于兼容性，不会被调用
+    """
+    raise NotImplementedError("History and compare features have been removed from GUI")
 
 
 def run_targets(
@@ -395,8 +241,6 @@ def run_targets(
             take_main_gui_screenshot(output_plan[target], port=port)
         elif target == "strategy":
             take_strategy_config_screenshots(output_plan[target], port=port)
-        elif target == "history":
-            test_history_and_compare_ui(output_plan[target], port=port)
 
 
 def _parse_args(argv: Optional[List[str]] = None) -> argparse.Namespace:

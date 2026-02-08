@@ -32,8 +32,6 @@
 - Flask Web应用，提供友好的操作界面
 - 可视化回测结果展示
 - 支持自定义参数配置
-- **历史记录管理**：自动保存最多20条回测记录
-- **回测对比功能**：并排对比多个回测记录的收益率、资产曲线等关键指标
 
 ### 4. 自动化工作流（CI/CD）
 
@@ -197,8 +195,6 @@ playwright install chromium
 # 运行统一截图脚本（推荐）
 python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
 python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-python tests/guitests/screenshot_main.py history --output-dir screenshots
-python tests/guitests/screenshot_main.py chart --output screenshots/stock_price_chart.png
 python tests/guitests/screenshot_main.py all --output-dir screenshots
 
 ```
@@ -335,9 +331,8 @@ python demo_simulator.py
 测试内容：
 1. **主界面截图** - 应用主界面
 2. **策略配置截图** - SMA、均值成本、定投策略配置界面
-3. **历史记录截图** - 历史记录和对比功能
-4. **完整工作流截图** - 从选股到回测的完整流程
-5. **股票集成测试** - 随机选择股票进行回测
+3. **完整工作流截图** - 从选股到回测的完整流程
+4. **股票集成测试** - 随机选择股票进行回测
 
 输出产物：
 - GUI 截图上传到 Artifacts（保留30天）

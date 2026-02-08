@@ -250,14 +250,6 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 - 鼠标悬停可同时查看归一化值和原始值
 - 两条曲线起点对齐，便于直观对比涨跌幅度
 
-### 9. 历史记录页面 (`/history`)
-- **归一化显示**：股价和总资产都以起点为100的相对变化显示
-- **Y轴**：相对变化（起点=100）
-- **总资产变化**：青色线
-- **股价变化**：红色线
-- **悬停提示**：鼠标悬停可同时查看归一化值和原始值
-- **曲线对齐**：两条曲线起点对齐，便于直观对比涨跌幅度
-
 **✨ 新增交互功能（v2.0）：**
 - 🔍 **缩放功能**：使用鼠标滚轮对图表X轴进行缩放，精确查看特定时间段
 - 🖱️ **平移功能**：按住鼠标左键拖拽图表，在缩放状态下平移查看不同区域
@@ -266,29 +258,6 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 - 👁️ **图例切换**：点击图表顶部的图例（如"总资产变化"、"股价变化"）可切换显示/隐藏对应的数据曲线
 - 📱 **移动端支持**：支持触摸手势进行缩放和平移操作
 - 💡 **操作提示**：图表上方显示友好的操作提示信息
-
-### 8. 历史记录页面 (`/history`)
-
-查看和管理所有回测历史记录：
-- 展示最多20条历史回测记录（FIFO策略）
-- 显示策略类型、股票代码、回测期间等关键信息
-- 支持多选记录进行对比
-- 支持删除单条记录
-- 自动保存每次回测结果
-
-### 10. 对比页面 (`/compare`)
-
-并排对比多个回测记录：
-- 基本信息对比（策略、股票、期间）
-- 收益对比（初始资金、最终资产、收益率等）
-- 交易统计对比（交易次数、持仓、现金）
-- **交互式资产曲线图表对比**（Chart.js可视化）
-- 自动标注最优指标
-
-**对比页面图表交互功能：**
-- 支持所有与结果页面相同的交互功能（缩放、平移、重置、导出、图例切换）
-- 可同时对比多条回测记录的资产曲线
-- 点击图例可选择性查看特定记录的曲线
 
 ## 路由说明
 
@@ -311,11 +280,6 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 | `/api/progress/<task_id>` | GET | SSE端点，推送回测进度（实时） |
 | `/api/result/<task_id>` | GET | 获取回测任务结果（JSON API） |
 | `/view_result` | POST | 查看回测结果页面 |
-| `/history` | GET | 历史记录列表页面 |
-| `/compare` | GET | 回测记录对比页面 |
-| `/api/records` | GET | 获取记录列表（JSON API） |
-| `/api/record/<id>` | GET | 获取单条记录详情（JSON API） |
-| `/api/record/<id>` | DELETE | 删除单条记录（JSON API） |
 
 ## 参数说明
 
@@ -419,7 +383,6 @@ with sync_playwright() as p:
 
 **测试稳定性说明**：
 - 关键 UI 元素添加了 `data-testid` 属性以提高 E2E 交互测试的稳定性
-- 历史记录按钮使用 `data-testid="history-link"` 选择器（供交互测试使用）
 - **截图测试**：推荐使用 `page.goto()` 直接导航，避免点击操作的不确定性
 - **交互测试**：推荐使用 `data-testid` 或 CSS 类选择器，而非文本选择器（避免 emoji 和文本变化导致的不稳定）
 - 详见 `tests/guitests/screenshot_main.py` 中的实现
@@ -431,7 +394,6 @@ with sync_playwright() as p:
 ```bash
 python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
 python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-python tests/guitests/screenshot_main.py history --output-dir screenshots
 ```
 
 ## 依赖
