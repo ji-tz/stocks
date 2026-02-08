@@ -8,7 +8,7 @@
 """
 import os
 import traceback
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, Callable
 
 from source.data_provider import get_data as _get_data
 
@@ -105,11 +105,14 @@ def get_data(symbol: str = "600900",
 
 
 def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
-                  lot_size: int = 100, init_cash: float = 100000.0, source: object = "auto") -> Dict[str, Any]:
+                  lot_size: int = 100, init_cash: float = 100000.0, source: object = "auto", 
+                  progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
     """调用均值成本模拟（封装自 solver.mean_cost_strategy.simulate_mean_cost）。"""
     if simulate_mean_cost is None:
         raise RuntimeError("mean_cost 模块不可用")
-    return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, lot_size=lot_size, init_cash=init_cash, source=source)
+    return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, 
+                            lot_size=lot_size, init_cash=init_cash, source=source,
+                            progress_callback=progress_callback)
 
 
 def run_fixed_amount(symbol: str = "600900",
@@ -118,7 +121,8 @@ def run_fixed_amount(symbol: str = "600900",
                     fixed_amount: float = 1000.0,
                     lot_size: int = 100,
                     init_cash: float = 100000.0,
-                    source: object = "auto") -> Dict[str, Any]:
+                    source: object = "auto",
+                    progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
     """调用定投策略模拟（封装自 simulator.simulator.simulate_fixed_amount）。
     
     Args:
@@ -129,6 +133,7 @@ def run_fixed_amount(symbol: str = "600900",
         lot_size: 交易手数
         init_cash: 初始资金
         source: 数据源
+        progress_callback: 进度回调函数
         
     Returns:
         包含回测结果的字典
@@ -141,12 +146,14 @@ def run_fixed_amount(symbol: str = "600900",
                                 fixed_amount=fixed_amount,
                                 lot_size=lot_size,
                                 init_cash=init_cash,
-                                source=source)
+                                source=source,
+                                progress_callback=progress_callback)
 
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      start_date: Optional[str] = None, end_date: Optional[str] = None,
-                     lot_size: int = 100, init_cash: float = 100000.0, period: int = 20) -> Dict[str, Any]:
+                     lot_size: int = 100, init_cash: float = 100000.0, period: int = 20,
+                     progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
     """使用 Backtrader 运行 SMA 回测并返回统一的展示结果。
 
     仍然会尝试通过 backtrader 运行策略（以保持与现有测试/行为兼容），
@@ -160,6 +167,7 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
         lot_size: 交易手数
         init_cash: 初始资金
         period: SMA 周期（默认 20）
+        progress_callback: 进度回调函数
     """
     try:
         import backtrader as bt
@@ -187,7 +195,8 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
 
     # 基于 pandas 的模拟，产生统一展示结构
     try:
-        sim_res = simulate_sma(symbol=symbol, df=df, period=period, lot_size=lot_size, init_cash=init_cash)
+        sim_res = simulate_sma(symbol=symbol, df=df, period=period, lot_size=lot_size, 
+                             init_cash=init_cash, progress_callback=progress_callback)
     except Exception:
         return {
             'symbol': symbol,
