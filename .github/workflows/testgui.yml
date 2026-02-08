@@ -127,13 +127,27 @@ jobs:
             }
             
             try {
+              // 根据文件扩展名确定MIME类型
+              const ext = path.extname(imagePath).toLowerCase();
+              const mimeTypes = {
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+                '.webp': 'image/webp'
+              };
+              const mimeType = mimeTypes[ext] || 'image/png';
+              
               // 读取图片并转换为base64
               const imageBuffer = fs.readFileSync(imagePath);
               const base64Image = imageBuffer.toString('base64');
-              const dataUri = `data:image/png;base64,${base64Image}`;
+              const dataUri = `data:${mimeType};base64,${base64Image}`;
+              
+              // 转义Markdown特殊字符
+              const escapedTitle = title.replace(/[[\]()]/g, '\\$&');
               
               // 返回嵌入base64的Markdown图片
-              return `![${title}](${dataUri})\n\n*${filename} - ${sizeKB} KB*`;
+              return `![${escapedTitle}](${dataUri})\n\n*${filename} - ${sizeKB} KB*`;
             } catch (error) {
               console.error(`Failed to encode image ${imagePath}:`, error);
               return `⚠️ ${title}编码失败 - 请在 [Artifacts](${artifactUrl}) 中查看`;
@@ -168,7 +182,8 @@ jobs:
           // 处理主界面截图
           console.log('Processing main GUI screenshot...');
           mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
-          console.log('Main GUI image result:', mainGuiImage.substring(0, 100) + '...');
+          const LOG_PREVIEW_LENGTH = 100;
+          console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
           
           // 处理策略配置截图
           console.log('Processing strategy config screenshots...');
