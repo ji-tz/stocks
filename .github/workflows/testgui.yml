@@ -126,42 +126,6 @@ jobs:
           const fs = require('fs');
           const path = require('path');
           
-          // 函数：上传图片到 GitHub 作为 issue attachment 并返回 URL
-          async function uploadImage(imagePath) {
-            try {
-              if (!fs.existsSync(imagePath)) {
-                console.log(`Image not found: ${imagePath}`);
-                return null;
-              }
-              
-              const imageBuffer = fs.readFileSync(imagePath);
-              const base64Image = imageBuffer.toString('base64');
-              const filename = path.basename(imagePath);
-              
-              // 使用 GitHub API 上传图片作为 issue attachment
-              // 注意：这需要先创建一个临时评论，然后上传附件
-              const response = await github.rest.repos.uploadReleaseAsset({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                // 使用 issue number 作为标识
-                name: filename,
-                data: imageBuffer,
-              }).catch(err => {
-                console.log(`Failed to upload via release asset API: ${err.message}`);
-                return null;
-              });
-              
-              if (response && response.data && response.data.browser_download_url) {
-                return response.data.browser_download_url;
-              }
-              
-              return null;
-            } catch (error) {
-              console.log(`Error uploading image ${imagePath}: ${error.message}`);
-              return null;
-            }
-          }
-          
           // 函数：将图片转换为 base64 data URL（用于小图片）
           function imageToDataUrl(imagePath) {
             try {
