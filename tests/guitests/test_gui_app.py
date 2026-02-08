@@ -77,6 +77,70 @@ class TestGuiRoutes(unittest.TestCase):
         self.playwright.stop()
 
     def test_index_get(self):
+        """测试股票选择首页"""
+        rv = self.client.get('/')
+        self.assertEqual(rv.status_code, 200)
+        # page title should be present (Chinese)
+        body = rv.data.decode('utf-8')
+        self.assertIn('量化回测平台', body)
+        self.assertIn('第一步：选择股票', body)
+        # ensure stock search box is present
+        self.assertIn('搜索股票', body)
+        self.assertIn('热门股票', body)
+        # ensure popular stocks are displayed
+        self.assertIn('600900', body)
+        self.assertIn('长江电力', body)
+        self.assertIn('600519', body)
+        self.assertIn('贵州茅台', body)
+
+    @patch('stocks.get_data')
+    @patch('stocks.run_mean_cost')
+    def test_run_mean_cost_post(self, mock_mean, mock_get):
+        # Set stock in session
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        # return a minimal dataframe required by the view
+        dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
+        df = pd.DataFrame({
+            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
+            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
+        })
+        mock_get.return_value = df
+        mock_mean.return_value = {
+            'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-01-10', 'init_cash': 100000.0,
+            'trades': 1, 'total_value': 100000.0, 'market_value': 20000.0, 'realized_pl': 0.0, 'unrealized_pl': 0.0, 'history': [], 'trades_list': []
+        }
+        rv = self.client.post('/run', data={'strategy': 'mean_cost', 'start': '20230101', 'end': '20231231'})
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        # Now expect progress page instead of result page
+        self.assertIn('回测仿真进行中', body)
+        self.assertIn('600900', body)  # Stock code should be shown
+        # Verify SSE connection setup is present
+        self.assertIn('EventSource', body)
+
+    @patch('stocks.get_data')
+    @patch('stocks.run_sma_backtest')
+    def test_run_sma_post(self, mock_sma, mock_get):
+        # Set stock in session
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
+        df = pd.DataFrame({
+            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
+            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
+        })
+        mock_get.return_value = df
+        mock_sma.return_value = {'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-01-10', 'init_cash': 100000.0, 'final_cash': 100500.0}
+        rv = self.client.post('/run', data={'strategy': 'sma', 'start': '20230101', 'end': '20231231'})
+        self.assertEqual(rv.status_code, 200)
+        # Now expect progress page instead of result page
+        body = rv.data.decode('utf-8')
+        self.assertIn('回测仿真进行中', body)
         """测试股票选择首页 - 真实浏览器访问"""
         print("\n🧪 测试：股票选择首页")
         

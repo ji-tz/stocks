@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>回测仿真进行中 - Stocks</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .info-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+            font-size: 14px;
+        }
+
+        .info-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .info-label {
+            color: #666;
+            font-weight: 500;
+        }
+
+        .info-value {
+            color: #333;
+            font-weight: 600;
+        }
+
+        .progress-section {
+            margin-bottom: 30px;
+        }
+
+        .progress-label {
+            color: #333;
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .progress-percentage {
+            font-size: 18px;
+            font-weight: 600;
+            color: #667eea;
+        }
+
+        .progress-bar-container {
+            background: #e9ecef;
+            border-radius: 10px;
+            height: 20px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .progress-bar {
+            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .progress-text {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .status {
+            text-align: center;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .status.running {
+            background: #e3f2fd;
+            color: #1976d2;
+        }
+
+        .status.completed {
+            background: #e8f5e9;
+            color: #2e7d32;
+        }
+
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 3px solid rgba(102, 126, 234, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            border: none;
+            cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+            width: 100%;
+            text-align: center;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+
+        .button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>回测仿真进行中</h1>
+        <p class="subtitle">正在执行回测策略，请稍候...</p>
+
+        <div class="info-card">
+            <div class="info-item">
+                <span class="info-label">股票代码</span>
+                <span class="info-value">{{ symbol }}</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">策略类型</span>
+                <span class="info-value" id="strategy-name">{{ strategy }}</span>
+            </div>
+        </div>
+
+        <div id="status-running" class="status running">
+            <span class="spinner"></span>
+            正在执行回测...
+        </div>
+
+        <div id="status-completed" class="status completed hidden">
+            ✓ 回测完成！
+        </div>
+
+        <div id="status-error" class="status error hidden">
+            ✗ 回测失败：<span id="error-message"></span>
+        </div>
+
+        <div class="progress-section">
+            <div class="progress-label">
+                <span>回测进度</span>
+                <span class="progress-percentage" id="progress-percentage">0%</span>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar" id="progress-bar"></div>
+            </div>
+            <div class="progress-text" id="progress-text">准备开始...</div>
+        </div>
+
+        <button id="view-result-btn" class="button hidden" onclick="viewResult()">
+            查看回测结果
+        </button>
+    </div>
+
+    <script>
+        const taskId = '{{ task_id }}';
+        let resultData = null;
+
+        // 策略名称映射
+        const strategyNames = {
+            'sma': 'SMA 策略',
+            'mean_cost': '均值成本策略',
+            'fixed_amount': '定投策略'
+        };
+
+        // 更新策略名称显示
+        const strategyElement = document.getElementById('strategy-name');
+        const strategy = {{ strategy|tojson }};
+        if (strategyNames[strategy]) {
+            strategyElement.textContent = strategyNames[strategy];
+        }
+
+        // 连接SSE获取进度更新
+        const eventSource = new EventSource(`/api/progress/${taskId}`);
+
+        eventSource.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+
+            if (data.type === 'progress') {
+                // 更新进度条
+                const percentage = data.percentage;
+                document.getElementById('progress-bar').style.width = percentage + '%';
+                document.getElementById('progress-percentage').textContent = percentage + '%';
+                document.getElementById('progress-text').textContent = 
+                    `正在处理第 ${data.current} / ${data.total} 天的数据`;
+            } else if (data.type === 'completed') {
+                // 回测完成
+                resultData = data.result;
+                document.getElementById('status-running').classList.add('hidden');
+                document.getElementById('status-completed').classList.remove('hidden');
+                document.getElementById('progress-percentage').textContent = '100%';
+                document.getElementById('progress-bar').style.width = '100%';
+                document.getElementById('progress-text').textContent = '回测完成！';
+                document.getElementById('view-result-btn').classList.remove('hidden');
+                eventSource.close();
+            } else if (data.type === 'error') {
+                // 回测出错
+                document.getElementById('status-running').classList.add('hidden');
+                document.getElementById('status-error').classList.remove('hidden');
+                document.getElementById('error-message').textContent = data.error;
+                eventSource.close();
+            }
+        };
+
+        eventSource.onerror = function(error) {
+            console.error('SSE连接错误:', error);
+            eventSource.close();
+        };
+
+        function viewResult() {
+            if (resultData) {
+                // 创建一个表单并提交结果数据
+                const form = document.createElement('form');
+                form.method = 'POST';
+                form.action = '/view_result';
+                
+                const input = document.createElement('input');
+                input.type = 'hidden';
+                input.name = 'result_json';
+                input.value = JSON.stringify(resultData);
+                
+                form.appendChild(input);
+                document.body.appendChild(form);
+                form.submit();
+            }
+        }
+    </script>
+</body>
+</html>
