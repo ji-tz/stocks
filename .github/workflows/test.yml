@@ -98,9 +98,12 @@ jobs:
         retention-days: 30
     
     - name: Upload Test Results
-        python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')" 2>&1 | tee -a test_output.log
-        echo "verify_exit_code=$?" >> $GITHUB_OUTPUT
-      continue-on-error: true
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test-results
+        path: test_results/
+        retention-days: 30
     
     - name: Upload Test Logs
       if: always()
