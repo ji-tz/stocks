@@ -148,6 +148,66 @@ def select_mode_api():
     return jsonify({'success': True})
 
 
+@app.route('/select_time_range', methods=['GET'])
+def select_time_range():
+    """回测时间段设置页面"""
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    strategy_type = session.get('strategy_type')
+    strategy_name = session.get('strategy_name')
+    run_mode = session.get('run_mode')
+    
+    if not stock_code or not stock_name or not strategy_type or not strategy_name:
+        # 如果缺少必要信息，跳转回相应页面
+        if not stock_code or not stock_name:
+            return render_template('select_stock.html')
+        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+    
+    if not run_mode or run_mode != 'backtest':
+        # 只有回测模式需要设置时间段
+        return render_template('select_mode.html', 
+                             stock_code=stock_code, 
+                             stock_name=stock_name,
+                             strategy_type=strategy_type,
+                             strategy_name=strategy_name)
+    
+    return render_template('select_time_range.html', 
+                         stock_code=stock_code, 
+                         stock_name=stock_name,
+                         strategy_type=strategy_type,
+                         strategy_name=strategy_name)
+
+
+@app.route('/api/select_time_range', methods=['POST'])
+def select_time_range_api():
+    """保存回测时间段API"""
+    data = request.get_json()
+    if data is None:
+        return jsonify({'success': False, 'error': '请求体必须是JSON格式'}), 400
+    
+    start = data.get('start', '')
+    end = data.get('end', '')
+    
+    # 后端验证：start和end必须为空或符合YYYYMMDD格式
+    import re
+    date_pattern = re.compile(r'^\d{8}$')
+    
+    if start and not date_pattern.match(start):
+        return jsonify({'success': False, 'error': '起始日期格式必须为YYYYMMDD'}), 400
+    if end and not date_pattern.match(end):
+        return jsonify({'success': False, 'error': '结束日期格式必须为YYYYMMDD'}), 400
+    
+    # 验证start <= end
+    if start and end and start > end:
+        return jsonify({'success': False, 'error': '起始日期不能晚于结束日期'}), 400
+    
+    # 保存到session（可以为空字符串，表示使用全部数据）
+    session['backtest_start'] = start
+    session['backtest_end'] = end
+    
+    return jsonify({'success': True})
+
+
 @app.route('/strategy/sma', methods=['GET'])
 def strategy_sma():
     """SMA策略配置页面"""
@@ -217,11 +277,25 @@ def strategy_fixed_amount():
 
 @app.route('/run', methods=['POST'])
 def run():
-    # 从session获取股票信息
+    # 从session获取股票信息和时间段
     symbol = session.get('stock_code')
     if not symbol:
         # 如果session中没有股票信息，回退到从表单获取（向后兼容）
         symbol = request.form.get('symbol', '600900').strip()
+    
+    # 时间段取值优先级：表单显式传的非空值 > session 中的值 > None
+    form_start = request.form.get('start', '').strip()
+    form_end = request.form.get('end', '').strip()
+    
+    if form_start:
+        start = form_start if form_start else None
+    else:
+        start = session.get('backtest_start') or None
+    
+    if form_end:
+        end = form_end if form_end else None
+    else:
+        end = session.get('backtest_end') or None
     
     source = request.form.get('source', 'auto')
     strategy = request.form.get('strategy', 'sma')
