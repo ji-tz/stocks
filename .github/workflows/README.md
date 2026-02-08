@@ -9,15 +9,14 @@
 
 ## 四个工作流
 - `lint.yml`：Pylint / Flake8 / Mypy（代码静态检查）
-- `test.yml`：单元测试 + 集成测试 + GUI截图测试 + 测试日志评论到PR
+- `test.yml`：单元测试 + 集成测试 + 测试日志评论到PR
 - `testgui.yml`：GUI截图测试 + 截图评论到PR（专注于截图和可视化反馈，**图片以 base64 内嵌显示**）
 - `package.yml`：打包产物 + Release（tag）
 
 ## 产物
 ### test.yml
 - 测试日志：`test_output.log`
-- 截图：包括主界面、策略配置、历史记录、股价图表、时间段设置等完整截图
-- Artifacts：`test-screenshots`、`test-results`、`test-logs`（保留30天）
+- Artifacts：`test-results`、`test-logs`（保留30天）
 
 ### testgui.yml
 - 截图：`screenshots/main_gui.png`、策略配置截图、历史记录截图、时间段设置截图等
