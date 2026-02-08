@@ -143,12 +143,28 @@ class TestGuiWorkflowE2E(unittest.TestCase):
 
             # 7. 点击开始回测，进入回测进度页面并截图
             page.click("button[type='submit']")
-            # 等待表单提交后的加载完成
-            # 给服务器一些时间处理POST请求并返回新页面
-            page.wait_for_load_state("networkidle", timeout=15000)
-            # 现在等待页面内容加载（不需要URL变化，因为是POST到/run但返回的是同一URL）
-            page.wait_for_selector("h1:has-text('回测仿真进行中')", timeout=20000)
-            self._screenshot(page, "07_backtest_progress.png")
+            # 等待导航开始 - 表单POST会触发页面导航
+            try:
+                # 等待导航完成，最多30秒
+                page.wait_for_load_state("domcontentloaded", timeout=30000)
+                # Debug: 获取页面内容看看
+                page_content = page.content()
+                print(f"Page after submit (first 500 chars): {page_content[:500]}")
+                # 截图看看实际加载的是什么页面
+                self._screenshot(page, "07_debug_after_submit.png")
+                # 现在等待页面内容加载
+                page.wait_for_selector("h1", timeout=5000)  # 先等任意h1出现
+                h1_text = page.locator("h1").first.inner_text()
+                print(f"Found h1 with text: {h1_text}")
+                # 如果不是我们期望的h1，说明表单提交有问题
+                if "回测仿真进行中" not in h1_text:
+                    raise Exception(f"Expected '回测仿真进行中', but got '{h1_text}'")
+                self._screenshot(page, "07_backtest_progress.png")
+            except Exception as e:
+                print(f"Error after form submit: {e}")
+                # 保存错误时的截图
+                self._screenshot(page, "07_error.png")
+                raise
 
             # 8. 等待回测完成并进入结果展示，截图
             # 注意：较短的时间范围（1个月）通常在30秒内完成，保留60秒作为缓冲
