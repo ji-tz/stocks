@@ -176,12 +176,16 @@ jobs:
       if: always()
       run: |
         echo "Checking test results..."
-        if [ "${{ steps.run_tests.outputs.test_exit_code }}" != "0" ]; then
-          echo "❌ 单元测试失败 (退出代码: ${{ steps.run_tests.outputs.test_exit_code }})"
+        TEST_EXIT="${{ steps.run_tests.outputs.test_exit_code }}"
+        SIMULATOR_EXIT="${{ steps.run_simulator_tests.outputs.simulator_exit_code }}"
+        
+        # 如果输出为空，表示步骤可能被跳过或失败，也视为测试失败
+        if [ -z "$TEST_EXIT" ] || [ "$TEST_EXIT" != "0" ]; then
+          echo "❌ 单元测试失败 (退出代码: ${TEST_EXIT:-未设置})"
           exit 1
         fi
-        if [ "${{ steps.run_simulator_tests.outputs.simulator_exit_code }}" != "0" ]; then
-          echo "❌ 策略模拟器测试失败 (退出代码: ${{ steps.run_simulator_tests.outputs.simulator_exit_code }})"
+        if [ -z "$SIMULATOR_EXIT" ] || [ "$SIMULATOR_EXIT" != "0" ]; then
+          echo "❌ 策略模拟器测试失败 (退出代码: ${SIMULATOR_EXIT:-未设置})"
           exit 1
         fi
         echo "✅ 所有测试通过"
