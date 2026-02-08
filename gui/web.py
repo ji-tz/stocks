@@ -181,8 +181,24 @@ def select_time_range():
 def select_time_range_api():
     """保存回测时间段API"""
     data = request.get_json()
+    if data is None:
+        return jsonify({'success': False, 'error': '请求体必须是JSON格式'}), 400
+    
     start = data.get('start', '')
     end = data.get('end', '')
+    
+    # 后端验证：start和end必须为空或符合YYYYMMDD格式
+    import re
+    date_pattern = re.compile(r'^\d{8}$')
+    
+    if start and not date_pattern.match(start):
+        return jsonify({'success': False, 'error': '起始日期格式必须为YYYYMMDD'}), 400
+    if end and not date_pattern.match(end):
+        return jsonify({'success': False, 'error': '结束日期格式必须为YYYYMMDD'}), 400
+    
+    # 验证start <= end
+    if start and end and start > end:
+        return jsonify({'success': False, 'error': '起始日期不能晚于结束日期'}), 400
     
     # 保存到session（可以为空字符串，表示使用全部数据）
     session['backtest_start'] = start
@@ -266,15 +282,19 @@ def run():
         # 如果session中没有股票信息，回退到从表单获取（向后兼容）
         symbol = request.form.get('symbol', '600900').strip()
     
-    # 优先从session获取时间段（新流程），如果没有则从表单获取（向后兼容）
-    start = session.get('backtest_start') or request.form.get('start') or None
-    end = session.get('backtest_end') or request.form.get('end') or None
+    # 时间段取值优先级：表单显式传的非空值 > session 中的值 > None
+    form_start = request.form.get('start', '').strip()
+    form_end = request.form.get('end', '').strip()
     
-    # 如果时间段为空字符串，转换为None
-    if start == '':
-        start = None
-    if end == '':
-        end = None
+    if form_start:
+        start = form_start if form_start else None
+    else:
+        start = session.get('backtest_start') or None
+    
+    if form_end:
+        end = form_end if form_end else None
+    else:
+        end = session.get('backtest_end') or None
     
     source = request.form.get('source', 'auto')
     strategy = request.form.get('strategy', 'sma')
