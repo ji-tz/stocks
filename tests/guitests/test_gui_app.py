@@ -439,7 +439,7 @@ class TestGuiRoutes(unittest.TestCase):
             self.assertIn('stockPriceData', page_content)
             print("✅ 复盘界面包含股价波动线图表")
         else:
-            print("⚠️  回测失败（可能是网络问题），但流程正确")
+            print("⚠️ 回测失败（可能是网络问题），但流程正确")
         
         print("✅ 复盘界面股价波动线图表测试通过")
 
