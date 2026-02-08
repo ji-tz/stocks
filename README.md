@@ -40,11 +40,11 @@
 项目采用四个独立的 GitHub Actions 工作流：
 
 - **Lint**：静态检查（Pylint / Flake8 / Mypy）
-- **Test**：运行单元测试和集成测试，将测试日志评论到PR中
-- **Test GUI**：运行GUI截图测试，将界面截图评论到PR中
+- **Test**：运行单元测试、集成测试和GUI截图测试，将测试日志评论到PR中
+- **Test GUI**：专注于GUI截图测试，将界面截图评论到PR中
 - **Package**：打包产物 + Release（tag）
 
-详情见 [docs/WORKFLOW.md](docs/WORKFLOW.md)。
+详情见 [.github/workflows/README.md](.github/workflows/README.md)。
 
 ## 项目结构
 
