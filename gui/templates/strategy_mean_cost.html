@@ -112,14 +112,28 @@
         </label>
 
         <label>每手股数
-          <input type="number" name="lot" value="100" min="100" step="100" required />
+          <input type="number" id="lot" name="lot" value="100" min="100" step="100" required />
           <div class="param-hint">A股市场 1 手 = 100 股</div>
         </label>
 
         <label>初始资金（元）
-          <input type="number" name="cash" value="100000" min="1000" step="1000" required />
+          <input type="number" id="cash" name="cash" value="100000" min="1000" step="1000" required />
           <div class="param-hint">回测初始资金，建议至少 50000 元（支持多次加仓）</div>
         </label>
+
+        <!-- 实时计算显示区域 -->
+        <div id="realtime-info" style="background: #fff9c4; border-left: 4px solid #ffc107; padding: 1rem; margin: 1rem 0; display: none;">
+          <div style="color: #666; font-size: 0.95rem; margin-bottom: 0.5rem;">💡 实时计算</div>
+          <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+            <span style="color: #333;">每手金额：</span>
+            <span id="lot-amount" style="color: #e65100; font-weight: bold;">-</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
+            <span style="color: #333;">资金支持手数：</span>
+            <span id="affordable-lots" style="color: #2e7d32; font-weight: bold;">-</span>
+          </div>
+          <div id="price-info" style="color: #999; font-size: 0.85rem; margin-top: 0.5rem;">加载中...</div>
+        </div>
 
         <button type="submit">🚀 开始回测</button>
       </form>
@@ -134,6 +148,74 @@
           return true;
         });
       }
+
+      // 实时计算每手金额和可购买手数
+      (function() {
+        const stockCode = {{ stock_code | tojson }};
+        const lotInput = document.getElementById('lot');
+        const cashInput = document.getElementById('cash');
+        const realtimeInfo = document.getElementById('realtime-info');
+        const lotAmountSpan = document.getElementById('lot-amount');
+        const affordableLotsSpan = document.getElementById('affordable-lots');
+        const priceInfoDiv = document.getElementById('price-info');
+
+        let latestPrice = null;
+        let latestDate = null;
+
+        // 获取股票最新价格
+        function fetchStockPrice() {
+          const url = '/api/stock_price/' + encodeURIComponent(stockCode);
+          fetch(url)
+            .then(response => response.json())
+            .then(data => {
+              if (data.error) {
+                priceInfoDiv.textContent = '价格获取失败：' + data.error;
+                priceInfoDiv.style.color = '#d32f2f';
+                return;
+              }
+              latestPrice = data.price;
+              latestDate = data.date;
+              priceInfoDiv.textContent = '参考价格：' + latestPrice.toFixed(2) + ' 元（' + latestDate + '）';
+              priceInfoDiv.style.color = '#999';
+              realtimeInfo.style.display = 'block';
+              updateCalculations();
+            })
+            .catch(error => {
+              priceInfoDiv.textContent = '价格获取失败，请稍后重试';
+              priceInfoDiv.style.color = '#d32f2f';
+            });
+        }
+
+        // 更新实时计算
+        function updateCalculations() {
+          if (latestPrice === null) return;
+
+          const lot = parseInt(lotInput.value) || 100;
+          const cash = parseFloat(cashInput.value) || 0;
+
+          // 计算每手金额
+          const lotAmount = latestPrice * lot;
+          lotAmountSpan.textContent = lotAmount.toFixed(2) + ' 元';
+
+          // 计算资金支持手数
+          const affordableLots = cash > 0 ? Math.floor(cash / lotAmount) : 0;
+          affordableLotsSpan.textContent = affordableLots + ' 手';
+
+          // 根据是否足够购买一手调整颜色
+          if (affordableLots > 0) {
+            affordableLotsSpan.style.color = '#2e7d32';
+          } else {
+            affordableLotsSpan.style.color = '#d32f2f';
+          }
+        }
+
+        // 监听输入变化
+        lotInput.addEventListener('input', updateCalculations);
+        cashInput.addEventListener('input', updateCalculations);
+
+        // 页面加载时获取价格
+        fetchStockPrice();
+      })();
     </script>
   </body>
 </html>
