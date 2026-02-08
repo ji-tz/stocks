@@ -72,8 +72,10 @@ class Simulator:
             if progress_callback:
                 try:
                     progress_callback(idx, total_rows)
-                except Exception:
-                    pass  # 忽略回调错误，不影响模拟
+                except Exception as e:
+                    # 记录回调错误但不中断模拟
+                    if use_verbose:
+                        print(f"警告: 进度回调失败 - {e}")
             price_open = float(row['open'])
             price_close = float(row['close'])
             date = row['date']

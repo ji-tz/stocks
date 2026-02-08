@@ -160,8 +160,8 @@ def take_progress_screenshots(output_dir='screenshots'):
                 try:
                     page.screenshot(path=f'{output_dir}/progress_error.png', full_page=True)
                     print(f"  保存了错误状态截图: {output_dir}/progress_error.png")
-                except:
-                    pass
+                except Exception as screenshot_error:
+                    print(f"  无法保存错误截图: {screenshot_error}")
                 raise
             finally:
                 context.close()
