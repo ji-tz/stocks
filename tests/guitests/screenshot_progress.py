@@ -43,10 +43,12 @@ app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
         # 尝试连接
         try:
             import urllib.request
+            import urllib.error
+            import socket
             urllib.request.urlopen('http://127.0.0.1:5000/', timeout=1)
             print("Flask服务启动成功！")
             return proc
-        except:
+        except (urllib.error.URLError, socket.timeout, OSError, ConnectionError):
             time.sleep(0.5)
     
     # 如果超时，打印输出并退出

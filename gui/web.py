@@ -229,6 +229,10 @@ def run():
     cash = float(request.form.get('cash') or 100000.0)
     start = request.form.get('start') or None
     end = request.form.get('end') or None
+    
+    # 在启动线程前提取所有需要的表单参数（避免request context问题）
+    fixed_amount = float(request.form.get('fixed_amount') or 1000.0) if strategy == 'fixed_amount' else None
+    period = int(request.form.get('period') or 20) if strategy == 'sma' else None
 
     # 创建回测任务
     progress_mgr = get_progress_manager()
@@ -241,13 +245,7 @@ def run():
     # 在后台线程执行回测
     def run_backtest():
         try:
-            # 获取数据
-            if start or end:
-                df = stocks.get_data(symbol=symbol, source=source, start_date=start or None, end_date=end or None)
-            else:
-                df = stocks.get_data(symbol=symbol, source=source)
-            
-            # 根据策略类型执行回测
+            # 根据策略类型执行回测（各策略内部自行获取所需数据）
             if strategy == 'mean_cost':
                 res = stocks.run_mean_cost(symbol=symbol, start_date=start, end_date=end, 
                                           lot_size=lot, init_cash=cash, source=source,
@@ -260,7 +258,6 @@ def run():
                     result=res
                 )
             elif strategy == 'fixed_amount':
-                fixed_amount = float(request.form.get('fixed_amount') or 1000.0)
                 res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end, 
                                             fixed_amount=fixed_amount, lot_size=lot, 
                                             init_cash=cash, source=source,
@@ -273,7 +270,6 @@ def run():
                     result=res
                 )
             else:  # sma
-                period = int(request.form.get('period') or 20)
                 res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end, 
                                              lot_size=lot, init_cash=cash, period=period,
                                              progress_callback=progress_callback)
