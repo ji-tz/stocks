@@ -44,6 +44,8 @@ jobs:
         pip install -r requirements.txt
         python -m playwright install chromium
         python -m playwright install-deps chromium
+        # Verify Playwright browsers are available
+        python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(); browser.close(); p.stop(); print('Playwright chromium verified successfully')"
     
     - name: Take Main GUI Screenshot
       run: |
@@ -111,8 +113,8 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 函数：将图片转换为base64并生成Markdown（带大小限制）
-          function formatImageDisplay(imagePath, title, artifactUrl, maxSizeKB = 500) {
+          // 函数：生成图片显示信息（统一使用Artifacts链接）
+          function formatImageDisplay(imagePath, title, artifactUrl) {
             if (!fs.existsSync(imagePath)) {
               return `⚠️ ${title}未生成`;
             }
@@ -121,37 +123,11 @@ jobs:
             const sizeKB = (stats.size / 1024).toFixed(1);
             const filename = path.basename(imagePath);
             
-            // 如果图片太大，只提供下载链接
-            if (stats.size / 1024 > maxSizeKB) {
-              return `📸 **${title}** (${filename} - ${sizeKB} KB)\n\n*图片较大，请在 [Artifacts](${artifactUrl}) 中下载查看*`;
-            }
+            // 转义Markdown特殊字符
+            const escapedTitle = title.replace(/[[\]()]/g, '\\$&');
             
-            try {
-              // 根据文件扩展名确定MIME类型
-              const ext = path.extname(imagePath).toLowerCase();
-              const mimeTypes = {
-                '.png': 'image/png',
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.gif': 'image/gif',
-                '.webp': 'image/webp'
-              };
-              const mimeType = mimeTypes[ext] || 'image/png';
-              
-              // 读取图片并转换为base64
-              const imageBuffer = fs.readFileSync(imagePath);
-              const base64Image = imageBuffer.toString('base64');
-              const dataUri = `data:${mimeType};base64,${base64Image}`;
-              
-              // 转义Markdown特殊字符
-              const escapedTitle = title.replace(/[[\]()]/g, '\\$&');
-              
-              // 返回嵌入base64的Markdown图片
-              return `![${escapedTitle}](${dataUri})\n\n*${filename} - ${sizeKB} KB*`;
-            } catch (error) {
-              console.error(`Failed to encode image ${imagePath}:`, error);
-              return `⚠️ ${title}编码失败 - 请在 [Artifacts](${artifactUrl}) 中查看`;
-            }
+            // 统一返回Artifacts链接提示
+            return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n*请在 [Artifacts](${artifactUrl}) 中查看此截图*`;
           }
           
           let mainGuiImage = '';
