@@ -146,8 +146,13 @@ class TestGuiWorkflowE2E(unittest.TestCase):
             submit_button = page.locator("button[type='submit']")
             submit_button.wait_for(state="visible", timeout=5000)
             
-            # 直接提交表单而不是点击按钮，避免click事件的问题
-            page.evaluate("document.querySelector('form').submit()")
+            # 使用更可靠的方式模拟用户点击：
+            # 1. 滚动到按钮位置确保可见
+            submit_button.scroll_into_view_if_needed()
+            # 2. 等待一小段时间确保页面稳定
+            page.wait_for_timeout(500)
+            # 3. 使用force click绕过可能的覆盖物
+            submit_button.click(force=True)
             
             # 等待导航完成
             page.wait_for_load_state("load", timeout=30000)
