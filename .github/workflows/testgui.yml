@@ -44,6 +44,8 @@ jobs:
         pip install -r requirements.txt
         python -m playwright install chromium
         python -m playwright install-deps chromium
+        # Verify Playwright browsers are available
+        python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(); browser.close(); p.stop(); print('Playwright chromium verified successfully')"
     
     - name: Take Main GUI Screenshot
       run: |
@@ -111,7 +113,7 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 函数：生成指向 artifact 的图片 Markdown
+          // 函数：生成图片显示信息（统一使用Artifacts链接）
           function formatImageDisplay(imagePath, title, artifactUrl) {
             if (!fs.existsSync(imagePath)) {
               return `⚠️ ${title}未生成`;
@@ -121,11 +123,11 @@ jobs:
             const sizeKB = (stats.size / 1024).toFixed(1);
             const filename = path.basename(imagePath);
             
-            // 生成指向 artifact 文件的相对路径
-            const artifactImageUrl = `${artifactUrl}#:~:text=${encodeURIComponent(filename)}`;
+            // 转义Markdown特殊字符
+            const escapedTitle = title.replace(/[[\]()]/g, '\\$&');
             
-            // 返回 Markdown 图片语法，链接指向 artifact
-            return `![${title}](${artifactImageUrl})\n\n*${filename} - ${sizeKB} KB - 图片存储在 [Artifacts](${artifactUrl}) 中*`;
+            // 统一返回Artifacts链接提示
+            return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n*请在 [Artifacts](${artifactUrl}) 中查看此截图*`;
           }
           
           let mainGuiImage = '';
@@ -141,18 +143,35 @@ jobs:
             '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
           };
           
-          console.log('Processing screenshots...');
+          console.log('=== Starting screenshot processing ===');
           console.log('Artifact URL:', artifactUrl);
+          console.log('Checking for screenshots in current directory...');
+          
+          // 列出所有可用的截图文件
+          try {
+            const screenshotFiles = fs.readdirSync('screenshots');
+            console.log('Found screenshots:', screenshotFiles);
+          } catch (e) {
+            console.log('Failed to list screenshots directory:', e);
+          }
           
           // 处理主界面截图
+          console.log('Processing main GUI screenshot...');
           mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
+          const LOG_PREVIEW_LENGTH = 100;
+          console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
           
           // 处理策略配置截图
+          console.log('Processing strategy config screenshots...');
           const strategyImages = [];
           for (const [title, imagePath] of Object.entries(strategyPaths)) {
+            console.log(`Checking ${title} at ${imagePath}...`);
             if (fs.existsSync(imagePath)) {
               const imageDisplay = formatImageDisplay(imagePath, title, artifactUrl);
               strategyImages.push(`#### ${title}\n\n${imageDisplay}`);
+              console.log(`Added ${title}`);
+            } else {
+              console.log(`${title} not found at ${imagePath}`);
             }
           }
           
@@ -161,6 +180,7 @@ jobs:
           }
 
           // 处理完整工作流截图
+          console.log('Processing workflow screenshots...');
           const workflowScreenshots = [
             { path: 'screenshots/workflow/01_open_home.png', title: '步骤1：打开界面' },
             { path: 'screenshots/workflow/02_select_strategy.png', title: '步骤2：选择股票后进入策略选择' },
@@ -174,9 +194,13 @@ jobs:
 
           const workflowImagesList = [];
           for (const screenshot of workflowScreenshots) {
+            console.log(`Checking workflow screenshot: ${screenshot.path}...`);
             if (fs.existsSync(screenshot.path)) {
               const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title, artifactUrl);
               workflowImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
+              console.log(`Added workflow screenshot: ${screenshot.title}`);
+            } else {
+              console.log(`Workflow screenshot not found: ${screenshot.path}`);
             }
           }
 
@@ -185,7 +209,9 @@ jobs:
           }
           
           // 处理回测结果UI截图
+          console.log('Processing backtest result screenshot...');
           if (fs.existsSync(backtestResultPath)) {
+            console.log(`Found backtest result at ${backtestResultPath}`);
             backtestResultImage = formatImageDisplay(backtestResultPath, '回测结果界面截图', artifactUrl);
           } else {
             backtestResultImage = '⚠️ 回测结果界面截图未生成(可能是回测步骤失败或超时)';
@@ -193,10 +219,12 @@ jobs:
           }
           
            // 读取测试结果
+          console.log('Reading test results...');
           let testResult = '';
           try {
             const resultPath = 'test_results/yangtze_power_test.json';
             if (fs.existsSync(resultPath)) {
+              console.log('Found test result JSON at:', resultPath);
               const data = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
               const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
               const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
@@ -225,6 +253,12 @@ jobs:
             console.log('Failed to read test results:', e);
           }
           
+          console.log('=== Generating PR comment ===');
+          console.log('Main GUI image length:', mainGuiImage.length);
+          console.log('Strategy config images length:', strategyConfigImages.length);
+          console.log('Workflow images length:', workflowImages.length);
+          console.log('Test result length:', testResult.length);
+          
           const comment = `
           ## 🖼️ GUI截图测试报告
           
@@ -246,7 +280,8 @@ jobs:
           *Generated by Test GUI Workflow*
           `;
           
-          console.log('Attempting to create PR comment...');
+          console.log('Comment length:', comment.length);
+          console.log('=== Attempting to create PR comment ===');
           console.log('Issue number:', context.issue.number);
           console.log('Owner:', context.repo.owner);
           console.log('Repo:', context.repo.repo);

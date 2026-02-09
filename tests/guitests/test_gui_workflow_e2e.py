@@ -142,8 +142,36 @@ class TestGuiWorkflowE2E(unittest.TestCase):
             self._screenshot(page, "06_strategy_params.png")
 
             # 7. 点击开始回测，进入回测进度页面并截图
-            page.click("button[type='submit']")
-            page.wait_for_selector("h1:has-text('回测仿真进行中')", timeout=20000)
+            # 确保按钮可见且可交互
+            submit_button = page.locator("button[type='submit']")
+            submit_button.wait_for(state="visible", timeout=5000)
+            
+            # 使用更可靠的方式模拟用户点击：
+            # 1. 滚动到按钮位置确保可见
+            submit_button.scroll_into_view_if_needed()
+            # 2. 等待一小段时间确保页面稳定
+            page.wait_for_timeout(500)
+            # 3. 使用force click绕过可能的覆盖物
+            submit_button.click(force=True)
+            
+            # 等待导航完成
+            page.wait_for_load_state("load", timeout=30000)
+            
+            # Debug: 获取页面内容看看
+            page_content = page.content()
+            print(f"Page after submit (first 500 chars): {page_content[:500]}")
+            # 截图看看实际加载的是什么页面
+            self._screenshot(page, "07_debug_after_submit.png")
+            # 现在等待页面内容加载
+            page.wait_for_selector("h1", timeout=5000)  # 先等任意h1出现
+            h1_text = page.locator("h1").first.inner_text()
+            print(f"Found h1 with text: {h1_text}")
+            # 如果不是我们期望的h1，说明表单提交有问题
+            if "回测仿真进行中" not in h1_text:
+                print(f"ERROR: Expected '回测仿真进行中', but got '{h1_text}'")
+                # 保存错误时的截图
+                self._screenshot(page, "07_error.png")
+                raise Exception(f"Expected '回测仿真进行中', but got '{h1_text}'")
             self._screenshot(page, "07_backtest_progress.png")
 
             # 8. 等待回测完成并进入结果展示，截图
