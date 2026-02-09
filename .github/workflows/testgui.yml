@@ -113,7 +113,21 @@ jobs:
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
           
-          // 函数：生成图片显示信息（统一使用Artifacts链接）
+          // 函数：将图片转换为 base64 data URL（仅适用于小图片）
+          function imageToDataUrl(imagePath) {
+            try {
+              const imageBuffer = fs.readFileSync(imagePath);
+              const base64Data = imageBuffer.toString('base64');
+              const ext = path.extname(imagePath).toLowerCase();
+              const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
+              return `data:${mimeType};base64,${base64Data}`;
+            } catch (error) {
+              console.log(`Failed to convert image to data URL: ${imagePath}`, error);
+              return null;
+            }
+          }
+          
+          // 函数：生成图片显示信息（小图片嵌入base64，大图片使用Artifacts链接）
           function formatImageDisplay(imagePath, title, artifactUrl) {
             if (!fs.existsSync(imagePath)) {
               return `⚠️ ${title}未生成`;
@@ -122,11 +136,20 @@ jobs:
             const stats = fs.statSync(imagePath);
             const sizeKB = (stats.size / 1024).toFixed(1);
             const filename = path.basename(imagePath);
+            const sizeBytes = stats.size;
             
             // 转义Markdown特殊字符
             const escapedTitle = title.replace(/[[\]()]/g, '\\$&');
             
-            // 统一返回Artifacts链接提示
+            // 对于小图片（< 1MB），使用 base64 嵌入
+            if (sizeBytes < 1024 * 1024) {
+              const dataUrl = imageToDataUrl(imagePath);
+              if (dataUrl) {
+                return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n![${escapedTitle}](${dataUrl})`;
+              }
+            }
+            
+            // 对于大图片或转换失败的情况，使用 Artifacts 链接
             return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n*请在 [Artifacts](${artifactUrl}) 中查看此截图*`;
           }
           
