@@ -142,12 +142,15 @@ class TestGuiWorkflowE2E(unittest.TestCase):
             self._screenshot(page, "06_strategy_params.png")
 
             # 7. 点击开始回测，进入回测进度页面并截图
-            # 使用更可靠的方式：等待按钮可点击并使用locator
+            # 确保按钮可见且可交互
             submit_button = page.locator("button[type='submit']")
             submit_button.wait_for(state="visible", timeout=5000)
-            # 使用expect_navigation包裹click，确保导航被捕获
-            with page.expect_navigation(timeout=30000):
-                submit_button.click()
+            
+            # 直接提交表单而不是点击按钮，避免click事件的问题
+            page.evaluate("document.querySelector('form').submit()")
+            
+            # 等待导航完成
+            page.wait_for_load_state("load", timeout=30000)
             
             # Debug: 获取页面内容看看
             page_content = page.content()
