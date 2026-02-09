@@ -132,13 +132,16 @@ class TestWorkflowConfiguration(unittest.TestCase):
         self.assertIn('actions/github-script@v7', content)
         self.assertIn('formatImageDisplay', content)
         
-        # 验证使用 Artifacts 链接方案（新方案）
+        # 验证使用混合方案：小图片base64嵌入，大图片Artifacts链接
         self.assertIn('请在 [Artifacts]', content)
         self.assertIn('中查看此截图', content)
         
-        # 验证不再包含 base64 编码相关代码
+        # 验证包含新的 base64 编码函数（用于小图片）
+        self.assertIn('imageToDataUrl', content)
+        self.assertIn('imageBuffer.toString', content)
+        
+        # 验证不包含旧的 base64Image 函数
         self.assertNotIn('base64Image', content)
-        self.assertNotIn('imageBuffer.toString', content)
 
     def test_test_workflow_exists(self):
         """测试 test.yml 文件存在"""
