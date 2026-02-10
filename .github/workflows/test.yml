@@ -182,6 +182,7 @@ jobs:
         echo "Checking test results..."
         TEST_EXIT="${{ steps.run_tests.outputs.test_exit_code }}"
         SIMULATOR_EXIT="${{ steps.run_simulator_tests.outputs.simulator_exit_code }}"
+        VERIFY_EXIT="${{ steps.verify_simulator.outputs.verify_exit_code }}"
         
         # 如果输出为空，表示步骤可能被跳过或失败，也视为测试失败
         if [ -z "$TEST_EXIT" ] || [ "$TEST_EXIT" != "0" ]; then
@@ -190,6 +191,10 @@ jobs:
         fi
         if [ -z "$SIMULATOR_EXIT" ] || [ "$SIMULATOR_EXIT" != "0" ]; then
           echo "❌ 策略模拟器测试失败 (退出代码: ${SIMULATOR_EXIT:-未设置})"
+          exit 1
+        fi
+        if [ -z "$VERIFY_EXIT" ] || [ "$VERIFY_EXIT" != "0" ]; then
+          echo "❌ 模拟器功能验证失败 (退出代码: ${VERIFY_EXIT:-未设置})"
           exit 1
         fi
         echo "✅ 所有测试通过"
