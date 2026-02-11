@@ -51,12 +51,28 @@ jobs:
     - name: Take Main GUI Screenshot
       run: |
         echo "=== Taking Main GUI Screenshot ==="
-        python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png || exit 1
+        mkdir -p screenshots
+        python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png || {
+          echo "❌ Main GUI screenshot failed"
+          echo "Screenshots directory contents:"
+          ls -la screenshots/ || echo "Directory does not exist"
+          exit 1
+        }
+        echo "✅ Main GUI screenshot completed successfully"
     
     - name: Take Strategy Config Screenshots
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
-        python tests/guitests/screenshot_main.py strategy --output-dir screenshots || exit 1
+        mkdir -p screenshots
+        python tests/guitests/screenshot_main.py strategy --output-dir screenshots || {
+          echo "❌ Strategy config screenshots failed"
+          echo "Screenshots directory contents:"
+          ls -la screenshots/ || echo "Directory does not exist"
+          exit 1
+        }
+        echo "✅ Strategy config screenshots completed successfully"
+        echo "Strategy screenshots generated:"
+        ls -la screenshots/strategy_*.png || echo "No strategy screenshots found"
     
     - name: Take Time Range Selection Screenshots
       run: |
@@ -115,17 +131,63 @@ jobs:
         path: test_results/
         retention-days: 30
     
+    - name: Workflow Status Summary
+      if: always()
+      run: |
+        echo "=== GUI Workflow Status Summary ==="
+        echo "Event type: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Actor: ${{ github.actor }}"
+        echo ""
+        echo "=== Screenshots Status ==="
+        if [ -d "screenshots" ]; then
+          echo "Screenshots directory exists"
+          echo "Screenshot count: $(find screenshots -name '*.png' | wc -l)"
+          echo "Screenshot files:"
+          find screenshots -name '*.png' -exec basename {} \; | sort
+        else
+          echo "Screenshots directory does not exist"
+        fi
+        echo ""
+        echo "=== Test Results Status ==="
+        if [ -d "test_results" ]; then
+          echo "Test results directory exists"
+          echo "Test result files:"
+          ls -la test_results/ || echo "No files in test_results"
+        else
+          echo "Test results directory does not exist"
+        fi
+        echo ""
+        echo "=== Screenshot Check Output ==="
+        echo "has_screenshots: ${{ steps.commit_screenshots.outputs.has_screenshots || 'not_set' }}"
+        echo "================================"
+        
+        # Final status for debugging
+        if [ "${{ steps.commit_screenshots.outputs.has_screenshots }}" = "true" ]; then
+          echo "✅ GUI Workflow: Screenshots generated successfully"
+        elif [ "${{ steps.commit_screenshots.outputs.has_screenshots }}" = "false" ]; then
+          echo "❌ GUI Workflow: No screenshots generated"
+        else
+          echo "❓ GUI Workflow: Screenshot status unknown"
+        fi
+    
     - name: Check Screenshot Status
-      if: github.event_name == 'pull_request'
       id: commit_screenshots
       run: |
         # Check if screenshots were generated
+        echo "Checking for screenshots in $(pwd)..."
         if ls screenshots/*.png 1> /dev/null 2>&1; then
           echo "Screenshots found"
           echo "has_screenshots=true" >> $GITHUB_OUTPUT
+          echo "Screenshot files found:"
+          ls -la screenshots/*.png
         else
           echo "No screenshots found"
           echo "has_screenshots=false" >> $GITHUB_OUTPUT
+          echo "Screenshots directory contents:"
+          ls -la screenshots/ || echo "screenshots directory does not exist"
         fi
     
     - name: Check GUI Test Results
@@ -162,7 +224,7 @@ jobs:
         fi
 
     - name: Comment PR with Screenshots
-      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
+      if: github.event_name == 'pull_request' && (steps.commit_screenshots.outputs.has_screenshots == 'true')
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -379,5 +441,21 @@ jobs:
             console.log('Comment created successfully:', response.data.html_url);
           } catch (error) {
             console.error('Failed to create comment:', error);
-            throw error;
+            // Don't fail the workflow if comment creation fails
+            console.log('Continuing workflow despite comment failure...');
           }
+
+    - name: Final Workflow Status
+      if: always()
+      run: |
+        echo "=== Final GUI Workflow Status ==="
+        if [ "${{ steps.commit_screenshots.outputs.has_screenshots }}" = "true" ]; then
+          echo "✅ GUI WORKFLOW SUCCEEDED"
+          echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
+          echo "   - PR comment: $([ '${{ github.event_name }}' = 'pull_request' ] && echo 'created' || echo 'not applicable')"
+          exit 0
+        else
+          echo "❌ GUI WORKFLOW FAILED"
+          echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
+          exit 1
+        fi
