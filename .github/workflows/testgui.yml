@@ -131,48 +131,6 @@ jobs:
         path: test_results/
         retention-days: 30
     
-    - name: Workflow Status Summary
-      if: always()
-      run: |
-        echo "=== GUI Workflow Status Summary ==="
-        echo "Event type: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "Repository: ${{ github.repository }}"
-        echo "Run ID: ${{ github.run_id }}"
-        echo "Actor: ${{ github.actor }}"
-        echo ""
-        echo "=== Screenshots Status ==="
-        if [ -d "screenshots" ]; then
-          echo "Screenshots directory exists"
-          echo "Screenshot count: $(find screenshots -name '*.png' | wc -l)"
-          echo "Screenshot files:"
-          find screenshots -name '*.png' -exec basename {} \; | sort
-        else
-          echo "Screenshots directory does not exist"
-        fi
-        echo ""
-        echo "=== Test Results Status ==="
-        if [ -d "test_results" ]; then
-          echo "Test results directory exists"
-          echo "Test result files:"
-          ls -la test_results/ || echo "No files in test_results"
-        else
-          echo "Test results directory does not exist"
-        fi
-        echo ""
-        echo "=== Screenshot Check Output ==="
-        echo "has_screenshots: ${{ steps.check_results.outputs.has_screenshots || 'not_set' }}"
-        echo "================================"
-        
-        # Final status for debugging
-        if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
-          echo "✅ GUI Workflow: Screenshots generated successfully"
-        elif [ "${{ steps.check_results.outputs.has_screenshots }}" = "false" ]; then
-          echo "❌ GUI Workflow: No screenshots generated"
-        else
-          echo "❓ GUI Workflow: Screenshot status unknown"
-        fi
-    
     - name: Check GUI Test Results
       id: check_results
       if: always()
@@ -219,6 +177,48 @@ jobs:
         echo ""
         echo "=== Final GUI Test Status ==="
         echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
+
+    - name: Workflow Status Summary
+      if: always()
+      run: |
+        echo "=== GUI Workflow Status Summary ==="
+        echo "Event type: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Actor: ${{ github.actor }}"
+        echo ""
+        echo "=== Screenshots Status ==="
+        if [ -d "screenshots" ]; then
+          echo "Screenshots directory exists"
+          echo "Screenshot count: $(find screenshots -name '*.png' | wc -l)"
+          echo "Screenshot files:"
+          find screenshots -name '*.png' -exec basename {} \; | sort
+        else
+          echo "Screenshots directory does not exist"
+        fi
+        echo ""
+        echo "=== Test Results Status ==="
+        if [ -d "test_results" ]; then
+          echo "Test results directory exists"
+          echo "Test result files:"
+          ls -la test_results/ || echo "No files in test_results"
+        else
+          echo "Test results directory does not exist"
+        fi
+        echo ""
+        echo "=== Screenshot Check Output ==="
+        echo "has_screenshots: ${{ steps.check_results.outputs.has_screenshots || 'not_set' }}"
+        echo "================================"
+        
+        # Final status for debugging
+        if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
+          echo "✅ GUI Workflow: Screenshots generated successfully"
+        elif [ "${{ steps.check_results.outputs.has_screenshots }}" = "false" ]; then
+          echo "❌ GUI Workflow: No screenshots generated"
+        else
+          echo "❓ GUI Workflow: Screenshot status unknown"
+        fi
 
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
