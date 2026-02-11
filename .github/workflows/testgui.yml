@@ -131,6 +131,23 @@ jobs:
         path: test_results/
         retention-days: 30
     
+    - name: Check Screenshot Status
+      id: commit_screenshots
+      run: |
+        # Check if screenshots were generated
+        echo "Checking for screenshots in $(pwd)..."
+        if ls screenshots/*.png 1> /dev/null 2>&1; then
+          echo "Screenshots found"
+          echo "has_screenshots=true" >> $GITHUB_OUTPUT
+          echo "Screenshot files found:"
+          ls -la screenshots/*.png
+        else
+          echo "No screenshots found"
+          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+          echo "Screenshots directory contents:"
+          ls -la screenshots/ || echo "screenshots directory does not exist"
+        fi
+    
     - name: Workflow Status Summary
       if: always()
       run: |
@@ -171,23 +188,6 @@ jobs:
           echo "❌ GUI Workflow: No screenshots generated"
         else
           echo "❓ GUI Workflow: Screenshot status unknown"
-        fi
-    
-    - name: Check Screenshot Status
-      id: commit_screenshots
-      run: |
-        # Check if screenshots were generated
-        echo "Checking for screenshots in $(pwd)..."
-        if ls screenshots/*.png 1> /dev/null 2>&1; then
-          echo "Screenshots found"
-          echo "has_screenshots=true" >> $GITHUB_OUTPUT
-          echo "Screenshot files found:"
-          ls -la screenshots/*.png
-        else
-          echo "No screenshots found"
-          echo "has_screenshots=false" >> $GITHUB_OUTPUT
-          echo "Screenshots directory contents:"
-          ls -la screenshots/ || echo "screenshots directory does not exist"
         fi
     
     - name: Check GUI Test Results
