@@ -61,17 +61,43 @@ jobs:
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
-        timeout 120 python tests/guitests/screenshot_time_range.py --output-dir screenshots || exit 1
+        echo "Current working directory: $(pwd)"
+        echo "Screenshots directory before: $(ls -la screenshots/ 2>/dev/null || echo 'Directory does not exist')"
+        timeout 120 python tests/guitests/screenshot_time_range.py --output-dir screenshots || {
+          echo "❌ Time range screenshots failed"
+          echo "Screenshots directory after failure:"
+          ls -la screenshots/ 2>/dev/null || echo "Directory does not exist"
+          exit 1
+        }
+        echo "✅ Time range screenshots completed"
+        echo "Screenshots directory after success:"
+        ls -la screenshots/
 
     - name: Run GUI Workflow Screenshot Test
       run: |
         echo "=== Running GUI Workflow Screenshot Test ==="
-        timeout 180 python -m unittest tests.guitests.test_gui_workflow_e2e -v || exit 1
+        echo "Environment: GUI_WORKFLOW_SCREENSHOT_DIR=${GUI_WORKFLOW_SCREENSHOT_DIR:-default}"
+        timeout 180 python -m unittest tests.guitests.test_gui_workflow_e2e -v || {
+          echo "❌ GUI workflow test failed"
+          echo "Checking workflow screenshots directory:"
+          ls -la screenshots/workflow/ 2>/dev/null || echo "Workflow directory does not exist"
+          exit 1
+        }
+        echo "✅ GUI workflow test completed"
+        echo "Workflow screenshots generated:"
+        ls -la screenshots/workflow/ 2>/dev/null || echo "No workflow screenshots found"
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
-        python -m tests.test_yangtze_power
+        python -m tests.test_yangtze_power || {
+          echo "❌ Stock integration test failed"
+          exit 1
+        }
+        echo "✅ Stock integration test completed"
+        echo "Test results generated:"
+        ls -la test_results/ 2>/dev/null || echo "No test_results directory found"
+        ls -la screenshots/yangtze_power_test.png 2>/dev/null || echo "No yangtze_power test screenshot found"
     
     - name: Upload Screenshots
       if: always()
@@ -106,14 +132,34 @@ jobs:
       if: always()
       run: |
         echo "Checking GUI test results..."
+        echo "Current directory contents:"
+        ls -la
         
-        # Check if screenshots were generated successfully
-        if [ ! -d "screenshots" ] || [ -z "$(ls -A screenshots)" ]; then
-          echo "❌ GUI测试失败：未生成任何截图"
+        echo "Screenshots directory status:"
+        if [ -d "screenshots" ]; then
+          echo "✓ screenshots directory exists"
+          echo "Screenshots directory contents:"
+          find screenshots -type f -name "*.png" -exec ls -la {} \; 2>/dev/null || echo "No PNG files found"
+          echo "Total PNG files: $(find screenshots -type f -name "*.png" 2>/dev/null | wc -l)"
+          
+          if [ -z "$(find screenshots -type f -name "*.png" 2>/dev/null)" ]; then
+            echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
+            exit 1
+          fi
+        else
+          echo "❌ GUI测试失败：screenshots目录不存在"
           exit 1
         fi
         
-        echo "✅ GUI测试通过，已生成 $(ls screenshots/*.png 2>/dev/null | wc -l) 张截图"
+        echo "✅ GUI测试通过，已生成 $(find screenshots -type f -name "*.png" 2>/dev/null | wc -l) 张截图"
+        
+        # Check test results if they should exist
+        if [ -d "test_results" ]; then
+          echo "Test results found:"
+          ls -la test_results/
+        else
+          echo "No test_results directory found (may be expected)"
+        fi
 
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
