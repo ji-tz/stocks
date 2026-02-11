@@ -61,12 +61,12 @@ jobs:
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
-        python tests/guitests/screenshot_time_range.py --output-dir screenshots || exit 1
+        timeout 120 python tests/guitests/screenshot_time_range.py --output-dir screenshots || exit 1
 
     - name: Run GUI Workflow Screenshot Test
       run: |
         echo "=== Running GUI Workflow Screenshot Test ==="
-        python -m unittest tests.guitests.test_gui_workflow_e2e -v || exit 1
+        timeout 180 python -m unittest tests.guitests.test_gui_workflow_e2e -v || exit 1
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
