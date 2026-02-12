@@ -140,6 +140,10 @@ jobs:
         echo "Current directory contents:"
         ls -la
         
+        # Initialize variables
+        screenshot_count=0
+        has_screenshots="false"
+        
         echo ""
         echo "=== Screenshots directory status ==="
         if [ -d "screenshots" ]; then
@@ -149,18 +153,46 @@ jobs:
           screenshot_count=$(find screenshots -type f -name "*.png" 2>/dev/null | wc -l)
           echo "Total PNG files: ${screenshot_count}"
           
-          if [ "${screenshot_count}" -eq 0 ]; then
-            echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
-            exit 1
-          else
+          if [ "${screenshot_count}" -gt 0 ]; then
             echo "✅ 截图文件存在，数量: ${screenshot_count}"
-            # 设置输出变量以供后续步骤使用
-            echo "has_screenshots=true" >> $GITHUB_OUTPUT
-            echo "Screenshots status: true"
+            has_screenshots="true"
+          else
+            echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
           fi
         else
           echo "❌ GUI测试失败：screenshots目录不存在"
+        fi
+        
+        # Always set the output variable
+        echo "has_screenshots=${has_screenshots}" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "=== Test results directory status ==="
+        if [ -d "test_results" ]; then
+          echo "Test results directory exists"
+          echo "Test results contents:"
+          ls -la test_results/
+        else
+          echo "No test_results directory found (may be expected)"
+        fi
+        
+        echo ""
+        echo "=== Final GUI Test Status ==="
+        echo "截图数量: ${screenshot_count}"
+        echo "截图状态: ${has_screenshots}"
+        
+        # Exit with appropriate code
+        if [ "${has_screenshots}" = "true" ]; then
+          echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
+          exit 0
+        else
+          echo "❌ GUI测试失败，未生成足够的截图"
+          exit 1
+        fi
+        else
+          echo "❌ GUI测试失败：screenshots目录不存在"
           echo "has_screenshots=false" >> $GITHUB_OUTPUT
+          screenshot_count=0
           exit 1
         fi
         
@@ -176,7 +208,7 @@ jobs:
         
         echo ""
         echo "=== Final GUI Test Status ==="
-        echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
+        echo "✅ GUI测试通过，已生成 ${screenshot_count:-0} 张截图"
 
     - name: Workflow Status Summary
       if: always()
@@ -208,13 +240,13 @@ jobs:
         fi
         echo ""
         echo "=== Screenshot Check Output ==="
-        echo "has_screenshots: ${{ steps.check_results.outputs.has_screenshots || 'not_set' }}"
+        echo "has_screenshots: ${has_screenshots:-not_set}"
         echo "================================"
         
         # Final status for debugging
-        if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
+        if [ "${has_screenshots}" = "true" ]; then
           echo "✅ GUI Workflow: Screenshots generated successfully"
-        elif [ "${{ steps.check_results.outputs.has_screenshots }}" = "false" ]; then
+        elif [ "${has_screenshots}" = "false" ]; then
           echo "❌ GUI Workflow: No screenshots generated"
         else
           echo "❓ GUI Workflow: Screenshot status unknown"
