@@ -189,26 +189,6 @@ jobs:
           echo "❌ GUI测试失败，未生成足够的截图"
           exit 1
         fi
-        else
-          echo "❌ GUI测试失败：screenshots目录不存在"
-          echo "has_screenshots=false" >> $GITHUB_OUTPUT
-          screenshot_count=0
-          exit 1
-        fi
-        
-        echo ""
-        echo "=== Test results directory status ==="
-        if [ -d "test_results" ]; then
-          echo "Test results directory exists"
-          echo "Test results contents:"
-          ls -la test_results/
-        else
-          echo "No test_results directory found (may be expected)"
-        fi
-        
-        echo ""
-        echo "=== Final GUI Test Status ==="
-        echo "✅ GUI测试通过，已生成 ${screenshot_count:-0} 张截图"
 
     - name: Workflow Status Summary
       if: always()
@@ -251,6 +231,16 @@ jobs:
         else
           echo "❓ GUI Workflow: Screenshot status unknown"
         fi
+
+    - name: Debug PR Comment Condition
+      if: github.event_name == 'pull_request'
+      run: |
+        echo "=== PR Comment Debug Info ==="
+        echo "Event name: ${{ github.event_name }}"
+        echo "Has screenshots output: ${{ steps.check_results.outputs.has_screenshots }}"
+        echo "PR number: ${{ github.event.number }}"
+        echo "Condition result: ${{ github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true') }}"
+        echo "=============================="
 
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
