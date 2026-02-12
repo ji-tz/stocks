@@ -34,28 +34,26 @@ def take_time_range_screenshots(output_dir='screenshots'):
             try:
                 print("📸 开始截图流程...")
                 
-                # 1. 设置session（模拟前面的步骤）
+                # 1. 使用真实的浏览器交互设置session（与test_gui_workflow_e2e.py保持一致）
                 print("  - 设置session...")
                 page.goto('http://127.0.0.1:5000/', wait_until='networkidle')
-                page.evaluate("""
-                    async () => {
-                        await fetch('/api/select_stock', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({code: '600900', name: '长江电力'})
-                        });
-                        await fetch('/api/select_strategy', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({strategy_type: 'sma', strategy_name: 'SMA策略'})
-                        });
-                        await fetch('/api/select_mode', {
-                            method: 'POST',
-                            headers: {'Content-Type': 'application/json'},
-                            body: JSON.stringify({mode: 'backtest'})
-                        });
-                    }
-                """)
+                
+                # 选择股票
+                page.fill("#search-input", "600900")
+                page.click("form#search-form button[type='submit']")
+                page.wait_for_selector("#result-section.show", timeout=10000)
+                page.click("button:has-text('选择此股票')")
+                page.wait_for_url("**/select_strategy", timeout=10000)
+                
+                # 选择策略
+                page.click(".strategy-card:has-text('SMA')")
+                page.wait_for_url("**/select_mode", timeout=10000)
+                
+                # 选择回测模式
+                page.click(".mode-card.backtest")
+                page.wait_for_url("**/select_time_range", timeout=10000)
+                
+                print("  - Session设置完成，进入时间段选择页面")
                 time.sleep(0.5)
                 
                 # 2. 截图：时间段设置页面（空白状态）
@@ -102,15 +100,9 @@ def take_time_range_screenshots(output_dir='screenshots'):
                 # 先设置正确的日期
                 page.fill('input#start-date', '2023-01-01')
                 page.fill('input#end-date', '2023-12-31')
-                page.evaluate("""
-                    fetch('/api/select_time_range', {
-                        method: 'POST',
-                        headers: {'Content-Type': 'application/json'},
-                        body: JSON.stringify({start: '20230101', end: '20231231'})
-                    })
-                """)
-                time.sleep(0.3)
-                page.goto('http://127.0.0.1:5000/strategy/sma', wait_until='networkidle')
+                # 使用真实的表单提交
+                page.click("form#timeRangeForm button[type='submit']")
+                page.wait_for_url("**/strategy/sma", timeout=10000)
                 time.sleep(1)
                 page.screenshot(path=f'{output_dir}/time_range_07_strategy_no_dates.png')
                 

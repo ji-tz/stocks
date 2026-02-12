@@ -42,35 +42,78 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        # Install Playwright browsers first
         python -m playwright install chromium
         python -m playwright install-deps chromium
         # Verify Playwright browsers are available
-        python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(); browser.close(); p.stop(); print('Playwright chromium verified successfully')"
+        python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(); browser.close(); p.stop(); print('✓ Playwright chromium verified successfully')" || exit 1
     
     - name: Take Main GUI Screenshot
       run: |
         echo "=== Taking Main GUI Screenshot ==="
-        python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
+        mkdir -p screenshots
+        python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png || {
+          echo "❌ Main GUI screenshot failed"
+          echo "Screenshots directory contents:"
+          ls -la screenshots/ || echo "Directory does not exist"
+          exit 1
+        }
+        echo "✅ Main GUI screenshot completed successfully"
     
     - name: Take Strategy Config Screenshots
       run: |
         echo "=== Taking Strategy Configuration Screenshots ==="
-        python tests/guitests/screenshot_main.py strategy --output-dir screenshots
+        mkdir -p screenshots
+        python tests/guitests/screenshot_main.py strategy --output-dir screenshots || {
+          echo "❌ Strategy config screenshots failed"
+          echo "Screenshots directory contents:"
+          ls -la screenshots/ || echo "Directory does not exist"
+          exit 1
+        }
+        echo "✅ Strategy config screenshots completed successfully"
+        echo "Strategy screenshots generated:"
+        ls -la screenshots/strategy_*.png || echo "No strategy screenshots found"
     
     - name: Take Time Range Selection Screenshots
       run: |
         echo "=== Taking Time Range Selection Screenshots ==="
-        python tests/guitests/screenshot_time_range.py --output-dir screenshots
+        echo "Current working directory: $(pwd)"
+        echo "Screenshots directory before: $(ls -la screenshots/ 2>/dev/null || echo 'Directory does not exist')"
+        timeout 120 python tests/guitests/screenshot_time_range.py --output-dir screenshots || {
+          echo "❌ Time range screenshots failed"
+          echo "Screenshots directory after failure:"
+          ls -la screenshots/ 2>/dev/null || echo "Directory does not exist"
+          exit 1
+        }
+        echo "✅ Time range screenshots completed"
+        echo "Screenshots directory after success:"
+        ls -la screenshots/
 
     - name: Run GUI Workflow Screenshot Test
       run: |
         echo "=== Running GUI Workflow Screenshot Test ==="
-        python -m unittest tests.guitests.test_gui_workflow_e2e -v
+        echo "Environment: GUI_WORKFLOW_SCREENSHOT_DIR=${GUI_WORKFLOW_SCREENSHOT_DIR:-default}"
+        timeout 180 python -m unittest tests.guitests.test_gui_workflow_e2e -v || {
+          echo "❌ GUI workflow test failed"
+          echo "Checking workflow screenshots directory:"
+          ls -la screenshots/workflow/ 2>/dev/null || echo "Workflow directory does not exist"
+          exit 1
+        }
+        echo "✅ GUI workflow test completed"
+        echo "Workflow screenshots generated:"
+        ls -la screenshots/workflow/ 2>/dev/null || echo "No workflow screenshots found"
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
-        python -m tests.test_yangtze_power
+        python -m tests.test_yangtze_power || {
+          echo "❌ Stock integration test failed"
+          exit 1
+        }
+        echo "✅ Stock integration test completed"
+        echo "Test results generated:"
+        ls -la test_results/ 2>/dev/null || echo "No test_results directory found"
+        ls -la screenshots/yangtze_power_test.png 2>/dev/null || echo "No yangtze_power test screenshot found"
     
     - name: Upload Screenshots
       if: always()
@@ -88,21 +131,129 @@ jobs:
         path: test_results/
         retention-days: 30
     
-    - name: Check Screenshot Status
-      if: github.event_name == 'pull_request'
-      id: commit_screenshots
+    - name: Check GUI Test Results
+      id: check_results
+      if: always()
       run: |
-        # Check if screenshots were generated
-        if ls screenshots/*.png 1> /dev/null 2>&1; then
-          echo "Screenshots found"
-          echo "has_screenshots=true" >> $GITHUB_OUTPUT
+        echo "=== Checking GUI Test Results ==="
+        echo "Current directory: $(pwd)"
+        echo "Current directory contents:"
+        ls -la
+        
+        # Initialize variables
+        screenshot_count=0
+        has_screenshots="false"
+        
+        echo ""
+        echo "=== Screenshots directory status ==="
+        if [ -d "screenshots" ]; then
+          echo "✓ screenshots directory exists"
+          echo "Screenshots directory contents:"
+          find screenshots -type f -name "*.png" -exec ls -la {} \; 2>/dev/null || echo "No PNG files found"
+          screenshot_count=$(find screenshots -type f -name "*.png" 2>/dev/null | wc -l)
+          echo "Total PNG files: ${screenshot_count}"
+          
+          if [ "${screenshot_count}" -gt 0 ]; then
+            echo "✅ 截图文件存在，数量: ${screenshot_count}"
+            has_screenshots="true"
+          else
+            echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
+          fi
         else
-          echo "No screenshots found"
-          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+          echo "❌ GUI测试失败：screenshots目录不存在"
         fi
-    
+        
+        # Always set the output variable
+        echo "has_screenshots=${has_screenshots}" >> $GITHUB_OUTPUT
+        
+        echo ""
+        echo "=== Test results directory status ==="
+        if [ -d "test_results" ]; then
+          echo "Test results directory exists"
+          echo "Test results contents:"
+          ls -la test_results/
+        else
+          echo "No test_results directory found (may be expected)"
+        fi
+        
+        echo ""
+        echo "=== Final GUI Test Status ==="
+        echo "截图数量: ${screenshot_count}"
+        echo "截图状态: ${has_screenshots}"
+        
+        # Exit with appropriate code
+        if [ "${has_screenshots}" = "true" ]; then
+          echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
+          exit 0
+        else
+          echo "❌ GUI测试失败，未生成足够的截图"
+          exit 1
+        fi
+        else
+          echo "❌ GUI测试失败：screenshots目录不存在"
+          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+          screenshot_count=0
+          exit 1
+        fi
+        
+        echo ""
+        echo "=== Test results directory status ==="
+        if [ -d "test_results" ]; then
+          echo "Test results directory exists"
+          echo "Test results contents:"
+          ls -la test_results/
+        else
+          echo "No test_results directory found (may be expected)"
+        fi
+        
+        echo ""
+        echo "=== Final GUI Test Status ==="
+        echo "✅ GUI测试通过，已生成 ${screenshot_count:-0} 张截图"
+
+    - name: Workflow Status Summary
+      if: always()
+      run: |
+        echo "=== GUI Workflow Status Summary ==="
+        echo "Event type: ${{ github.event_name }}"
+        echo "Ref: ${{ github.ref }}"
+        echo "Repository: ${{ github.repository }}"
+        echo "Run ID: ${{ github.run_id }}"
+        echo "Actor: ${{ github.actor }}"
+        echo ""
+        echo "=== Screenshots Status ==="
+        if [ -d "screenshots" ]; then
+          echo "Screenshots directory exists"
+          echo "Screenshot count: $(find screenshots -name '*.png' | wc -l)"
+          echo "Screenshot files:"
+          find screenshots -name '*.png' -exec basename {} \; | sort
+        else
+          echo "Screenshots directory does not exist"
+        fi
+        echo ""
+        echo "=== Test Results Status ==="
+        if [ -d "test_results" ]; then
+          echo "Test results directory exists"
+          echo "Test result files:"
+          ls -la test_results/ || echo "No files in test_results"
+        else
+          echo "Test results directory does not exist"
+        fi
+        echo ""
+        echo "=== Screenshot Check Output ==="
+        echo "has_screenshots: ${has_screenshots:-not_set}"
+        echo "================================"
+        
+        # Final status for debugging
+        if [ "${has_screenshots}" = "true" ]; then
+          echo "✅ GUI Workflow: Screenshots generated successfully"
+        elif [ "${has_screenshots}" = "false" ]; then
+          echo "❌ GUI Workflow: No screenshots generated"
+        else
+          echo "❓ GUI Workflow: Screenshot status unknown"
+        fi
+
     - name: Comment PR with Screenshots
-      if: github.event_name == 'pull_request' && steps.commit_screenshots.outputs.has_screenshots == 'true'
+      if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -319,5 +470,21 @@ jobs:
             console.log('Comment created successfully:', response.data.html_url);
           } catch (error) {
             console.error('Failed to create comment:', error);
-            throw error;
+            // Don't fail the workflow if comment creation fails
+            console.log('Continuing workflow despite comment failure...');
           }
+
+    - name: Final Workflow Status
+      if: always()
+      run: |
+        echo "=== Final GUI Workflow Status ==="
+        if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
+          echo "✅ GUI WORKFLOW SUCCEEDED"
+          echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
+          echo "   - PR comment: $([ '${{ github.event_name }}' = 'pull_request' ] && echo 'created' || echo 'not applicable')"
+          exit 0
+        else
+          echo "❌ GUI WORKFLOW FAILED"
+          echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
+          exit 1
+        fi
