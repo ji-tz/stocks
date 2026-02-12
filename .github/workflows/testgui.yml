@@ -181,14 +181,14 @@ jobs:
         echo "截图数量: ${screenshot_count}"
         echo "截图状态: ${has_screenshots}"
         
-        # Exit with appropriate code
+        # Always exit with 0 to allow workflow to continue and PR comment to be created
+        # The final status will be determined in the Final Workflow Status step
         if [ "${has_screenshots}" = "true" ]; then
           echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
-          exit 0
         else
           echo "❌ GUI测试失败，未生成足够的截图"
-          exit 1
         fi
+        exit 0
 
     - name: Workflow Status Summary
       if: always()
@@ -243,7 +243,7 @@ jobs:
         echo "=============================="
 
     - name: Comment PR with Screenshots
-      if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
+      if: github.event_name == 'pull_request'
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -294,10 +294,19 @@ jobs:
             return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n*请在 [Artifacts](${artifactUrl}) 中查看此截图*`;
           }
           
+          const hasScreenshots = '${{ steps.check_results.outputs.has_screenshots }}';
+          
           let mainGuiImage = '';
           let backtestResultImage = '';
           let strategyConfigImages = '';
           let workflowImages = '';
+          
+          // 如果没有截图，显示失败信息
+          if (hasScreenshots !== 'true') {
+            mainGuiImage = '❌ **GUI截图测试失败** - 未生成任何截图文件\n\n请检查 [GitHub Actions Logs](${artifactUrl}) 获取详细错误信息。';
+            strategyConfigImages = '';
+            workflowImages = '';
+          }
           
           const mainGuiPath = 'screenshots/main_gui.png';
           const backtestResultPath = 'screenshots/03_backtest_result_mean_cost.png';
@@ -309,23 +318,27 @@ jobs:
           
           console.log('=== Starting screenshot processing ===');
           console.log('Artifact URL:', artifactUrl);
-          console.log('Checking for screenshots in current directory...');
+          console.log('Has screenshots:', hasScreenshots);
           
-          // 列出所有可用的截图文件
-          try {
-            const screenshotFiles = fs.readdirSync('screenshots');
-            console.log('Found screenshots:', screenshotFiles);
-          } catch (e) {
-            console.log('Failed to list screenshots directory:', e);
-          }
-          
-          // 处理主界面截图
-          console.log('Processing main GUI screenshot...');
-          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
-          const LOG_PREVIEW_LENGTH = 100;
-          console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
-          
-          // 处理策略配置截图
+          // 只有在截图存在时才处理
+          if (hasScreenshots === 'true') {
+            console.log('Checking for screenshots in current directory...');
+            
+            // 列出所有可用的截图文件
+            try {
+              const screenshotFiles = fs.readdirSync('screenshots');
+              console.log('Found screenshots:', screenshotFiles);
+            } catch (e) {
+              console.log('Failed to list screenshots directory:', e);
+            }
+            
+            // 处理主界面截图
+            console.log('Processing main GUI screenshot...');
+            mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
+            const LOG_PREVIEW_LENGTH = 100;
+            console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
+            
+            // 处理策略配置截图
           console.log('Processing strategy config screenshots...');
           const strategyImages = [];
           for (const [title, imagePath] of Object.entries(strategyPaths)) {
@@ -381,6 +394,7 @@ jobs:
             backtestResultImage = '⚠️ 回测结果界面截图未生成(可能是回测步骤失败或超时)';
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
           }
+          } // End of hasScreenshots conditional
           
            // 读取测试结果
           console.log('Reading test results...');
