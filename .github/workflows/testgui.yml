@@ -146,25 +146,35 @@ jobs:
         
         echo ""
         echo "=== Screenshots directory status ==="
+        echo "DEBUG: Checking if screenshots directory exists..."
         if [ -d "screenshots" ]; then
           echo "✓ screenshots directory exists"
           echo "Screenshots directory contents:"
           find screenshots -type f -name "*.png" -exec ls -la {} \; 2>/dev/null || echo "No PNG files found"
           screenshot_count=$(find screenshots -type f -name "*.png" 2>/dev/null | wc -l)
-          echo "Total PNG files: ${screenshot_count}"
+          echo "DEBUG: Total PNG files found: ${screenshot_count}"
           
           if [ "${screenshot_count}" -gt 0 ]; then
             echo "✅ 截图文件存在，数量: ${screenshot_count}"
             has_screenshots="true"
+            echo "DEBUG: Setting has_screenshots to true"
           else
             echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
+            echo "DEBUG: Setting has_screenshots to false - no PNG files"
           fi
         else
           echo "❌ GUI测试失败：screenshots目录不存在"
+          echo "DEBUG: screenshots directory not found"
         fi
         
-        # Always set the output variable
-        echo "has_screenshots=${has_screenshots}" >> $GITHUB_OUTPUT
+        # Always set the output variable - use absolute truthy value
+        echo "DEBUG: Final has_screenshots value: '${has_screenshots}'"
+        if [ "${has_screenshots}" = "true" ]; then
+          echo "has_screenshots=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+        fi
+        echo "DEBUG: GITHUB_OUTPUT updated"
         
         echo ""
         echo "=== Test results directory status ==="
@@ -192,6 +202,7 @@ jobs:
 
     - name: Workflow Status Summary
       if: always()
+      needs: check_results
       run: |
         echo "=== GUI Workflow Status Summary ==="
         echo "Event type: ${{ github.event_name }}"
@@ -234,6 +245,7 @@ jobs:
 
     - name: Debug PR Comment Condition
       if: github.event_name == 'pull_request'
+      needs: check_results
       run: |
         echo "=== PR Comment Debug Info ==="
         echo "Event name: ${{ github.event_name }}"
@@ -244,6 +256,7 @@ jobs:
 
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request'
+      needs: check_results
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -480,6 +493,7 @@ jobs:
 
     - name: Final Workflow Status
       if: always()
+      needs: check_results
       run: |
         echo "=== Final GUI Workflow Status ==="
         if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
