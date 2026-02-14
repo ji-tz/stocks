@@ -5,6 +5,7 @@ on:
     branches: [ main ]
   pull_request:
     branches: [ main ]
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -146,25 +147,35 @@ jobs:
         
         echo ""
         echo "=== Screenshots directory status ==="
+        echo "DEBUG: Checking if screenshots directory exists..."
         if [ -d "screenshots" ]; then
           echo "✓ screenshots directory exists"
           echo "Screenshots directory contents:"
           find screenshots -type f -name "*.png" -exec ls -la {} \; 2>/dev/null || echo "No PNG files found"
           screenshot_count=$(find screenshots -type f -name "*.png" 2>/dev/null | wc -l)
-          echo "Total PNG files: ${screenshot_count}"
+          echo "DEBUG: Total PNG files found: ${screenshot_count}"
           
           if [ "${screenshot_count}" -gt 0 ]; then
             echo "✅ 截图文件存在，数量: ${screenshot_count}"
             has_screenshots="true"
+            echo "DEBUG: Setting has_screenshots to true"
           else
             echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
+            echo "DEBUG: Setting has_screenshots to false - no PNG files"
           fi
         else
           echo "❌ GUI测试失败：screenshots目录不存在"
+          echo "DEBUG: screenshots directory not found"
         fi
         
-        # Always set the output variable
-        echo "has_screenshots=${has_screenshots}" >> $GITHUB_OUTPUT
+        # Always set the output variable - use absolute truthy value
+        echo "DEBUG: Final has_screenshots value: '${has_screenshots}'"
+        if [ "${has_screenshots}" = "true" ]; then
+          echo "has_screenshots=true" >> $GITHUB_OUTPUT
+        else
+          echo "has_screenshots=false" >> $GITHUB_OUTPUT
+        fi
+        echo "DEBUG: GITHUB_OUTPUT updated"
         
         echo ""
         echo "=== Test results directory status ==="
@@ -181,17 +192,18 @@ jobs:
         echo "截图数量: ${screenshot_count}"
         echo "截图状态: ${has_screenshots}"
         
-        # Exit with appropriate code
+        # Always exit with 0 to allow workflow to continue and PR comment to be created
+        # The final status will be determined in the Final Workflow Status step
         if [ "${has_screenshots}" = "true" ]; then
           echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
-          exit 0
         else
           echo "❌ GUI测试失败，未生成足够的截图"
-          exit 1
         fi
+        exit 0
 
     - name: Workflow Status Summary
       if: always()
+      needs: check_results
       run: |
         echo "=== GUI Workflow Status Summary ==="
         echo "Event type: ${{ github.event_name }}"
@@ -234,6 +246,7 @@ jobs:
 
     - name: Debug PR Comment Condition
       if: github.event_name == 'pull_request'
+      needs: check_results
       run: |
         echo "=== PR Comment Debug Info ==="
         echo "Event name: ${{ github.event_name }}"
@@ -243,7 +256,10 @@ jobs:
         echo "=============================="
 
     - name: Comment PR with Screenshots
-      if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
+      if: github.event_name == 'pull_request'
+      needs: check_results
+      env:
+        HAS_SCREENSHOTS: ${{ steps.check_results.outputs.has_screenshots }}
       uses: actions/github-script@v7
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -253,6 +269,13 @@ jobs:
           
           const runId = context.runId;
           const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+          
+          // Use environment variable instead of direct ${{ }} in script
+          const hasScreenshots = process.env.HAS_SCREENSHOTS;
+          
+          console.log('=== PR Comment Debug ===');
+          console.log('HAS_SCREENSHOTS from env:', hasScreenshots);
+          console.log('=========================');
           
           // 函数：将图片转换为 base64 data URL（仅适用于小图片）
           function imageToDataUrl(imagePath) {
@@ -294,6 +317,8 @@ jobs:
             return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n*请在 [Artifacts](${artifactUrl}) 中查看此截图*`;
           }
           
+          console.log('Has screenshots:', hasScreenshots);
+          
           let mainGuiImage = '';
           let backtestResultImage = '';
           let strategyConfigImages = '';
@@ -307,25 +332,29 @@ jobs:
             '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
           };
           
-          console.log('=== Starting screenshot processing ===');
-          console.log('Artifact URL:', artifactUrl);
-          console.log('Checking for screenshots in current directory...');
-          
-          // 列出所有可用的截图文件
-          try {
-            const screenshotFiles = fs.readdirSync('screenshots');
-            console.log('Found screenshots:', screenshotFiles);
-          } catch (e) {
-            console.log('Failed to list screenshots directory:', e);
-          }
-          
-          // 处理主界面截图
-          console.log('Processing main GUI screenshot...');
-          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
-          const LOG_PREVIEW_LENGTH = 100;
-          console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
-          
-          // 处理策略配置截图
+          // 如果没有截图，显示失败信息
+          if (hasScreenshots !== 'true') {
+            mainGuiImage = '❌ **GUI截图测试失败** - 未生成任何截图文件\n\n请检查 [GitHub Actions Logs](${artifactUrl}) 获取详细错误信息。';
+            strategyConfigImages = '';
+            workflowImages = '';
+          } else {
+            console.log('Checking for screenshots in current directory...');
+            
+            // 列出所有可用的截图文件
+            try {
+              const screenshotFiles = fs.readdirSync('screenshots');
+              console.log('Found screenshots:', screenshotFiles);
+            } catch (e) {
+              console.log('Failed to list screenshots directory:', e);
+            }
+            
+            // 处理主界面截图
+            console.log('Processing main GUI screenshot...');
+            mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
+            const LOG_PREVIEW_LENGTH = 100;
+            console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
+            
+            // 处理策略配置截图
           console.log('Processing strategy config screenshots...');
           const strategyImages = [];
           for (const [title, imagePath] of Object.entries(strategyPaths)) {
@@ -381,6 +410,7 @@ jobs:
             backtestResultImage = '⚠️ 回测结果界面截图未生成(可能是回测步骤失败或超时)';
             console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
           }
+          } // End of hasScreenshots conditional
           
            // 读取测试结果
           console.log('Reading test results...');
@@ -466,6 +496,7 @@ jobs:
 
     - name: Final Workflow Status
       if: always()
+      needs: check_results
       run: |
         echo "=== Final GUI Workflow Status ==="
         if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
