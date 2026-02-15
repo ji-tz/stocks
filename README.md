@@ -582,3 +582,5 @@ result = sim.simulate(df=data, strategy=strategy, verbose=True)
 - [Matplotlib](https://matplotlib.org/) - 数据可视化
 
 感谢所有贡献者的支持！
+
+
