@@ -12,7 +12,7 @@ permissions:
 jobs:
   lint:
     name: 代码检视 (Code Linting)
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     
     steps:
     - uses: actions/checkout@v4
