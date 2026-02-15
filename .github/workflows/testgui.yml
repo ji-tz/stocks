@@ -502,7 +502,7 @@ jobs:
         if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
           echo "✅ GUI WORKFLOW SUCCEEDED"
           echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
-          echo "   - PR comment: $([ '${{ github.event_name }}' = 'pull_request' ] && echo 'created' || echo 'not applicable')"
+          echo "   - PR comment: $([ ${{ github.event_name }} = 'pull_request' ] && echo 'created' || echo 'not applicable')"
           exit 0
         else
           echo "❌ GUI WORKFLOW FAILED"
