@@ -25,9 +25,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run opencode
+      - name: Run opencode (copilot/gpt5-mini, GitHub token)
         uses: anomalyco/opencode/github@latest
         env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: opencode/big-pickle
+          model: copilot/gpt5-mini
+
