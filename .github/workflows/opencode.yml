@@ -25,42 +25,10 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Choose model & token
-        id: chooser
-        run: |
-          body="${COMMENT_BODY:-}"
-          model=""
-          key_choice=""
-          # comment override
-          if echo "$body" | grep -qi 'gpt5-mini'; then model="gpt5-mini"; fi
-          if echo "$body" | grep -qi 'big-pickle'; then model="opencode/big-pickle"; fi
-          if echo "$body" | grep -Ei '(^|\s)(use:|token:)\s*github(\s|$)'; then key_choice="github"; fi
-          if echo "$body" | grep -Ei '(^|\s)(use:|token:)\s*opencode(\s|$)'; then key_choice="opencode"; fi
-          # default: alternate by run number parity
-          if [ -z "$model" ]; then
-            if [ $((GITHUB_RUN_NUMBER % 2)) -eq 0 ]; then model="gpt5-mini"; else model="opencode/big-pickle"; fi
-          fi
-          if [ -z "$key_choice" ]; then
-            if [ "$model" = "gpt5-mini" ]; then key_choice="github"; else key_choice="opencode"; fi
-          fi
-          echo "model=$model" >> $GITHUB_OUTPUT
-          echo "key_choice=$key_choice" >> $GITHUB_OUTPUT
-        env:
-          COMMENT_BODY: ${{ github.event.comment.body }}
-          GITHUB_RUN_NUMBER: ${{ github.run_number }}
-
-      - name: Run opencode (gpt5-mini, GitHub token)
-        if: steps.chooser.outputs.model == 'gpt5-mini'
+      - name: Run opencode (copilot/gpt5-mini, GitHub token)
         uses: anomalyco/opencode/github@latest
         env:
-          OPENCODE_API_KEY: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          model: gpt5-mini
+          model: copilot/gpt5-mini
 
-      - name: Run opencode (big-pickle, OPENCODE key)
-        if: steps.chooser.outputs.model == 'opencode/big-pickle'
-        uses: anomalyco/opencode/github@latest
-        env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-        with:
-          model: opencode/big-pickle

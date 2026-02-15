@@ -13,15 +13,15 @@ permissions:
 jobs:
   lint:
     name: 代码检视 (Code Linting)
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
     
-    # - name: Set up Python
-    #   uses: actions/setup-python@v5
-    #   with:
-    #     python-version: '3.13'
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.13'
     
     - name: Install pip conf
       run: |
