@@ -21,13 +21,44 @@ jobs:
       with:
         ref: ${{ github.head_ref }}
         token: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Set up Python
+
+    - name: Detect runner distro
+      id: detect-os
+      run: |
+        echo "Detecting OS..."
+        if [ -f /etc/os-release ]; then . /etc/os-release; else ID=unknown; VERSION_ID=unknown; fi
+        echo "os_id=${ID}" >> $GITHUB_OUTPUT
+        echo "os_version=${VERSION_ID}" >> $GITHUB_OUTPUT
+        if [ "${ID}" = "debian" ] && [ "${VERSION_ID%%.*}" = "13" ]; then
+          echo "is_debian_13=true" >> $GITHUB_OUTPUT
+          echo "Detected Debian 13 runner"
+        else
+          echo "is_debian_13=false" >> $GITHUB_OUTPUT
+        fi
+
+    - name: Install system Python on Debian 13 runner and create venv
+      if: steps.detect-os.outputs.is_debian_13 == 'true'
+      run: |
+        sudo apt-get update
+        # try to install 3.12, fallback to 3.11
+        if sudo apt-get install -y python3.12 python3.12-venv python3.12-dev python3-pip; then
+          PY=python3.12
+        else
+          sudo apt-get install -y python3.11 python3.11-venv python3.11-dev python3-pip
+          PY=python3.11
+        fi
+        # create and activate venv for isolated installs
+        $PY -m venv .venv
+        . .venv/bin/activate
+        python -m pip install --upgrade pip setuptools wheel
+        python -m pip install -r requirements.txt
+
+    - name: Set up Python (GitHub-hosted / non-Debian13)
+      if: steps.detect-os.outputs.is_debian_13 != 'true'
       uses: actions/setup-python@v5
       with:
-        python-version: '3.13'
-        platform: 'linux'
-    
+        python-version: '3.12'
+
     - name: Install pip conf
       run: |
         mkdir -p ~/.pip
