@@ -30,7 +30,7 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: opencode/MINIMAX-M2.1-FREE
+          model: opencode/minimax-m2.1-free
 
       # - name: Run opencode
       #   uses: anomalyco/opencode/github@latest
