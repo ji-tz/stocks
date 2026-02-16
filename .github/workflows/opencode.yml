@@ -30,7 +30,7 @@ jobs:
         env:
           OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: opencode/MINIMAX-M2.1-FREE
+          model: opencode/minimax-m2.1-free
 
       # - name: Run opencode
       #   uses: anomalyco/opencode/github@latest
@@ -43,6 +43,7 @@ jobs:
       #   uses: anomalyco/opencode/github@latest
       #   env:
       #     NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      # 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
       #   with:
       #     model: Nvidia/MINIMAXAI/MINIMAX-M2.1
       
