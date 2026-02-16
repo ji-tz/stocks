@@ -28,8 +28,23 @@ jobs:
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
         with:
-          model: copilot/GPT-5-MINI
+          model: opencode/MINIMAX-M2.1-FREE
+
+      # - name: Run opencode
+      #   uses: anomalyco/opencode/github@latest
+      #   env:
+      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #   with:
+      #     model: copilot/GPT-5-MINI
+
+      # - name: Run opencode
+      #   uses: anomalyco/opencode/github@latest
+      #   env:
+      #     NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+      #   with:
+      #     model: Nvidia/MINIMAXAI/MINIMAX-M2.1
+      
 
 
