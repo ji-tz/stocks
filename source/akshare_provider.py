@@ -4,6 +4,16 @@ import requests
 import pandas as pd
 from .base_provider import BaseProvider
 
+# 东方财富 API 返回空数据时的常见原因提示
+_RATE_LIMIT_HINT = (
+    "akshare（东方财富）接口返回空数据，可能原因：\n"
+    "1. 请求频率过高（速率限制），建议降低请求频率或稍后重试；\n"
+    "2. 当前网络环境无法访问东方财富服务器（如 CI/CD 环境）；\n"
+    "3. 股票代码不存在或数据范围超出可用区间。\n"
+    "提示：akshare/baostock 均为免费接口，不存在付费限制；"
+    "若持续失败请使用 source='baostock' 或 source='auto' 自动切换数据源。"
+)
+
 
 class AkshareProvider(BaseProvider):
     def __init__(self, max_attempts: int = 3):
@@ -22,6 +32,7 @@ class AkshareProvider(BaseProvider):
         except Exception as e:
             raise ImportError("akshare is required for AkshareProvider") from e
 
+        last_error: Exception | None = None
         for attempt in range(1, self.max_attempts + 1):
             sess = requests.Session()
             sess.headers.update({"User-Agent": random.choice(user_agents)})
@@ -35,6 +46,11 @@ class AkshareProvider(BaseProvider):
                                         end_date=end_date,
                                         adjust="qfq",
                                         timeout=None)
+            except Exception as e:
+                # 捕获网络错误（ConnectionError 等）及其他异常，记录后继续重试
+                last_error = e
+                time.sleep(1)
+                continue
             finally:
                 requests.Session = orig_session
 
@@ -47,4 +63,8 @@ class AkshareProvider(BaseProvider):
             df["date"] = pd.to_datetime(df["date"])
             return df
 
-        raise RuntimeError("akshare: no data returned after retries")
+        if last_error is not None:
+            raise RuntimeError(
+                f"akshare 请求失败（{type(last_error).__name__}: {last_error}）。\n{_RATE_LIMIT_HINT}"
+            ) from last_error
+        raise RuntimeError(f"akshare: 重试后仍无数据返回。\n{_RATE_LIMIT_HINT}")

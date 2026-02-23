@@ -130,6 +130,39 @@ CSV格式，包含以下列：
 
 ## 常见问题
 
+### Q: 什么是"高级接口/付费请求（Premium Requests）"？通过 API 调用是付费的吗？
+
+A: **本项目使用的 akshare 和 baostock 均为免费开源库，调用本身不收费。**
+
+但需要了解以下几点：
+
+1. **akshare 的底层数据来源**：`AkshareProvider` 调用的是[东方财富（East Money）](https://www.eastmoney.com/) 的公开行情 API，该 API 本身是免费的，但并非官方开放接口。
+
+2. **"Premium Requests" 的含义**：在 akshare 生态中，"高级接口"或"premium requests"通常指：
+   - **速率限制（Rate Limiting）**：东方财富服务器会对高频请求进行限速，大量短时间内的请求可能被拒绝或返回空数据。
+   - **反爬虫机制**：东方财富会检测异常请求（如服务器环境、无 Cookies 等），可能返回空响应或拒绝连接。
+   - **访问环境限制**：在 CI/CD 环境（如 GitHub Actions）中，由于 IP 无法解析中国境内域名，akshare 的网络请求通常会失败。
+
+3. **baostock 的情况**：`BaostockProvider` 使用 [baostock](http://baostock.com/) 提供的免费证券数据接口，需要先登录（`bs.login()`）但不需要付费账户。
+
+**总结**：通过 API 调用 akshare/baostock 本身**不产生费用**，但可能因速率限制、反爬虫机制或网络环境而失败。本项目通过以下策略应对这些问题：
+
+- 优先读取本地缓存（`data/{symbol}.csv`），避免不必要的网络请求
+- akshare 失败时自动切换到 baostock（`source="auto"` 模式）
+- akshare 支持最多 3 次重试（`max_attempts` 参数）
+
+### Q: akshare 请求失败怎么办？
+
+A: 常见原因及解决方案：
+
+| 错误类型 | 原因 | 解决方案 |
+|---------|------|---------|
+| `ConnectionError` / DNS 解析失败 | 网络环境无法访问东方财富服务器（如 CI 环境） | 使用本地缓存文件，或切换到 baostock |
+| `RemoteDisconnected` / 连接中断 | 东方财富反爬虫限速 | 降低请求频率，适当等待后重试 |
+| 返回空 DataFrame | 股票代码错误或超出请求限制 | 检查股票代码，使用 `source="auto"` 自动切换 |
+
+建议在无法访问东方财富 API 的环境下（如 CI/CD），使用本地 `data/` 目录中预先缓存的数据文件。
+
 ### Q: 为什么回测收益与不复权数据计算的不一致？
 
 A: 不复权数据在分红除权时会出现价格"跳空"，导致收益计算错误。使用前复权数据可以消除这种影响，确保收益计算准确。
