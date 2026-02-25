@@ -13,7 +13,7 @@ jobs:
       startsWith(github.event.comment.body, '/oc') ||
       contains(github.event.comment.body, ' /opencode') ||
       startsWith(github.event.comment.body, '/opencode')
-    runs-on: self-hosted
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
       contents: write
@@ -25,19 +25,19 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: Run opencode
-        uses: anomalyco/opencode/github@latest
-        env:
-          OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
-        with:
-          model: opencode/big-pickle
-
       # - name: Run opencode
       #   uses: anomalyco/opencode/github@latest
       #   env:
-      #     GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      #     OPENCODE_API_KEY: ${{ secrets.OPENCODE_API_KEY }}
       #   with:
-      #     model: copilot/GPT-5-MINI
+      #     model: opencode/big-pickle
+
+      - name: Run opencode
+        uses: anomalyco/opencode/github@latest
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          model: copilot/GPT-5-MINI
 
       # - name: Run opencode
       #   uses: anomalyco/opencode/github@latest
