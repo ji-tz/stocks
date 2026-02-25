@@ -5,6 +5,7 @@ on:
     types: [created]
   pull_request_review_comment:
     types: [created]
+  
 
 jobs:
   opencode:
@@ -34,8 +35,8 @@ jobs:
 
       - name: Run opencode
         uses: anomalyco/opencode/github@latest
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # env:
+          # GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           model: copilot/GPT-5-MINI
 
