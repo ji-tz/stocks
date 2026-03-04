@@ -10,6 +10,7 @@ on:
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   testgui:
@@ -117,6 +118,7 @@ jobs:
         ls -la screenshots/yangtze_power_test.png 2>/dev/null || echo "No yangtze_power test screenshot found"
     
     - name: Upload Screenshots
+      id: upload_screenshots
       if: always()
       uses: actions/upload-artifact@v4
       with:
@@ -125,6 +127,7 @@ jobs:
         retention-days: 30
     
     - name: Upload Test Results
+      id: upload_test_results
       if: always()
       uses: actions/upload-artifact@v4
       with:
@@ -250,219 +253,78 @@ jobs:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
           const fs = require('fs');
-          const path = require('path');
-          
+          const marker = '<!-- gui-workflow-screenshots -->';
           const runId = context.runId;
-          const artifactUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-          
-          // 函数：将图片转换为 base64 data URL（仅适用于小图片）
-          function imageToDataUrl(imagePath) {
-            try {
-              const imageBuffer = fs.readFileSync(imagePath);
-              const base64Data = imageBuffer.toString('base64');
-              const ext = path.extname(imagePath).toLowerCase();
-              const mimeType = ext === '.png' ? 'image/png' : 'image/jpeg';
-              return `data:${mimeType};base64,${base64Data}`;
-            } catch (error) {
-              console.log(`Failed to convert image to data URL: ${imagePath}`, error);
-              return null;
-            }
-          }
-          
-          // 函数：生成图片显示信息（小图片嵌入base64，大图片使用Artifacts链接）
-          function formatImageDisplay(imagePath, title, artifactUrl) {
-            if (!fs.existsSync(imagePath)) {
-              return `⚠️ ${title}未生成`;
-            }
-            
-            const stats = fs.statSync(imagePath);
-            const sizeKB = (stats.size / 1024).toFixed(1);
-            const filename = path.basename(imagePath);
-            const sizeBytes = stats.size;
-            
-            // 转义Markdown特殊字符
-            const escapedTitle = title.replace(/[[\]()]/g, '\\$&');
-            
-            // 对于小图片（< 1MB），使用 base64 嵌入
-            if (sizeBytes < 1024 * 1024) {
-              const dataUrl = imageToDataUrl(imagePath);
-              if (dataUrl) {
-                return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n![${escapedTitle}](${dataUrl})`;
-              }
-            }
-            
-            // 对于大图片或转换失败的情况，使用 Artifacts 链接
-            return `📸 **${escapedTitle}** (${filename} - ${sizeKB} KB)\n\n*请在 [Artifacts](${artifactUrl}) 中查看此截图*`;
-          }
-          
-          let mainGuiImage = '';
-          let backtestResultImage = '';
-          let strategyConfigImages = '';
-          let workflowImages = '';
-          
-          const mainGuiPath = 'screenshots/main_gui.png';
-          const backtestResultPath = 'screenshots/03_backtest_result_mean_cost.png';
-          const strategyPaths = {
-            'SMA策略配置': 'screenshots/strategy_sma_config.png',
-            '均值成本策略配置': 'screenshots/strategy_mean_cost_config.png',
-            '定投策略配置': 'screenshots/strategy_fixed_amount_config.png'
-          };
-          
-          console.log('=== Starting screenshot processing ===');
-          console.log('Artifact URL:', artifactUrl);
-          console.log('Checking for screenshots in current directory...');
-          
-          // 列出所有可用的截图文件
-          try {
-            const screenshotFiles = fs.readdirSync('screenshots');
-            console.log('Found screenshots:', screenshotFiles);
-          } catch (e) {
-            console.log('Failed to list screenshots directory:', e);
-          }
-          
-          // 处理主界面截图
-          console.log('Processing main GUI screenshot...');
-          mainGuiImage = formatImageDisplay(mainGuiPath, '主界面截图', artifactUrl);
-          const LOG_PREVIEW_LENGTH = 100;
-          console.log('Main GUI image result:', mainGuiImage.substring(0, LOG_PREVIEW_LENGTH) + '...');
-          
-          // 处理策略配置截图
-          console.log('Processing strategy config screenshots...');
-          const strategyImages = [];
-          for (const [title, imagePath] of Object.entries(strategyPaths)) {
-            console.log(`Checking ${title} at ${imagePath}...`);
-            if (fs.existsSync(imagePath)) {
-              const imageDisplay = formatImageDisplay(imagePath, title, artifactUrl);
-              strategyImages.push(`#### ${title}\n\n${imageDisplay}`);
-              console.log(`Added ${title}`);
-            } else {
-              console.log(`${title} not found at ${imagePath}`);
-            }
-          }
-          
-          if (strategyImages.length > 0) {
-            strategyConfigImages = `\n### 🎯 策略参数配置界面\n\n${strategyImages.join('\n\n')}`;
-          }
+          const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-          // 处理完整工作流截图
-          console.log('Processing workflow screenshots...');
-          const workflowScreenshots = [
-            { path: 'screenshots/workflow/01_open_home.png', title: '步骤1：打开界面' },
-            { path: 'screenshots/workflow/02_select_strategy.png', title: '步骤2：选择股票后进入策略选择' },
-            { path: 'screenshots/workflow/03_select_mode.png', title: '步骤3：选择策略进入运行模式' },
-            { path: 'screenshots/workflow/04_select_time_range.png', title: '步骤4：选择回测模式进入时间段' },
-            { path: 'screenshots/workflow/05_mean_cost_strategy.png', title: '步骤5：进入策略配置界面' },
-            { path: 'screenshots/workflow/06_strategy_params.png', title: '步骤6：配置策略参数' },
-            { path: 'screenshots/workflow/07_backtest_progress.png', title: '步骤7：回测进行中' },
-            { path: 'screenshots/workflow/08_backtest_result.png', title: '步骤8：回测结果展示' }
+          const screenshotArtifactId = `${{ steps.upload_screenshots.outputs.artifact-id }}`;
+          const resultArtifactId = `${{ steps.upload_test_results.outputs.artifact-id }}`;
+          const screenshotArtifactUrl = screenshotArtifactId ? `${runUrl}/artifacts/${screenshotArtifactId}` : runUrl;
+          const resultArtifactUrl = resultArtifactId ? `${runUrl}/artifacts/${resultArtifactId}` : runUrl;
+
+          const expectedWorkflowShots = [
+            ['步骤1：打开界面', 'screenshots/workflow/01_open_home.png'],
+            ['步骤2：选择股票后进入策略选择', 'screenshots/workflow/02_select_strategy.png'],
+            ['步骤3：选择策略进入运行模式', 'screenshots/workflow/03_select_mode.png'],
+            ['步骤4：选择回测模式进入时间段', 'screenshots/workflow/04_select_time_range.png'],
+            ['步骤5：进入策略配置界面', 'screenshots/workflow/05_mean_cost_strategy.png'],
+            ['步骤6：配置策略参数', 'screenshots/workflow/06_strategy_params.png'],
+            ['步骤7：回测进行中', 'screenshots/workflow/07_backtest_progress.png'],
+            ['步骤8：回测结果展示', 'screenshots/workflow/08_backtest_result.png'],
           ];
 
-          const workflowImagesList = [];
-          for (const screenshot of workflowScreenshots) {
-            console.log(`Checking workflow screenshot: ${screenshot.path}...`);
-            if (fs.existsSync(screenshot.path)) {
-              const imageDisplay = formatImageDisplay(screenshot.path, screenshot.title, artifactUrl);
-              workflowImagesList.push(`**${screenshot.title}**\n\n${imageDisplay}`);
-              console.log(`Added workflow screenshot: ${screenshot.title}`);
-            } else {
-              console.log(`Workflow screenshot not found: ${screenshot.path}`);
+          const formatSize = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
+          const rows = expectedWorkflowShots.map(([title, filePath]) => {
+            const exists = fs.existsSync(filePath);
+            if (!exists) {
+              return `| ${title} | ❌ 缺失 | ${filePath} | - |`;
             }
-          }
+            const size = formatSize(fs.statSync(filePath).size);
+            return `| ${title} | ✅ 已生成 | ${filePath} | ${size} |`;
+          });
 
-          if (workflowImagesList.length > 0) {
-            workflowImages = `\n### 🧭 完整工作流截图\n\n${workflowImagesList.join('\n\n')}`;
-          }
-          
-          // 处理回测结果UI截图
-          console.log('Processing backtest result screenshot...');
-          if (fs.existsSync(backtestResultPath)) {
-            console.log(`Found backtest result at ${backtestResultPath}`);
-            backtestResultImage = formatImageDisplay(backtestResultPath, '回测结果界面截图', artifactUrl);
+          const commentBody = `${marker}
+## 🖼️ GUI流程截图报告
+
+本次工作流已按“完整流程”执行并检查关键步骤截图。
+
+| 流程步骤 | 状态 | 文件 | 大小 |
+|---|---|---|---|
+${rows.join('\n')}
+
+### 📦 下载链接
+- [本次 Workflow 运行页面](${runUrl})
+- [截图产物 gui-screenshots](${screenshotArtifactUrl})
+- [测试结果产物 gui-test-results](${resultArtifactUrl})
+
+> 说明：GitHub PR 评论区不支持稳定渲染 Artifact 内部图片直链，因此此处提供步骤级状态表 + Artifact 下载链接。
+`;
+
+          const { data: comments } = await github.rest.issues.listComments({
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            issue_number: context.issue.number,
+            per_page: 100,
+          });
+
+          const existing = comments.find((item) =>
+            item.user?.type === 'Bot' && item.body?.includes(marker)
+          );
+
+          if (existing) {
+            await github.rest.issues.updateComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              comment_id: existing.id,
+              body: commentBody,
+            });
           } else {
-            backtestResultImage = '⚠️ 回测结果界面截图未生成(可能是回测步骤失败或超时)';
-            console.log('Warning: Backtest result screenshot not found at:', backtestResultPath);
-          }
-          
-           // 读取测试结果
-          console.log('Reading test results...');
-          let testResult = '';
-          try {
-            const resultPath = 'test_results/yangtze_power_test.json';
-            if (fs.existsSync(resultPath)) {
-              console.log('Found test result JSON at:', resultPath);
-              const data = JSON.parse(fs.readFileSync(resultPath, 'utf8'));
-              const totalProfit = (data.total_value || data.init_cash || 0) - (data.init_cash || 0);
-              const returnRate = (data.init_cash > 0) ? (totalProfit / data.init_cash * 100) : 0;
-              testResult = `
-          ### 📊 回测结果界面
-          
-          **测试数据摘要**:
-          - **股票代码**: ${data.symbol || '未知'}
-          - **测试期间**: ${data.start_date || '2020-01-01'} ~ ${data.end_date || '2022-12-31'}
-          - **初始资金**: ¥${(data.init_cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **最大占用资金**: ¥${(data.max_capital_used || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **最终资金**: ¥${(data.cash || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **持有市值**: ¥${(data.market_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **总资产**: ¥${(data.total_value || 0).toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **总收益**: ¥${totalProfit.toLocaleString('zh-CN', {minimumFractionDigits: 2})}
-          - **收益率**: ${returnRate.toFixed(2)}%
-          - **交易次数**: ${data.trades || 0}
-          - **持有股数**: ${data.shares || 0}
-          
-          **真实UI界面截图**:
-          
-          ${backtestResultImage}
-          `;
-            }
-          } catch (e) {
-            console.log('Failed to read test results:', e);
-          }
-          
-          console.log('=== Generating PR comment ===');
-          console.log('Main GUI image length:', mainGuiImage.length);
-          console.log('Strategy config images length:', strategyConfigImages.length);
-          console.log('Workflow images length:', workflowImages.length);
-          console.log('Test result length:', testResult.length);
-          
-          const comment = `
-          ## 🖼️ GUI截图测试报告
-          
-          ### 📊 主界面截图
-          
-          ${mainGuiImage}
-          ${strategyConfigImages}
-          ${workflowImages}
-          
-          ${testResult}
-          
-          ### 📁 完整报告
-          
-          所有截图和详细测试结果可在 [GitHub Actions Artifacts](${artifactUrl}) 中下载：
-          - **gui-screenshots**: 包含主界面截图、策略配置截图和测试结果图表
-          - **gui-test-results**: 包含测试结果JSON数据
-          
-          ---
-          *Generated by Test GUI Workflow*
-          `;
-          
-          console.log('Comment length:', comment.length);
-          console.log('=== Attempting to create PR comment ===');
-          console.log('Issue number:', context.issue.number);
-          console.log('Owner:', context.repo.owner);
-          console.log('Repo:', context.repo.repo);
-          
-          try {
-            const response = await github.rest.issues.createComment({
+            await github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
               repo: context.repo.repo,
-              body: comment
+              body: commentBody,
             });
-            console.log('Comment created successfully:', response.data.html_url);
-          } catch (error) {
-            console.error('Failed to create comment:', error);
-            // Don't fail the workflow if comment creation fails
-            console.log('Continuing workflow despite comment failure...');
           }
 
     - name: Final Workflow Status
