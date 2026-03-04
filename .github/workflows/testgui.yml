@@ -246,6 +246,138 @@ jobs:
         echo "Condition result: ${{ github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true') }}"
         echo "=============================="
 
+    - name: Upload Workflow Screenshots to GitLab
+      id: upload_gitlab_images
+      if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
+      env:
+        GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
+        GITLAB_BASE_URL: ${{ secrets.GITLAB_BASE_URL }}
+        GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
+        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
+      run: |
+        python - <<'PY'
+        import json
+        import os
+        from pathlib import Path
+        from urllib.parse import quote
+
+        output_file = Path('gitlab_uploaded_images.json')
+        github_output = os.environ.get('GITHUB_OUTPUT')
+
+        api_url = (os.environ.get('GITLAB_API_URL') or 'https://gitlab.com/api/v4').rstrip('/')
+        base_url = (os.environ.get('GITLAB_BASE_URL') or '').rstrip('/')
+        project_id = (os.environ.get('GITLAB_PROJECT_ID') or '').strip()
+        token = (os.environ.get('GITLAB_TOKEN') or '').strip()
+
+        if not base_url:
+          base_url = api_url.split('/api/')[0] if '/api/' in api_url else api_url
+
+        expected_workflow_shots = [
+          ('步骤1：打开界面', 'screenshots/workflow/01_open_home.png'),
+          ('步骤2：选择股票后进入策略选择', 'screenshots/workflow/02_select_strategy.png'),
+          ('步骤3：选择策略进入运行模式', 'screenshots/workflow/03_select_mode.png'),
+          ('步骤4：选择回测模式进入时间段', 'screenshots/workflow/04_select_time_range.png'),
+          ('步骤5：进入策略配置界面', 'screenshots/workflow/05_mean_cost_strategy.png'),
+          ('步骤6：配置策略参数', 'screenshots/workflow/06_strategy_params.png'),
+          ('步骤7：回测进行中', 'screenshots/workflow/07_backtest_progress.png'),
+          ('步骤8：回测结果展示', 'screenshots/workflow/08_backtest_result.png'),
+        ]
+
+        result = {
+          'enabled': False,
+          'api_url': api_url,
+          'base_url': base_url,
+          'images': [],
+          'reason': '',
+        }
+
+        def write_outputs(has_images: bool, count: int):
+          if github_output:
+            with open(github_output, 'a', encoding='utf-8') as handle:
+              handle.write(f"has_gitlab_images={'true' if has_images else 'false'}\n")
+              handle.write(f"uploaded_count={count}\n")
+
+        if not project_id or not token:
+          result['reason'] = 'GITLAB_PROJECT_ID 或 GITLAB_TOKEN 未配置，跳过 GitLab 上传'
+          output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          write_outputs(False, 0)
+          print(result['reason'])
+          raise SystemExit(0)
+
+        try:
+          import requests
+        except Exception as exc:
+          result['reason'] = f'requests 不可用: {exc}'
+          output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+          write_outputs(False, 0)
+          print(result['reason'])
+          raise SystemExit(0)
+
+        upload_endpoint = f"{api_url}/projects/{quote(project_id, safe='')}/uploads"
+
+        for title, rel_path in expected_workflow_shots:
+          file_path = Path(rel_path)
+          if not file_path.exists():
+            result['images'].append({
+              'title': title,
+              'path': rel_path,
+              'uploaded': False,
+              'url': '',
+              'markdown': '',
+              'error': '文件不存在',
+            })
+            continue
+
+          try:
+            with file_path.open('rb') as fp:
+              resp = requests.post(
+                upload_endpoint,
+                headers={'PRIVATE-TOKEN': token},
+                files={'file': (file_path.name, fp, 'image/png')},
+                timeout=60,
+              )
+            if not resp.ok:
+              result['images'].append({
+                'title': title,
+                'path': rel_path,
+                'uploaded': False,
+                'url': '',
+                'markdown': '',
+                'error': f'HTTP {resp.status_code}: {resp.text[:200]}',
+              })
+              continue
+
+            payload = resp.json()
+            raw_url = payload.get('url', '')
+            absolute_url = raw_url if raw_url.startswith('http') else f"{base_url}{raw_url}"
+            result['images'].append({
+              'title': title,
+              'path': rel_path,
+              'uploaded': True,
+              'url': absolute_url,
+              'markdown': payload.get('markdown', ''),
+              'error': '',
+            })
+          except Exception as exc:
+            result['images'].append({
+              'title': title,
+              'path': rel_path,
+              'uploaded': False,
+              'url': '',
+              'markdown': '',
+              'error': str(exc),
+            })
+
+        uploaded_count = sum(1 for item in result['images'] if item.get('uploaded'))
+        result['enabled'] = uploaded_count > 0
+        if not result['enabled']:
+          result['reason'] = 'GitLab 上传未成功（可回退到 Artifacts 链接）'
+
+        output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
+        write_outputs(result['enabled'], uploaded_count)
+        print(f"GitLab 上传完成：{uploaded_count}/{len(result['images'])}")
+        PY
+
     - name: Comment PR with Screenshots
       if: github.event_name == 'pull_request' && (steps.check_results.outputs.has_screenshots == 'true')
       uses: actions/github-script@v7
@@ -261,6 +393,8 @@ jobs:
           const resultArtifactId = `${{ steps.upload_test_results.outputs.artifact-id }}`;
           const screenshotArtifactUrl = screenshotArtifactId ? `${runUrl}/artifacts/${screenshotArtifactId}` : runUrl;
           const resultArtifactUrl = resultArtifactId ? `${runUrl}/artifacts/${resultArtifactId}` : runUrl;
+          const hasGitlabImages = `${{ steps.upload_gitlab_images.outputs.has_gitlab_images }}` === 'true';
+          const uploadedCount = `${{ steps.upload_gitlab_images.outputs.uploaded_count }}`;
 
           const expectedWorkflowShots = [
             ['步骤1：打开界面', 'screenshots/workflow/01_open_home.png'],
@@ -273,6 +407,15 @@ jobs:
             ['步骤8：回测结果展示', 'screenshots/workflow/08_backtest_result.png'],
           ];
 
+          let gitlabPayload = { enabled: false, images: [], reason: '' };
+          if (fs.existsSync('gitlab_uploaded_images.json')) {
+            try {
+              gitlabPayload = JSON.parse(fs.readFileSync('gitlab_uploaded_images.json', 'utf8'));
+            } catch (error) {
+              console.log('解析 gitlab_uploaded_images.json 失败:', error);
+            }
+          }
+
           const formatSize = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
           const rows = expectedWorkflowShots.map(([title, filePath]) => {
             const exists = fs.existsSync(filePath);
@@ -283,6 +426,24 @@ jobs:
             return `| ${title} | ✅ 已生成 | ${filePath} | ${size} |`;
           });
 
+          const markdownImageBlocks = expectedWorkflowShots.map(([title, filePath]) => {
+            const uploaded = (gitlabPayload.images || []).find(
+              (item) => item.path === filePath && item.uploaded && item.url
+            );
+            if (!uploaded) {
+              return `#### ${title}\n\n⚠️ 图片未上传到 GitLab：${filePath}`;
+            }
+            return `#### ${title}\n\n![${title}](${uploaded.url})`;
+          });
+
+          const previewSection = hasGitlabImages
+            ? `### 🖼️ 步骤截图预览（GitLab Markdown 渲染）\n\n${markdownImageBlocks.join('\n\n')}`
+            : `### 🖼️ 步骤截图预览\n\n⚠️ 未启用 GitLab 图片上传（或上传失败），本次仅提供 Artifact 下载链接。`;
+
+          const gitlabStatusLine = hasGitlabImages
+            ? `- GitLab 图片上传：✅ 已启用（${uploadedCount} 张）`
+            : `- GitLab 图片上传：❌ 未启用（${gitlabPayload.reason || '未配置 GITLAB_PROJECT_ID / GITLAB_TOKEN'})`;
+
           const commentBody = `${marker}
 ## 🖼️ GUI流程截图报告
 
@@ -292,12 +453,17 @@ jobs:
 |---|---|---|---|
 ${rows.join('\n')}
 
+${previewSection}
+
 ### 📦 下载链接
 - [本次 Workflow 运行页面](${runUrl})
 - [截图产物 gui-screenshots](${screenshotArtifactUrl})
 - [测试结果产物 gui-test-results](${resultArtifactUrl})
 
-> 说明：GitHub PR 评论区不支持稳定渲染 Artifact 内部图片直链，因此此处提供步骤级状态表 + Artifact 下载链接。
+### 🔧 上传状态
+${gitlabStatusLine}
+
+> 说明：当配置 GitLab 上传参数后，评论会通过 Markdown 图片语法直接渲染步骤截图。
 `;
 
           const { data: comments } = await github.rest.issues.listComments({

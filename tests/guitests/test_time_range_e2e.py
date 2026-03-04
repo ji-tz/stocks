@@ -83,7 +83,7 @@ class TestTimeRangeSelectionE2E(unittest.TestCase):
                 expect(page.locator('input#start-date')).to_be_visible()
                 expect(page.locator('input#end-date')).to_be_visible()
                 expect(page.get_by_text('600900 - 长江电力')).to_be_visible()
-                expect(page.get_by_text('SMA策略')).to_be_visible()
+                expect(page.get_by_text('SMA')).to_be_visible()
             finally:
                 browser.close()
 

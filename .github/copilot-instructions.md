@@ -47,6 +47,10 @@
   ```
   或 `python -m unittest discover` 执行全部。
 - 所有 GUI 测试结果需要将截图添加到 PR，CI workflow 会自动存储并显示。
+- PR 评论区截图渲染走 GitLab 上传接口（见 `.github/workflows/testgui.yml`）：
+   - 需要配置 secrets：`GITLAB_PROJECT_ID`、`GITLAB_TOKEN`
+   - 可选 secrets：`GITLAB_API_URL`（默认 `https://gitlab.com/api/v4`）、`GITLAB_BASE_URL`
+   - 若未配置 GitLab secrets，workflow 会自动回退为 Artifact 链接，不会阻塞测试通过。
 
 ## 典型开发/调试流程
 1. 阅读根目录 `README.md` 了解功能和用户操作流。

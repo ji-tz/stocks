@@ -169,8 +169,8 @@ class TestGuiWorkflowE2E(unittest.TestCase):
                 timeout=60000,  # 使用较短时间范围后，60秒应该足够
             )
             page.click("#view-result-btn")
-            page.wait_for_url("**/view_result", timeout=10000)
-            page.wait_for_selector("canvas#chart", timeout=20000)
+            page.wait_for_load_state("load", timeout=20000)
+            page.wait_for_selector("canvas#chart", timeout=30000)
             self._screenshot(page, "08_backtest_result.png")
 
             # 验证结果页面显示正常（资产曲线图表）

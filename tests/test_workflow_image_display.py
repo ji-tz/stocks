@@ -26,7 +26,7 @@ class TestWorkflowConfiguration(unittest.TestCase):
         self.assertIn('issues: write', content)
 
     def test_testgui_workflow_comment_step_structure(self):
-        """测试评论步骤使用 Artifact 链接与 sticky comment 方案。"""
+        """测试评论步骤支持 GitLab 图片渲染与回退方案。"""
         content = self._read_testgui_content()
 
         # 基本步骤存在
@@ -39,11 +39,22 @@ class TestWorkflowConfiguration(unittest.TestCase):
         self.assertIn('steps.upload_screenshots.outputs.artifact-id', content)
         self.assertIn('steps.upload_test_results.outputs.artifact-id', content)
 
+        # GitLab 上传步骤与输出
+        self.assertIn('Upload Workflow Screenshots to GitLab', content)
+        self.assertIn('id: upload_gitlab_images', content)
+        self.assertIn('steps.upload_gitlab_images.outputs.has_gitlab_images', content)
+        self.assertIn('steps.upload_gitlab_images.outputs.uploaded_count', content)
+        self.assertIn('gitlab_uploaded_images.json', content)
+        self.assertIn('GITLAB_PROJECT_ID', content)
+        self.assertIn('GITLAB_TOKEN', content)
+
         # 评论应包含步骤级截图状态表与下载链接
         self.assertIn('GUI流程截图报告', content)
         self.assertIn('流程步骤 | 状态 | 文件 | 大小', content)
         self.assertIn('截图产物 gui-screenshots', content)
         self.assertIn('测试结果产物 gui-test-results', content)
+        self.assertIn('步骤截图预览（GitLab Markdown 渲染）', content)
+        self.assertIn('![${title}](${uploaded.url})', content)
 
         # Sticky comment（更新已有机器人评论）
         self.assertIn("marker = '<!-- gui-workflow-screenshots -->'", content)
