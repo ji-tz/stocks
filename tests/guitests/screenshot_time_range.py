@@ -8,6 +8,15 @@ import subprocess
 import os
 from playwright.sync_api import sync_playwright
 
+# 确保 Playwright 浏览器已安装
+# 若从包内部调用，导入 tests.guitests 会触发 __init__ 中的检查；
+# 如果脚本作为顶层运行，尝试导入可能失败，此时手动安装。
+try:
+    import tests.guitests  # triggers auto-install helper
+except ImportError:
+    subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
+    subprocess.run([sys.executable, '-m', 'playwright', 'install-deps', 'chromium'], check=True)
+
 
 def take_time_range_screenshots(output_dir='screenshots'):
     """生成时间段设置功能的截图"""

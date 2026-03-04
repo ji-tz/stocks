@@ -10,6 +10,13 @@ from unittest.mock import patch
 import pandas as pd
 from playwright.sync_api import sync_playwright
 
+# Ensure Playwright browsers are available (similar logic to other scripts)
+try:
+    import tests.guitests
+except ImportError:
+    subprocess.run([sys.executable, '-m', 'playwright', 'install', 'chromium'], check=True)
+    subprocess.run([sys.executable, '-m', 'playwright', 'install-deps', 'chromium'], check=True)
+
 # 添加项目根目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
 

@@ -1,81 +1,92 @@
 # Copilot AI Coding Agent Instructions for stocks
 
-## 项目架构与主要目录
-- `main.py`：量化投资、回测主入口。
-- `gui/`：包含 Web 前端，如 `gui/web.py`。
-- `tests/`：所有单元测试与集成测试。
-- `solver/`：存放投资策略实现，如 `SmaStrategy`。
-- `pip.conf`：配置 pip 使用中国镜像源。
-- `data/`：存放本地备份的历史数据文件。
-- `sources/`：数据获取模块，支持akshare、baostock等数据，对外透明。
-- `simulator/`：模拟交易引擎模块。支持回测交易、实盘扩展（TODO）、模拟交易。
+## 项目大局观
+`stocks` 是一个小型量化回测框架，包含：
 
-## 文档
-- [非常重要]各个目录下存放相关文档:README.md。如：gui/README.md。用于copilot参考。每次对代码的修改，需参考该目录的文档，并在修改后同步文档。
-- 不再新增新的README.md文件，所有说明文档均集中在已有的README.md中。
+1. **核心计算库**（`stocks.py` + `solver/` + `simulator/`）
+   - 各类策略在 `solver/` 下以独立模块实现，入口函数如 `run_sma_backtest`、`run_mean_cost` 等。
+   - `simulator/` 封装交易仿真逻辑，提供 `SimulatorEngine` 等类供策略调用。
+   - `stocks.py` 负责统一入口、数据缓存、和对外 API。
 
-## 模块化
-- [非常重要]各个功能模块相互独立，高内聚，低耦合。修改时每个模块时，参考该模块的文档说明，并在修改后同步文档。
-- 模块间通过明确的接口进行交互，避免直接访问其他模块的内部实现。
-- 每个模块的修改需确保不影响其他模块的功能。
-- [非常重要]不再新增新的模块
+2. **数据层**
+   - `sources/` 包含多个数据提供者（akshare、baostock），由 `data_provider.py` 统一调度。
+   - 本地缓存 CSV 文件存放在 `data/`，测试用例会优先使用这些文件。
 
-## 测试与验证
-- 单元测试和集成测试分别位于 `tests/test_unit_xxx.py` 和 `tests/integration/xxx.py`。
-- 测试用例需覆盖数据获取、回测流程，所有新功能需配套测试。
-- 测试用例需覆盖GUI各个界面。
-- 新增的代码必须添加相应测试，确保覆盖率。
-- [非常重要]使用集成测试，验证GUI的主要操作流程。
-- 新增的GUI功能，需在集成测试中添加对应的测试用例。
+3. **Web GUI**（`gui/`）
+   - 基于 Flask 的多页面应用，模板位于 `gui/templates`。
+   - `gui/web.py` 定义路由和 REST API，大多数页面通过 session 存储中间状态。
+   - 前端通过简单的 HTML + JavaScript 实现流程导航、数据验证和实时计算。
 
-## 依赖与环境
-- 使用虚拟环境（已自动配置 .venv）。
-- 依赖通过 pip 安装，已配置清华镜像。
-- 安装依赖命令：
+4. **测试**
+   - 单元/集成测试放在根目录 `tests/`。
+   - GUI 端到端测试位于 `tests/guitests/`，使用 Playwright；还有截图脚本供文档和 PR 使用。
+   - 测试工具如 `tests/test_utils.py` 提供通用 helper 函数。
+
+5. **运行入口**
+   - CLI/脚本入口为 `main.py`，可运行回测、下载数据等。
+   - GUI 通过 `python -m gui.web` 启动。
+
+## 开发环境与依赖
+- 使用 Python 3.12 虚拟环境（`.venv`）。
+- 运行前请执行：
   ```bash
-  pip install -r requirements.txt
+  python -m pip install -r requirements.txt
+  python -m playwright install chromium
+  python -m playwright install-deps chromium
   ```
+  后两步可由测试自动触发（见下文 Playwright 安装逻辑）。
+- 使用 `configure_python_environment` / `install_python_packages` 工具管理包，而非手敲 `pip`。
 
-## 约定与风格
-- 代码、注释、界面均以中文为主。
-- 目录结构清晰，功能分层明确：主逻辑、界面、测试分离。
-- 新增功能需先写单元测试，集成后写集成测试，所有测试通过后再合并。
-- 需采用面向对象思路，模块化设计，确保代码可维护性。
-- 采用类型注解，提升代码可读性。
-- 进行架构调整，大面积修改之前，需先给出方案，图文并茂，经确认后再实施。
+## Playwright & GUI 测试特殊说明
+- `tests/guitests/__init__.py` 会在模块导入时检查并自动安装 Chromium 浏览器。
+- 截图脚本（`tests/guitests/screenshot_*.py`）同样调用该逻辑以便独立运行。
+- GUI 测试通过 `unittest` 直接运行，推荐命令
+  ```bash
+  python -m unittest tests.guitests.test_time_range_e2e
+  python -m unittest tests.guitests.test_gui_workflow_e2e
+  ```
+  或 `python -m unittest discover` 执行全部。
+- 所有 GUI 测试结果需要将截图添加到 PR，CI workflow 会自动存储并显示。
 
-## [重要]典型工作流
-1. 分析需求，阅读根目录README.md文档，确定是否需进行架构调整，如需进行架构调整，则：
-  1. 制定架构调整方案。
-  2. 进行架构调整。
-  3. 修改根目录README.md。
-2. 确定需修改的模块，阅读模块README.md文档。
-3. 阅读模块代码文件，理解现有实现。
-4. 制定修改方案，确保模块间接口不变或兼容。
-5. 编写或修改代码，实现功能。
-6. 根据调整，修改模块README.md文档，确保文档与代码一致。
-7. 阅读测试模块README.md文档，理解测试覆盖范围。
-8. 编写或修改测试代码，确保覆盖新增功能。
-9. 本地运行所有测试，确保通过。
-10. 调整测试模块README.md文档，确保测试文档与代码一致。
-11. 提交代码，发起 Pull Request，描述修改内容与测试情况。
+## 典型开发/调试流程
+1. 阅读根目录 `README.md` 了解功能和用户操作流。
+2. 定位相关模块（`solver`/`gui`/`simulator`等），并阅读对应的 `README.md`。
+3. 编写或修改代码；同时更新文档（同级 `README.md`）。
+4. 添加或修改测试：单元（`tests/test_*`）、集成（`tests/integration/*`）、以及必要的 GUI 测试。
+5. 运行所有测试：
+   ```bash
+   python -m unittest discover
+   ```
+   也可使用 `runTests` 工具针对单个文件。
+6. 如果涉及 Playwright，请注意首次运行时可能需要下载浏览器（自动完成）。
+7. 确保截图脚本可执行并生成图片，便于在 PR 中展示。
+8. 提交并附带中文 commit 信息。
 
-## [重要]用户操作流
-1. 选取股票
-2. 选取策略，并配置参数，
-3. 选取回测仿真、模拟盘交易（TODO）、或实盘交易（TODO）
-4. 如果选取了回测仿真，则选取时间范围
-4. 查看复盘结果（或开始持续运行策略TODO）
+## 代码和风格约定
+- 所有注释、日志、提交信息使用中文。
+- 目录结构层级清晰：计算逻辑 (`solver/`) 与界面 (`gui/`) 严格分离。
+- 不增加新模块，若需新增功能尽量在现有模块扩展。
+- 使用类型注解，尽量保证 `mypy` 无错误。
+- 日志输出使用项目内部工具或直接 `print`，简洁即可。
 
-## 提交规范
-- [非常重要]使用中文描述提交信息，简明扼要。
+## 关键文件速览
+| 路径 | 说明 |
+|------|------|
+| `stocks.py` | 回测核心 API；数据缓存与策略调度。 |
+| `gui/web.py` | Flask 路由、Session 管理、回测启动逻辑。|
+| `gui/templates/*.html` | 页面模板，注意表单字段名称与后端对应。|
+| `tests/guitests/*.py` | End‑to‑end GUI 测试和截图脚本。|
+| `tests/test_utils.py` | 测试工具，如随机股票选择。|
+| `docs/` | 文档目录，包含流程图和测试指南。|
 
-## CI/CD
-- 使用 GitHub Actions 进行持续集成，自动运行测试。
-- 每次提交触发测试，确保主分支代码质量。
-- 测试中，使用 GitHub 提供的 Ubuntu 环境，安装依赖并运行测试脚本。
-- 对所有GUI测试，截图、录屏并将测试结果上传至 PR 以供审查。
-- [非常重要]GUI测试的截图，放在产物中，并在PR中，使用markdown语法，展示截图，不要使用Base64编码，不会成功的。
-- [非常重要]不要试图使用任何手段，绕过workflow中，任何一个步骤。每个步骤都必须执行，并且执行成功。
+## 其他约定
+- 每次修改代码后需同步更新相应的文档文件。
+- CI 环境使用 Ubuntu，若本地出现依赖或浏览器问题，可参考 `.github/workflows/testgui.yml`。
+- 遵循项目 README 中的“用户操作流”以便 GUI 测试编写。
 
-如需扩展新策略、数据源或界面功能，必须遵循现有分层与测试驱动开发模式。
+## 提交与协作
+- 使用中文描述提交信息。
+- PR 中务必包含测试结果截图，特别是 GUI 端到端用例。遵循 CI 指南，不跳过任何步骤。
+
+
+> 如有不清楚的地方，请指出需要补充或调整的部分。
