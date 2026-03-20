@@ -389,10 +389,8 @@ jobs:
           const runId = context.runId;
           const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
-          const screenshotArtifactId = `${{ steps.upload_screenshots.outputs.artifact-id }}`;
-          const resultArtifactId = `${{ steps.upload_test_results.outputs.artifact-id }}`;
-          const screenshotArtifactUrl = screenshotArtifactId ? `${runUrl}/artifacts/${screenshotArtifactId}` : runUrl;
-          const resultArtifactUrl = resultArtifactId ? `${runUrl}/artifacts/${resultArtifactId}` : runUrl;
+          const screenshotArtifactUrl = `${runUrl}/artifacts#./screenshots`;
+          const resultArtifactUrl = `${runUrl}/artifacts#./test_results`;
           const hasGitlabImages = `${{ steps.upload_gitlab_images.outputs.has_gitlab_images }}` === 'true';
           const uploadedCount = `${{ steps.upload_gitlab_images.outputs.uploaded_count }}`;
 
