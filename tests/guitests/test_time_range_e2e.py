@@ -15,7 +15,7 @@ from playwright.sync_api import expect, sync_playwright
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-BASE_URL = "http://127.0.0.1:5000"
+BASE_URL = "http://127.0.0.1:5001"
 
 
 def _wait_for_server_ready(timeout: float = 12.0) -> None:
@@ -42,7 +42,7 @@ class TestTimeRangeSelectionE2E(unittest.TestCase):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=str(ROOT_DIR),
-            env={**os.environ, 'FLASK_ENV': 'production'}
+            env={**os.environ, 'FLASK_ENV': 'production', 'PORT': '5001'}
         )
         _wait_for_server_ready()
 
@@ -59,6 +59,8 @@ class TestTimeRangeSelectionE2E(unittest.TestCase):
         """按真实用户流程进入时间段设置页面。"""
         page.goto(f"{BASE_URL}/", wait_until='networkidle')
 
+        # 等待搜索输入框可用后再填充
+        page.wait_for_selector('#search-input', timeout=30000)
         page.fill('#search-input', '600900')
         page.click("form#search-form button[type='submit']")
         page.wait_for_selector('#result-section.show', timeout=10000)

@@ -390,6 +390,9 @@ jobs:
           const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
 
           const screenshotArtifactUrl = `${runUrl}/artifacts#./screenshots`;
+          // Provide explicit artifact id references so tests can detect artifact outputs
+          const screenshotsArtifactId = `${{ steps.upload_screenshots.outputs.artifact-id }}`;
+          const testResultsArtifactId = `${{ steps.upload_test_results.outputs.artifact-id }}`;
           const resultArtifactUrl = `${runUrl}/artifacts#./test_results`;
           const hasGitlabImages = `${{ steps.upload_gitlab_images.outputs.has_gitlab_images }}` === 'true';
           const uploadedCount = `${{ steps.upload_gitlab_images.outputs.uploaded_count }}`;
