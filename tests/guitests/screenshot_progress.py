@@ -28,7 +28,8 @@ import sys
 import os
 sys.path.insert(0, os.getcwd())
 from gui.web import app
-app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
+port = int(os.environ.get('PORT', '5001'))
+app.run(host='127.0.0.1', port=port, debug=False, use_reloader=False)
 """
     
     script_path = '/tmp/start_flask.py'
@@ -47,14 +48,15 @@ app.run(host='127.0.0.1', port=5000, debug=False, use_reloader=False)
     print("等待Flask服务启动...")
     start_time = time.time()
     while time.time() - start_time < 10:
-        # 尝试连接
-        try:
-            import urllib.request
-            import urllib.error
-            import socket
-            urllib.request.urlopen('http://127.0.0.1:5000/', timeout=1)
-            print("Flask服务启动成功！")
-            return proc
+            # 尝试连接
+            try:
+                import urllib.request
+                import urllib.error
+                import socket
+                port = int(os.environ.get('PORT', '5001'))
+                urllib.request.urlopen(f'http://127.0.0.1:{port}/', timeout=1)
+                print("Flask服务启动成功！")
+                return proc
         except (urllib.error.URLError, socket.timeout, OSError, ConnectionError):
             time.sleep(0.5)
     

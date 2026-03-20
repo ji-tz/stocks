@@ -16,6 +16,8 @@ jobs:
   testgui:
     name: GUI截图测试 (GUI Screenshot Testing)
     runs-on: ubuntu-latest
+    env:
+      PORT: '5001'
     
     steps:
     - uses: actions/checkout@v4
