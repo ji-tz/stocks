@@ -29,7 +29,7 @@ def take_time_range_screenshots(output_dir='screenshots'):
         [sys.executable, '-m', 'gui.web'],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        env={**os.environ, 'FLASK_ENV': 'production'}
+        env={**os.environ, 'FLASK_ENV': 'production', 'PORT': '5001'}
     )
     
     try:
@@ -45,9 +45,10 @@ def take_time_range_screenshots(output_dir='screenshots'):
                 
                 # 1. 使用真实的浏览器交互设置session（与test_gui_workflow_e2e.py保持一致）
                 print("  - 设置session...")
-                page.goto('http://127.0.0.1:5000/', wait_until='networkidle')
+                page.goto('http://127.0.0.1:5001/', wait_until='networkidle')
                 
-                # 选择股票
+                # 等待搜索输入框出现并选择股票
+                page.wait_for_selector("#search-input", timeout=30000)
                 page.fill("#search-input", "600900")
                 page.click("form#search-form button[type='submit']")
                 page.wait_for_selector("#result-section.show", timeout=10000)
@@ -67,7 +68,7 @@ def take_time_range_screenshots(output_dir='screenshots'):
                 
                 # 2. 截图：时间段设置页面（空白状态）
                 print("  - 截图：时间段设置页面（空白）...")
-                page.goto('http://127.0.0.1:5000/select_time_range', wait_until='networkidle')
+                page.goto('http://127.0.0.1:5001/select_time_range', wait_until='networkidle')
                 time.sleep(1)
                 page.screenshot(path=f'{output_dir}/time_range_01_blank.png')
                 

@@ -16,7 +16,7 @@ from urllib.request import urlopen
 from playwright.sync_api import expect, sync_playwright
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-BASE_URL = "http://127.0.0.1:5000"
+BASE_URL = "http://127.0.0.1:5001"
 SCREENSHOT_DIR = Path(
     os.environ.get(
         "GUI_WORKFLOW_SCREENSHOT_DIR",
@@ -76,7 +76,7 @@ class TestGuiWorkflowE2E(unittest.TestCase):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=str(ROOT_DIR),
-            env={**os.environ, "FLASK_ENV": "production"},
+            env={**os.environ, "FLASK_ENV": "production", "PORT": "5001"},
         )
         _wait_for_server_ready()
 
@@ -108,6 +108,8 @@ class TestGuiWorkflowE2E(unittest.TestCase):
 
             # 1. 打开主界面并截图
             page.goto(f"{BASE_URL}/", wait_until="networkidle")
+            # 等待搜索输入框存在以提高稳定性
+            page.wait_for_selector('#search-input', timeout=30000)
             self._screenshot(page, "01_open_home.png")
 
             # 2. 选择股票进入策略选择页面并截图

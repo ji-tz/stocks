@@ -18,7 +18,7 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 # 确保项目根目录在 sys.path
 sys.path.insert(0, ROOT_DIR)
 
-DEFAULT_PORT = 5000
+DEFAULT_PORT = int(os.environ.get('PORT', '5000'))
 DEFAULT_OUTPUT_DIR = "screenshots"
 AVAILABLE_TARGETS = ["main", "strategy"]
 
