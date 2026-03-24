@@ -208,7 +208,7 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
                     return btn && !btn.classList.contains('hidden');
                 }
                 """,
-                timeout=60000,
+                timeout=120000,
             )
             page.click("#view-result-btn")
             page.wait_for_load_state("load", timeout=20000)

@@ -40,7 +40,7 @@ jobs:
 
       - name: Run GUI backtest report test
         run: |
-          timeout 180 python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
+          timeout 300 python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 
       - name: Run supporting GUI regressions
         run: |

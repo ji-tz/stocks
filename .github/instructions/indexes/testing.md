@@ -3,6 +3,7 @@
 - testgui 工作流只保留一次完整浏览器回测，不再拆分旧截图脚本。
 - 统一入口是 tests/guitests/test_gui_backtest_report_e2e.py。
 - Playwright Chromium 的安装检查仅在完整浏览器测试启动前显式执行，避免影响非浏览器 GUI 回归测试；CI 与测试辅助函数统一使用 `playwright install --with-deps chromium` 收敛浏览器和系统依赖安装链路。
+- 完整 GUI E2E 在 CI 中允许更长的回测完成等待窗口，避免进度页在慢机器上因 60 秒阈值过紧而误报失败。
 - 所有截图与测试报告统一输出到 testing/。
 - PR 评论内容直接读取 testing/guitest.md。
 - 评论脚本位于 .github/scripts/comment_guitest_report.js。
