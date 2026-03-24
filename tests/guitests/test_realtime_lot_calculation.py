@@ -134,12 +134,17 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         html = response.data.decode('utf-8')
         # 验证实时计算区域存在
         self.assertIn('id="realtime-info"', html)
+        self.assertIn('id="fixed-amount"', html)
         self.assertIn('id="lot-amount"', html)
+        self.assertIn('id="fixed-amount-multiple"', html)
         self.assertIn('id="affordable-lots"', html)
+        self.assertIn('定投金额是一手金额的整数倍', html)
 
         # 验证JavaScript实时计算逻辑存在
         self.assertIn('fetchStockPrice', html)
         self.assertIn('updateCalculations', html)
+        self.assertIn('Math.floor(fixedAmount / lotAmount)', html)
+        self.assertIn("fixedAmountMultipleSpan.classList.add('warning-text')", html)
 
         # 验证XSS防护
         self.assertIn('"000001"', html)
