@@ -354,9 +354,9 @@ stocks.run_fixed_amount(symbol, start_date, end_date, fixed_amount, lot_size, in
    def strategy_xxx():
        return render_template('strategy_xxx.html')
    ```
-4. 在 `/run` 路由添加策略处理逻辑
+4. 在 `stocks.py` 的策略注册表中声明新策略参数与执行函数
 5. 在 `index.html` 首页添加新策略卡片
-6. 在 `stocks.py` 添加对应的后端函数（如需要）
+6. 如确有必要，再补充专用模板或说明文档
 
 ## 测试
 
@@ -408,7 +408,7 @@ python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 
 - Flask：Web 框架
 - pandas：数据处理
-- backtrader：SMA 策略回测
+- 统一模拟器：所有策略的回测执行核心
 - Chart.js：图表可视化库
 - chartjs-plugin-zoom：图表缩放和平移插件
 - hammerjs：触摸手势支持库

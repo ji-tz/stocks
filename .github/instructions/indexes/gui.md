@@ -7,3 +7,5 @@
 - gui/templates/select_time_range.html 会根据当前日期选择实时请求 /api/stock_chart/<stock_code>，展示日线开盘价走势图。
 - 时间段页的“清除全部缓存并自动重下当前股票日线数据”按钮会调用 /api/stock_chart/<stock_code>/refresh_cache，先清空 data 目录下 CSV 缓存，再重下当前股票日线数据并刷新图表。
 - tests/guitests/test_gui_app.py 负责校验时间段页面的走势图与清缓存接口。
+- gui/web.py 的 /run 路由不再直接按 if/elif 分发策略，而是先收集通用参数与策略专属参数，再交给 stocks.create_backtest_request 和 stocks.run_backtest 统一执行。
+- gui/web.py 的策略专属参数提取由 _collect_strategy_form_params 负责，参数定义来源于 stocks.py 中的策略注册表。

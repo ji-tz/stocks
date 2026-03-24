@@ -1,19 +1,4 @@
-import backtrader as bt
-
-
-class SmaStrategy(bt.Strategy):
-    params = (('period', 20),)
-
-    def __init__(self):
-        self.sma = bt.indicators.SimpleMovingAverage(self.datas[0], period=self.params.period)
-
-    def next(self):
-        if not self.position:
-            if self.datas[0].close[0] > self.sma[0]:
-                self.buy()
-        else:
-            if self.datas[0].close[0] < self.sma[0]:
-                self.sell()
+from typing import Any
 
 
 class SmaDecision:
@@ -28,7 +13,8 @@ class SmaDecision:
         self.period = period
         self.df = df
 
-    def decide(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: int = 0, date=None):
+    def decide(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: int = 0,
+               date: Any = None, trade_price: float | None = None, trade_price_field: str = 'open'):
         # close_price 对比 sma 决策由 simulator 预先计算 sma 并放入 df；此处使用 close_price 与 df 中对应 sma 值比较具有上下文耦合。
         # 为了保持简单，假设调用方在构造时给定了 df，并且当前 date 可用于查询 sma。
         if self.df is None or date is None:

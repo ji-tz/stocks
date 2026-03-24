@@ -1,6 +1,6 @@
 # 量化股票回测系统 Stocks
 
-一个基于 Python 的量化股票回测系统，集成了 Backtrader 策略和 AKShare 数据获取，支持Web界面操作和自动化CI/CD流程。
+一个基于 Python 的量化股票回测系统，基于统一模拟交易模型和 AKShare 数据获取，支持Web界面操作和自动化CI/CD流程。
 
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -11,6 +11,7 @@
 - 🚀 **开箱即用**: 提供 Web 界面、命令行工具、Python API 三种使用方式
 - 📊 **多数据源**: 支持 AKShare、Baostock 自动切换，数据稳定可靠
 - 🎯 **策略灵活**: 内置 SMA、定投策略，支持自定义策略扩展
+- 🧩 **统一回测入口**: 通用参数、策略参数和交易时点通过统一请求对象组织，便于扩展新策略
 - 🔍 **详细日志**: verbose 模式提供每日交易明细，便于调试分析
 - 🏗️ **架构清晰**: 分层设计，模拟交易引擎与实盘接口解耦，易于扩展
 - 🧪 **测试完善**: 单元测试、集成测试、CI/CD 全流程自动化
@@ -22,6 +23,12 @@
 - **SMA策略**: 基于简单移动平均线的交易策略
 - **均值成本策略**: 低于成本时买入，高于成本时卖出
 - **定投策略**: 每天投入固定金额，自动计算购买股数，适合长期投资
+
+### 回测执行约定
+- 当前策略统一以开盘价作为成交时点，先保证现有功能稳定。
+- 回测通用参数包括股票、时间范围、初始资金、交易手数、数据源。
+- 策略专属参数通过统一注册表管理，例如 `SMA` 的 `period`、定投的 `fixed_amount`。
+- 新增策略时，优先补充策略注册信息并复用现有模拟交易和数据获取能力。
 
 ### 2. 数据获取
 - 支持 AKShare 和 Baostock 多数据源
@@ -371,7 +378,7 @@ python demo_simulator.py
 
 ## 主要依赖
 
-- **backtrader**: 量化回测框架
+- **统一模拟器**: 回测执行核心，负责策略驱动和成交撮合
 - **akshare/baostock**: 股票数据源
 - **pandas**: 数据处理
 - **matplotlib**: 图表生成
@@ -566,7 +573,6 @@ result = sim.simulate(df=data, strategy=strategy, verbose=True)
 ## 致谢
 
 本项目使用了以下优秀的开源项目：
-- [Backtrader](https://www.backtrader.com/) - 量化回测框架
 - [AKShare](https://github.com/akfamily/akshare) - 金融数据接口
 - [Baostock](http://baostock.com/) - 证券数据平台
 - [Flask](https://flask.palletsprojects.com/) - Web 框架

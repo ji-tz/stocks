@@ -1,5 +1,3 @@
-import sys
-import types
 import unittest
 from unittest.mock import patch
 
@@ -19,66 +17,45 @@ def make_mock_df(n=10):
         "volume": [1000 + i * 10 for i in range(n)],
     }
     return pd.DataFrame(data)
-
-
-class FakeBroker:
-    def __init__(self):
-        self._value = 100000.0
-
-    def setcash(self, v):
-        self._value = float(v)
-
-    def getvalue(self):
-        return float(self._value)
-
-
-class FakeCerebro:
-    def __init__(self):
-        self._data = []
-        self._strategies = []
-        self.broker = FakeBroker()
-
-    def adddata(self, d):
-        self._data.append(d)
-
-    def addstrategy(self, s):
-        self._strategies.append(s)
-
-    def run(self):
-        # simulate some profit
-        self.broker._value += 1234.5
-
-
-class FakeFeeds:
-    class PandasData:
-        def __init__(self, dataname=None, **kwargs):
-            self.dataname = dataname
-
-
 class TestRunSMA(unittest.TestCase):
-    @patch('source.data_provider.get_data')
-    def test_run_sma_backtest_with_fake_backtrader(self, mock_get):
-        # prepare data
+    @patch('stocks.get_data')
+    def test_run_sma_backtest_returns_unified_simulator_result(self, mock_get):
         df = make_mock_df(15)
         mock_get.return_value = df
 
-        # inject fake backtrader module
-        fake_bt = types.ModuleType('backtrader')
-        fake_bt.Cerebro = FakeCerebro
-        fake_bt.feeds = FakeFeeds()
-        sys.modules['backtrader'] = fake_bt
+        res = stocks.run_sma_backtest(symbol='600900', source='auto', start_date='20230101', end_date='20231231')
+        self.assertIn('symbol', res)
+        self.assertIn('init_cash', res)
+        self.assertIn('cash', res)
+        self.assertIn('total_value', res)
+        self.assertIn('history', res)
+        self.assertIn('trades_list', res)
+        self.assertIn('final_cash', res)
+        self.assertAlmostEqual(res['init_cash'], 100000.0)
+        self.assertEqual(res['final_cash'], res['total_value'])
 
-        try:
-            # pass explicit date range to ensure it's handled
-            res = stocks.run_sma_backtest(symbol='600900', source='auto', start_date='20230101', end_date='20231231')
-            self.assertIn('symbol', res)
-            self.assertIn('init_cash', res)
-            self.assertIn('final_cash', res)
-            self.assertAlmostEqual(res['init_cash'], 100000.0)
-            self.assertTrue(res['final_cash'] >= res['init_cash'])
-        finally:
-            # cleanup injected module
-            sys.modules.pop('backtrader', None)
+    @patch('stocks.get_data')
+    def test_run_sma_backtest_period_changes_result(self, mock_get):
+        df = make_mock_df(30)
+        closes = [
+            100.0, 120.0, 80.0, 130.0, 70.0, 140.0, 60.0, 150.0, 50.0, 160.0,
+            55.0, 155.0, 65.0, 145.0, 75.0, 135.0, 85.0, 125.0, 95.0, 115.0,
+            105.0, 110.0, 100.0, 90.0, 80.0, 120.0, 140.0, 60.0, 150.0, 50.0,
+        ]
+        df['close'] = closes
+        df['open'] = [value - 1.0 for value in closes]
+        df['high'] = [value + 1.0 for value in closes]
+        df['low'] = [value - 2.0 for value in closes]
+        mock_get.return_value = df
+
+        short_period_result = stocks.run_sma_backtest(
+            symbol='600900', source='auto', start_date='20230101', end_date='20231231', period=5
+        )
+        long_period_result = stocks.run_sma_backtest(
+            symbol='600900', source='auto', start_date='20230101', end_date='20231231', period=20
+        )
+
+        self.assertNotEqual(short_period_result['total_value'], long_period_result['total_value'])
 
 
 if __name__ == '__main__':

@@ -1,9 +1,7 @@
 import unittest
 import pandas as pd
 from unittest.mock import patch
-import backtrader as bt
-from stocks import get_data
-from solver.sma_strategy import SmaStrategy
+import stocks
 
 
 class TestIntegration(unittest.TestCase):
@@ -19,28 +17,30 @@ class TestIntegration(unittest.TestCase):
         }
         return pd.DataFrame(data)
 
-    @patch('source.data_provider.ak.stock_zh_a_hist')
-    def test_backtrader_run(self, mock_hist):
-        mock_hist.return_value = self.make_mock_df(60)
-        df = get_data()
-        df = df[["date", "open", "high", "low", "close", "volume"]]
-        data = bt.feeds.PandasData(
-            dataname=df,
-            datetime="date",
-            open="open",
-            high="high",
-            low="low",
-            close="close",
-            volume="volume",
-            openinterest=None
+    @patch('stocks.get_data')
+    def test_run_sma_backtest_integration(self, mock_get_data):
+        mock_get_data.return_value = pd.DataFrame({
+            'date': pd.date_range(end='2023-12-31', periods=60, freq='D'),
+            'open': [100.0 + i for i in range(60)],
+            'high': [101.0 + i for i in range(60)],
+            'low': [99.0 + i for i in range(60)],
+            'close': [100.0 + i for i in range(60)],
+            'volume': [1000 + i * 10 for i in range(60)],
+        })
+        result = stocks.run_sma_backtest(
+            symbol='600900',
+            source='auto',
+            start_date='20230101',
+            end_date='20231231',
+            period=20,
+            lot_size=100,
+            init_cash=100000.0,
         )
-        cerebro = bt.Cerebro()
-        cerebro.adddata(data)
-        cerebro.addstrategy(SmaStrategy)
-        cerebro.broker.setcash(100000)
-        cerebro.run()
-        # 检查资金是否为float类型
-        self.assertIsInstance(cerebro.broker.getvalue(), float)
+        self.assertEqual(result['symbol'], '600900')
+        self.assertIn('total_value', result)
+        self.assertIn('history', result)
+        self.assertIn('trades_list', result)
+        self.assertEqual(result['final_cash'], result['total_value'])
 
 
 if __name__ == "__main__":

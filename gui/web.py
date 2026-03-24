@@ -98,6 +98,17 @@ def _clear_all_cache_files() -> int:
 
     return removed
 
+
+def _collect_strategy_form_params(strategy_key: str) -> dict:
+    """按策略注册表提取当前表单中的策略专属参数。"""
+    params = {}
+    spec = stocks.get_strategy_spec(strategy_key)
+    for parameter in spec.parameters:
+        raw_value = request.form.get(parameter.name, '')
+        if raw_value != '':
+            params[parameter.name] = raw_value
+    return params
+
 def _init_stock_data():
     """初始化股票数据和索引"""
     global _STOCK_LIST, _STOCK_INDEX
@@ -460,10 +471,18 @@ def run():
     strategy = request.form.get('strategy', 'sma')
     lot = int(request.form.get('lot') or 100)
     cash = float(request.form.get('cash') or 100000.0)
-
-    # 在启动线程前提取所有需要的表单参数（避免request context问题）
-    fixed_amount = float(request.form.get('fixed_amount') or 1000.0) if strategy == 'fixed_amount' else None
-    period = int(request.form.get('period') or 20) if strategy == 'sma' else None
+    strategy_params = _collect_strategy_form_params(strategy)
+    request_payload = {
+        'symbol': symbol,
+        'strategy': strategy,
+        'source': source,
+        'start_date': start,
+        'end_date': end,
+        'lot_size': lot,
+        'init_cash': cash,
+        'trade_price': stocks.TRADE_PRICE_OPEN,
+        'strategy_params': strategy_params,
+    }
 
     # 创建回测任务
     progress_mgr = get_progress_manager()
@@ -476,20 +495,11 @@ def run():
     # 在后台线程执行回测
     def run_backtest():
         try:
-            # 根据策略类型执行回测（各策略内部自行获取所需数据）
-            if strategy == 'mean_cost':
-                res = stocks.run_mean_cost(symbol=symbol, start_date=start, end_date=end,
-                                          lot_size=lot, init_cash=cash, source=source,
-                                          progress_callback=progress_callback)
-            elif strategy == 'fixed_amount':
-                res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end,
-                                            fixed_amount=fixed_amount, lot_size=lot,
-                                            init_cash=cash, source=source,
-                                            progress_callback=progress_callback)
-            else:  # sma
-                res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end,
-                                             lot_size=lot, init_cash=cash, period=period,
-                                             progress_callback=progress_callback)
+            backtest_request = stocks.create_backtest_request(
+                progress_callback=progress_callback,
+                **request_payload,
+            )
+            res = stocks.run_backtest(backtest_request)
 
             # 设置任务结果
             progress_mgr.set_result(task_id, res)

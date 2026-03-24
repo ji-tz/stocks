@@ -5,3 +5,6 @@
 - 所有截图与测试报告统一输出到 testing/。
 - PR 评论内容直接读取 testing/guitest.md。
 - 评论脚本位于 .github/scripts/comment_guitest_report.js。
+- tests/test_stocks.py 额外覆盖策略注册表、统一回测请求校验，以及 run_backtest 的分发逻辑。
+- tests/test_run_sma.py 与 tests/test_integration.py 已改为验证统一模拟器下的 SMA 结果契约；requirements.txt 与 .github/workflows/test.yml 中也不再安装 backtrader。
+- 本轮架构整理后，应优先保留 tests/test_stocks.py、tests/test_simulator_engine.py、tests/guitests/test_gui_app.py 作为核心回归基线。

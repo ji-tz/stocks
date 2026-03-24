@@ -7,7 +7,7 @@
 ### 核心功能测试
 - `test_main.py` - 测试主模块的数据获取功能
 - `test_stocks.py` - 测试 stocks 模块的核心业务逻辑
-- `test_integration.py` - 集成测试，验证 Backtrader 回测功能
+- `test_integration.py` - 集成测试，验证统一 SMA 回测入口
 
 ### 策略与模拟器测试
 - **`test_simulator.py`** - **[新增]** 全面测试模拟交易系统

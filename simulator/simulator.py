@@ -5,6 +5,16 @@ from source.data_provider import get_data
 from simulator.simulator_engine import SimulatorEngine
 
 
+SUPPORTED_TRADE_PRICE_FIELDS = ('open', 'close', 'high', 'low')
+
+
+def _resolve_trade_price(row, trade_price: str) -> float:
+    """按交易时点字段获取本次成交价。"""
+    if trade_price not in SUPPORTED_TRADE_PRICE_FIELDS:
+        raise ValueError(f"不支持的交易价格字段: {trade_price}")
+    return float(row[trade_price])
+
+
 class Simulator:
     """通用模拟器：根据传入的决策器在时间序列上执行买/卖操作。
 
@@ -28,7 +38,7 @@ class Simulator:
         self.init_cash = float(init_cash)
         self.verbose = verbose
 
-    def simulate(self, df, strategy, symbol: str = "", start_date: Optional[str] = None, end_date: Optional[str] = None, source: str = "auto", verbose: Optional[bool] = None, progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
+    def simulate(self, df, strategy, symbol: str = "", start_date: Optional[str] = None, end_date: Optional[str] = None, source: str = "auto", verbose: Optional[bool] = None, progress_callback: Optional[Callable[[int, int], None]] = None, trade_price: str = 'open') -> Dict[str, Any]:
         """执行模拟交易
 
         Args:
@@ -78,6 +88,7 @@ class Simulator:
                         print(f"警告: 进度回调失败 - {e}")
             price_open = float(row['open'])
             price_close = float(row['close'])
+            execution_price = _resolve_trade_price(row, trade_price)
             date = row['date']
 
             # 获取当前持仓信息
@@ -86,22 +97,37 @@ class Simulator:
 
             # 调用策略决策
             action = None
-            try:
-                action = strategy.decide(
-                    open_price=price_open,
-                    close_price=price_close,
-                    avg_cost=avg_cost,
-                    shares=pos.shares,
-                    date=date
-                )
-            except TypeError:
-                # 向后兼容：尝试不带 date 参数
-                action = strategy.decide(
-                    open_price=price_open,
-                    close_price=price_close,
-                    avg_cost=avg_cost,
-                    shares=pos.shares
-                )
+            decision_kwargs_chain = [
+                {
+                    'open_price': price_open,
+                    'close_price': price_close,
+                    'avg_cost': avg_cost,
+                    'shares': pos.shares,
+                    'date': date,
+                    'trade_price': execution_price,
+                    'trade_price_field': trade_price,
+                },
+                {
+                    'open_price': price_open,
+                    'close_price': price_close,
+                    'avg_cost': avg_cost,
+                    'shares': pos.shares,
+                    'date': date,
+                },
+                {
+                    'open_price': price_open,
+                    'close_price': price_close,
+                    'avg_cost': avg_cost,
+                    'shares': pos.shares,
+                },
+            ]
+
+            for decision_kwargs in decision_kwargs_chain:
+                try:
+                    action = strategy.decide(**decision_kwargs)
+                    break
+                except TypeError:
+                    continue
 
             # 执行交易
             trade_result = None
@@ -109,26 +135,28 @@ class Simulator:
                 # 检查策略是否有 calculate_shares 方法（定投策略）
                 buy_shares = None
                 if hasattr(strategy, 'calculate_shares'):
-                    buy_shares = strategy.calculate_shares(price_open, self.lot_size)
+                    buy_shares = strategy.calculate_shares(execution_price, self.lot_size)
                 
-                trade_result = engine.buy(date=date, price=price_open, shares=buy_shares)
+                trade_result = engine.buy(date=date, price=execution_price, shares=buy_shares)
                 if trade_result.success:
                     actual_shares = buy_shares if buy_shares is not None else self.lot_size
                     trades_list.append({
                         'date': date.strftime('%Y-%m-%d'),
                         'action': 'buy',
-                        'price': price_open,
+                        'price': execution_price,
+                        'trade_price_field': trade_price,
                         'shares': actual_shares,
                         'cash': round(trade_result.cash_after, 2),
                         'shares_after': trade_result.shares_after
                     })
             elif action == 'sell':
-                trade_result = engine.sell(date=date, price=price_open)
+                trade_result = engine.sell(date=date, price=execution_price)
                 if trade_result.success:
                     trades_list.append({
                         'date': date.strftime('%Y-%m-%d'),
                         'action': 'sell',
-                        'price': price_open,
+                        'price': execution_price,
+                        'trade_price_field': trade_price,
                         'shares': self.lot_size,
                         'cash': round(trade_result.cash_after, 2),
                         'shares_after': trade_result.shares_after,
@@ -193,6 +221,7 @@ class Simulator:
             'unrealized_pl': final_summary['unrealized_pl'],
             'total_value': final_summary['total_value'],
             'trades': engine.trade_count,
+            'trade_price_field': trade_price,
             'max_capital_used': round(max_capital_used, 2),  # 最大占用资金
             'min_cash': round(min_cash, 2),  # 最小现金余额（供参考）
             'history': history,
@@ -206,7 +235,8 @@ def simulate_mean_cost(symbol: str = "600900",
                        lot_size: int = 100,
                        init_cash: float = 100000.0,
                        source: str = "auto",
-                       progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
+                       progress_callback: Optional[Callable[[int, int], None]] = None,
+                       trade_price: str = 'open') -> Dict[str, Any]:
     from solver.mean_cost_strategy import MeanCostDecision
 
     if end_date is None:
@@ -218,7 +248,7 @@ def simulate_mean_cost(symbol: str = "600900",
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     strategy = MeanCostDecision()
-    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback, trade_price=trade_price)
 
 
 def simulate_sma(symbol: str = "600900",
@@ -226,7 +256,8 @@ def simulate_sma(symbol: str = "600900",
                  period: int = 20,
                  lot_size: int = 100,
                  init_cash: float = 100000.0,
-                 progress_callback: Optional[Callable[[int, int], None]] = None):
+                 progress_callback: Optional[Callable[[int, int], None]] = None,
+                 trade_price: str = 'open'):
     from solver.sma_strategy import SmaDecision
 
     if df is None:
@@ -240,7 +271,7 @@ def simulate_sma(symbol: str = "600900",
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     strategy = SmaDecision(period=period, df=df)
-    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback, trade_price=trade_price)
 
 
 def simulate_fixed_amount(symbol: str = "600900",
@@ -251,7 +282,8 @@ def simulate_fixed_amount(symbol: str = "600900",
                          init_cash: float = 100000.0,
                          source: str = "auto",
                          verbose: bool = False,
-                         progress_callback: Optional[Callable[[int, int], None]] = None) -> Dict[str, Any]:
+                         progress_callback: Optional[Callable[[int, int], None]] = None,
+                         trade_price: str = 'open') -> Dict[str, Any]:
     """运行定投策略回测
     
     定投策略：每天投入固定金额购买股票，不考虑市场价格波动。
@@ -280,5 +312,5 @@ def simulate_fixed_amount(symbol: str = "600900",
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash, verbose=verbose)
     strategy = FixedAmountDecision(fixed_amount=fixed_amount)
-    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback)
+    return sim.simulate(df=df, strategy=strategy, symbol=symbol, progress_callback=progress_callback, trade_price=trade_price)
 

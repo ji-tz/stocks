@@ -185,11 +185,15 @@
 
         // 获取股票最新价格
         function fetchStockPrice() {
+          realtimeInfo.style.display = 'block';
+          priceInfoDiv.textContent = '正在加载参考价格...';
+          priceInfoDiv.style.color = '#999';
           const url = '/api/stock_price/' + encodeURIComponent(stockCode);
           fetch(url)
             .then(response => response.json())
             .then(data => {
               if (data.error) {
+                realtimeInfo.style.display = 'block';
                 priceInfoDiv.textContent = '价格获取失败：' + data.error;
                 priceInfoDiv.style.color = '#d32f2f';
                 return;
@@ -202,6 +206,7 @@
               updateCalculations();
             })
             .catch(error => {
+              realtimeInfo.style.display = 'block';
               priceInfoDiv.textContent = '价格获取失败，请稍后重试';
               priceInfoDiv.style.color = '#d32f2f';
             });
