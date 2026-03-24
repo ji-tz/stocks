@@ -17,7 +17,7 @@
    python -m pip install -r requirements.txt
    ```
 
-2. Playwright 浏览器只会在完整浏览器测试启动前显式检查；若缺失，会自动安装 Chromium。
+2. Playwright 浏览器只会在完整浏览器测试启动前显式检查；若缺少浏览器或系统依赖，会自动执行 `playwright install --with-deps chromium`。
 
 3. 运行完整 GUI 回测报告测试
 

@@ -13,8 +13,8 @@ def _ensure_playwright_chromium():
 
     如果第一次运行或者最近更新了 playwright，
     可能需要执行安装命令。我们尝试启动一个临时
-    浏览器实例来验证安装；如果检测到缺少可执行文件，
-    则自动调用 `playwright install` 和 `playwright install-deps`。
+    浏览器实例来验证安装；如果检测到缺少浏览器或系统依赖，
+    则自动调用 `playwright install --with-deps chromium`。
     """
     try:
         # 导入延迟到函数内部，避免在没有安装 playwright 时导入失败
@@ -25,10 +25,18 @@ def _ensure_playwright_chromium():
             browser.close()
     except Exception as exc:  # pylint: disable=broad-except
         msg = str(exc)
-        if "Executable doesn't exist" in msg or 'Please run the following command to download new browsers' in msg:
-            # 自动安装所需的浏览器及依赖
-            subprocess.run([sys.executable, "-m", "playwright", "install", "chromium"], check=True)
-            subprocess.run([sys.executable, "-m", "playwright", "install-deps", "chromium"], check=True)
+        missing_browser_or_deps = (
+            "Executable doesn't exist" in msg
+            or 'Please run the following command to download new browsers' in msg
+            or "Host system is missing dependencies" in msg
+            or "Missing libraries" in msg
+        )
+        if missing_browser_or_deps:
+            # 自动安装所需的浏览器及系统依赖
+            subprocess.run(
+                [sys.executable, "-m", "playwright", "install", "--with-deps", "chromium"],
+                check=True,
+            )
         else:
             # 如果是其他错误，则重新抛出
             raise
