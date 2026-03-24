@@ -8,505 +8,81 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
   pull-requests: write
   issues: write
 
 jobs:
   testgui:
-    name: GUI截图测试 (GUI Screenshot Testing)
+    name: GUI 回测报告测试
     runs-on: ubuntu-latest
     env:
       PORT: '5001'
-    
+
     steps:
-    - uses: actions/checkout@v4
-      with:
-        ref: ${{ github.head_ref }}
-        token: ${{ secrets.GITHUB_TOKEN }}
-    
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.13'
-    
-    - name: Install pip conf
-      run: |
-        mkdir -p ~/.pip
-        cp pip.conf ~/.pip/pip.conf || true
-    
-    - name: Install Chinese fonts for matplotlib
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y fonts-wqy-zenhei fonts-wqy-microhei
-        # Clear matplotlib font cache to recognize new fonts
-        rm -rf ~/.cache/matplotlib
-    
-    - name: Install dependencies
-      run: |
-        python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        # Install Playwright browsers first
-        python -m playwright install chromium
-        python -m playwright install-deps chromium
-        # Verify Playwright browsers are available
-        python -c "from playwright.sync_api import sync_playwright; p = sync_playwright().start(); browser = p.chromium.launch(); browser.close(); p.stop(); print('✓ Playwright chromium verified successfully')" || exit 1
-    
-    - name: Take Main GUI Screenshot
-      run: |
-        echo "=== Taking Main GUI Screenshot ==="
-        mkdir -p screenshots
-        python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png || {
-          echo "❌ Main GUI screenshot failed"
-          echo "Screenshots directory contents:"
-          ls -la screenshots/ || echo "Directory does not exist"
-          exit 1
-        }
-        echo "✅ Main GUI screenshot completed successfully"
-    
-    - name: Take Strategy Config Screenshots
-      run: |
-        echo "=== Taking Strategy Configuration Screenshots ==="
-        mkdir -p screenshots
-        python tests/guitests/screenshot_main.py strategy --output-dir screenshots || {
-          echo "❌ Strategy config screenshots failed"
-          echo "Screenshots directory contents:"
-          ls -la screenshots/ || echo "Directory does not exist"
-          exit 1
-        }
-        echo "✅ Strategy config screenshots completed successfully"
-        echo "Strategy screenshots generated:"
-        ls -la screenshots/strategy_*.png || echo "No strategy screenshots found"
-    
-    - name: Take Time Range Selection Screenshots
-      run: |
-        echo "=== Taking Time Range Selection Screenshots ==="
-        echo "Current working directory: $(pwd)"
-        echo "Screenshots directory before: $(ls -la screenshots/ 2>/dev/null || echo 'Directory does not exist')"
-        timeout 120 python tests/guitests/screenshot_time_range.py --output-dir screenshots || {
-          echo "❌ Time range screenshots failed"
-          echo "Screenshots directory after failure:"
-          ls -la screenshots/ 2>/dev/null || echo "Directory does not exist"
-          exit 1
-        }
-        echo "✅ Time range screenshots completed"
-        echo "Screenshots directory after success:"
-        ls -la screenshots/
+      - uses: actions/checkout@v4
 
-    - name: Run GUI Workflow Screenshot Test
-      run: |
-        echo "=== Running GUI Workflow Screenshot Test ==="
-        echo "Environment: GUI_WORKFLOW_SCREENSHOT_DIR=${GUI_WORKFLOW_SCREENSHOT_DIR:-default}"
-        timeout 180 python -m unittest tests.guitests.test_gui_workflow_e2e -v || {
-          echo "❌ GUI workflow test failed"
-          echo "Checking workflow screenshots directory:"
-          ls -la screenshots/workflow/ 2>/dev/null || echo "Workflow directory does not exist"
-          exit 1
-        }
-        echo "✅ GUI workflow test completed"
-        echo "Workflow screenshots generated:"
-        ls -la screenshots/workflow/ 2>/dev/null || echo "No workflow screenshots found"
-    
-    - name: Run Stock Integration Test (Random Selection)
-      run: |
-        echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
-        python -m tests.test_yangtze_power || {
-          echo "❌ Stock integration test failed"
-          exit 1
-        }
-        echo "✅ Stock integration test completed"
-        echo "Test results generated:"
-        ls -la test_results/ 2>/dev/null || echo "No test_results directory found"
-        ls -la screenshots/yangtze_power_test.png 2>/dev/null || echo "No yangtze_power test screenshot found"
-    
-    - name: Upload Screenshots
-      id: upload_screenshots
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: gui-screenshots
-        path: screenshots/
-        retention-days: 30
-    
-    - name: Upload Test Results
-      id: upload_test_results
-      if: always()
-      uses: actions/upload-artifact@v4
-      with:
-        name: gui-test-results
-        path: test_results/
-        retention-days: 30
-    
-    - name: Check GUI Test Results
-      id: check_results
-      if: always()
-      run: |
-        echo "=== Checking GUI Test Results ==="
-        echo "Current directory: $(pwd)"
-        echo "Current directory contents:"
-        ls -la
-        
-        # Initialize variables
-        screenshot_count=0
-        has_screenshots="false"
-        
-        echo ""
-        echo "=== Screenshots directory status ==="
-        if [ -d "screenshots" ]; then
-          echo "✓ screenshots directory exists"
-          echo "Screenshots directory contents:"
-          find screenshots -type f -name "*.png" -exec ls -la {} \; 2>/dev/null || echo "No PNG files found"
-          screenshot_count=$(find screenshots -type f -name "*.png" 2>/dev/null | wc -l)
-          echo "Total PNG files: ${screenshot_count}"
-          
-          if [ "${screenshot_count}" -gt 0 ]; then
-            echo "✅ 截图文件存在，数量: ${screenshot_count}"
-            has_screenshots="true"
-          else
-            echo "❌ GUI测试失败：截图目录存在但未生成任何PNG文件"
-          fi
-        else
-          echo "❌ GUI测试失败：screenshots目录不存在"
-        fi
-        
-        # Always set the output variable
-        echo "has_screenshots=${has_screenshots}" >> $GITHUB_OUTPUT
-        
-        echo ""
-        echo "=== Test results directory status ==="
-        if [ -d "test_results" ]; then
-          echo "Test results directory exists"
-          echo "Test results contents:"
-          ls -la test_results/
-        else
-          echo "No test_results directory found (may be expected)"
-        fi
-        
-        echo ""
-        echo "=== Final GUI Test Status ==="
-        echo "截图数量: ${screenshot_count}"
-        echo "截图状态: ${has_screenshots}"
-        
-        # Exit with appropriate code
-        if [ "${has_screenshots}" = "true" ]; then
-          echo "✅ GUI测试通过，已生成 ${screenshot_count} 张截图"
-          exit 0
-        else
-          echo "❌ GUI测试失败，未生成足够的截图"
-          exit 1
-        fi
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
-    - name: Workflow Status Summary
-      if: always()
-      run: |
-        echo "=== GUI Workflow Status Summary ==="
-        echo "Event type: ${{ github.event_name }}"
-        echo "Ref: ${{ github.ref }}"
-        echo "Repository: ${{ github.repository }}"
-        echo "Run ID: ${{ github.run_id }}"
-        echo "Actor: ${{ github.actor }}"
-        echo ""
-        echo "=== Screenshots Status ==="
-        if [ -d "screenshots" ]; then
-          echo "Screenshots directory exists"
-          echo "Screenshot count: $(find screenshots -name '*.png' | wc -l)"
-          echo "Screenshot files:"
-          find screenshots -name '*.png' -exec basename {} \; | sort
-        else
-          echo "Screenshots directory does not exist"
-        fi
-        echo ""
-        echo "=== Test Results Status ==="
-        if [ -d "test_results" ]; then
-          echo "Test results directory exists"
-          echo "Test result files:"
-          ls -la test_results/ || echo "No files in test_results"
-        else
-          echo "Test results directory does not exist"
-        fi
-        echo ""
-        echo "=== Screenshot Check Output ==="
-        echo "has_screenshots: ${has_screenshots:-not_set}"
-        echo "================================"
-        
-        # Final status for debugging
-        if [ "${has_screenshots}" = "true" ]; then
-          echo "✅ GUI Workflow: Screenshots generated successfully"
-        elif [ "${has_screenshots}" = "false" ]; then
-          echo "❌ GUI Workflow: No screenshots generated"
-        else
-          echo "❓ GUI Workflow: Screenshot status unknown"
-        fi
+      - name: Install pip conf
+        run: |
+          mkdir -p ~/.pip
+          cp pip.conf ~/.pip/pip.conf || true
 
-    - name: Debug PR Comment Condition
-      if: github.event_name == 'pull_request'
-      run: |
-        echo "=== PR Comment Debug Info ==="
-        echo "Event name: ${{ github.event_name }}"
-        echo "Has screenshots output: ${{ steps.check_results.outputs.has_screenshots }}"
-        echo "PR number: ${{ github.event.number }}"
-        echo "Condition result: ${{ github.event_name == 'pull_request' && steps.check_results.outputs.has_screenshots == 'true' }}"
-        echo "=============================="
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
 
-    - name: Upload Workflow Screenshots to GitLab
-      id: upload_gitlab_images
-      if: github.event_name == 'pull_request' && steps.check_results.outputs.has_screenshots == 'true'
-      env:
-        GITLAB_API_URL: ${{ secrets.GITLAB_API_URL }}
-        GITLAB_BASE_URL: ${{ secrets.GITLAB_BASE_URL }}
-        GITLAB_PROJECT_ID: ${{ secrets.GITLAB_PROJECT_ID }}
-        GITLAB_TOKEN: ${{ secrets.GITLAB_TOKEN }}
-      run: |
-        python - <<'PY'
-        import json
-        import os
-        from pathlib import Path
-        from urllib.parse import quote
+      - name: Run GUI backtest report test
+        run: |
+          timeout 300 python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 
-        output_file = Path('gitlab_uploaded_images.json')
-        github_output = os.environ.get('GITHUB_OUTPUT')
+      - name: Run supporting GUI regressions
+        run: |
+          python -m unittest \
+            tests.guitests.test_gui_app \
+            tests.guitests.test_realtime_lot_calculation \
+            tests.test_guitest_workflow_report -v
 
-        api_url = (os.environ.get('GITLAB_API_URL') or 'https://gitlab.com/api/v4').rstrip('/')
-        base_url = (os.environ.get('GITLAB_BASE_URL') or '').rstrip('/')
-        project_id = (os.environ.get('GITLAB_PROJECT_ID') or '').strip()
-        token = (os.environ.get('GITLAB_TOKEN') or '').strip()
+      - name: Verify testing outputs
+        run: |
+          test -f testing/guitest.md
+          test $(find testing -maxdepth 1 -name '*.png' | wc -l) -eq 8
+          ls -la testing/
 
-        if not base_url:
-          base_url = api_url.split('/api/')[0] if '/api/' in api_url else api_url
+      - name: Upload GUI testing artifacts
+        id: upload_testing_artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: guitest-report
+          path: testing/
+          retention-days: 30
 
-        expected_workflow_shots = [
-          ('步骤1：打开界面', 'screenshots/workflow/01_open_home.png'),
-          ('步骤2：选择股票后进入策略选择', 'screenshots/workflow/02_select_strategy.png'),
-          ('步骤3：选择策略进入运行模式', 'screenshots/workflow/03_select_mode.png'),
-          ('步骤4：选择回测模式进入时间段', 'screenshots/workflow/04_select_time_range.png'),
-          ('步骤5：进入策略配置界面', 'screenshots/workflow/05_mean_cost_strategy.png'),
-          ('步骤6：配置策略参数', 'screenshots/workflow/06_strategy_params.png'),
-          ('步骤7：回测进行中', 'screenshots/workflow/07_backtest_progress.png'),
-          ('步骤8：回测结果展示', 'screenshots/workflow/08_backtest_result.png'),
-        ]
-
-        result = {
-          'enabled': False,
-          'api_url': api_url,
-          'base_url': base_url,
-          'images': [],
-          'reason': '',
-        }
-
-        def write_outputs(has_images: bool, count: int):
-          if github_output:
-            with open(github_output, 'a', encoding='utf-8') as handle:
-              handle.write(f"has_gitlab_images={'true' if has_images else 'false'}\n")
-              handle.write(f"uploaded_count={count}\n")
-
-        if not project_id or not token:
-          result['reason'] = 'GITLAB_PROJECT_ID 或 GITLAB_TOKEN 未配置，跳过 GitLab 上传'
-          output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-          write_outputs(False, 0)
-          print(result['reason'])
-          raise SystemExit(0)
-
-        try:
-          import requests
-        except Exception as exc:
-          result['reason'] = f'requests 不可用: {exc}'
-          output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-          write_outputs(False, 0)
-          print(result['reason'])
-          raise SystemExit(0)
-
-        upload_endpoint = f"{api_url}/projects/{quote(project_id, safe='')}/uploads"
-
-        for title, rel_path in expected_workflow_shots:
-          file_path = Path(rel_path)
-          if not file_path.exists():
-            result['images'].append({
-              'title': title,
-              'path': rel_path,
-              'uploaded': False,
-              'url': '',
-              'markdown': '',
-              'error': '文件不存在',
-            })
-            continue
-
-          try:
-            with file_path.open('rb') as fp:
-              resp = requests.post(
-                upload_endpoint,
-                headers={'PRIVATE-TOKEN': token},
-                files={'file': (file_path.name, fp, 'image/png')},
-                timeout=60,
-              )
-            if not resp.ok:
-              result['images'].append({
-                'title': title,
-                'path': rel_path,
-                'uploaded': False,
-                'url': '',
-                'markdown': '',
-                'error': f'HTTP {resp.status_code}: {resp.text[:200]}',
-              })
-              continue
-
-            payload = resp.json()
-            raw_url = payload.get('url', '')
-            absolute_url = raw_url if raw_url.startswith('http') else f"{base_url}{raw_url}"
-            result['images'].append({
-              'title': title,
-              'path': rel_path,
-              'uploaded': True,
-              'url': absolute_url,
-              'markdown': payload.get('markdown', ''),
-              'error': '',
-            })
-          except Exception as exc:
-            result['images'].append({
-              'title': title,
-              'path': rel_path,
-              'uploaded': False,
-              'url': '',
-              'markdown': '',
-              'error': str(exc),
-            })
-
-        uploaded_count = sum(1 for item in result['images'] if item.get('uploaded'))
-        result['enabled'] = uploaded_count > 0
-        if not result['enabled']:
-          result['reason'] = 'GitLab 上传未成功（可回退到 Artifacts 链接）'
-
-        output_file.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding='utf-8')
-        write_outputs(result['enabled'], uploaded_count)
-        print(f"GitLab 上传完成：{uploaded_count}/{len(result['images'])}")
-        PY
-
-    - name: Comment PR with Screenshots
-      if: github.event_name == 'pull_request' && steps.check_results.outputs.has_screenshots == 'true'
-      uses: actions/github-script@v7
-      with:
-        github-token: ${{ secrets.GITHUB_TOKEN }}
-        script: |
-          const fs = require('fs');
-          const marker = '<!-- gui-workflow-screenshots -->';
-          const runId = context.runId;
-          const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
-
-          const screenshotArtifactUrl = `${runUrl}/artifacts#./screenshots`;
-          // Provide explicit artifact id references so tests can detect artifact outputs
-          const screenshotsArtifactId = `${{ steps.upload_screenshots.outputs.artifact-id }}`;
-          const testResultsArtifactId = `${{ steps.upload_test_results.outputs.artifact-id }}`;
-          const resultArtifactUrl = `${runUrl}/artifacts#./test_results`;
-          const hasGitlabImages = `${{ steps.upload_gitlab_images.outputs.has_gitlab_images }}` === 'true';
-          const uploadedCount = `${{ steps.upload_gitlab_images.outputs.uploaded_count }}`;
-
-          const expectedWorkflowShots = [
-            ['步骤1：打开界面', 'screenshots/workflow/01_open_home.png'],
-            ['步骤2：选择股票后进入策略选择', 'screenshots/workflow/02_select_strategy.png'],
-            ['步骤3：选择策略进入运行模式', 'screenshots/workflow/03_select_mode.png'],
-            ['步骤4：选择回测模式进入时间段', 'screenshots/workflow/04_select_time_range.png'],
-            ['步骤5：进入策略配置界面', 'screenshots/workflow/05_mean_cost_strategy.png'],
-            ['步骤6：配置策略参数', 'screenshots/workflow/06_strategy_params.png'],
-            ['步骤7：回测进行中', 'screenshots/workflow/07_backtest_progress.png'],
-            ['步骤8：回测结果展示', 'screenshots/workflow/08_backtest_result.png'],
-          ];
-
-          let gitlabPayload = { enabled: false, images: [], reason: '' };
-          if (fs.existsSync('gitlab_uploaded_images.json')) {
-            try {
-              gitlabPayload = JSON.parse(fs.readFileSync('gitlab_uploaded_images.json', 'utf8'));
-            } catch (error) {
-              console.log('解析 gitlab_uploaded_images.json 失败:', error);
-            }
-          }
-
-          const formatSize = (bytes) => `${(bytes / 1024).toFixed(1)} KB`;
-          const rows = expectedWorkflowShots.map(([title, filePath]) => {
-            const exists = fs.existsSync(filePath);
-            if (!exists) {
-              return `| ${title} | ❌ 缺失 | ${filePath} | - |`;
-            }
-            const size = formatSize(fs.statSync(filePath).size);
-            return `| ${title} | ✅ 已生成 | ${filePath} | ${size} |`;
-          });
-
-          const markdownImageBlocks = expectedWorkflowShots.map(([title, filePath]) => {
-            const uploaded = (gitlabPayload.images || []).find(
-              (item) => item.path === filePath && item.uploaded && item.url
+      - name: Comment PR with GUI report
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { commentGuitestReport } = require(
+              process.env.GITHUB_WORKSPACE + '/.github/scripts/comment_guitest_report.js'
             );
-            if (!uploaded) {
-              return `#### ${title}\n\n⚠️ 图片未上传到 GitLab：${filePath}`;
-            }
-            return `#### ${title}\n\n![${title}](${uploaded.url})`;
-          });
-
-          const previewSection = hasGitlabImages
-            ? `### 🖼️ 步骤截图预览（GitLab Markdown 渲染）\n\n${markdownImageBlocks.join('\n\n')}`
-            : `### 🖼️ 步骤截图预览\n\n⚠️ 未启用 GitLab 图片上传（或上传失败），本次仅提供 Artifact 下载链接。`;
-
-          const gitlabStatusLine = hasGitlabImages
-            ? `- GitLab 图片上传：✅ 已启用（${uploadedCount} 张）`
-            : `- GitLab 图片上传：❌ 未启用（${gitlabPayload.reason || '未配置 GITLAB_PROJECT_ID / GITLAB_TOKEN'})`;
-
-          const commentBody = `${marker}
-          ## 🖼️ GUI流程截图报告
-
-          本次工作流已按“完整流程”执行并检查关键步骤截图。
-
-          | 流程步骤 | 状态 | 文件 | 大小 |
-          |---|---|---|---|
-          ${rows.join('\n')}
-
-          ${previewSection}
-
-          ### 📦 下载链接
-          - [本次 Workflow 运行页面](${runUrl})
-          - [截图产物 gui-screenshots](${screenshotArtifactUrl})
-          - [测试结果产物 gui-test-results](${resultArtifactUrl})
-
-          ### 🔧 上传状态
-          ${gitlabStatusLine}
-
-          > 说明：当配置 GitLab 上传参数后，评论会通过 Markdown 图片语法直接渲染步骤截图。
-          `;
-
-          const { data: comments } = await github.rest.issues.listComments({
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            issue_number: context.issue.number,
-            per_page: 100,
-          });
-
-          const existing = comments.find((item) =>
-            item.user?.type === 'Bot' && item.body?.includes(marker)
-          );
-
-          if (existing) {
-            await github.rest.issues.updateComment({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              comment_id: existing.id,
-              body: commentBody,
+            await commentGuitestReport({
+              github,
+              context,
+              core,
+              artifactName: 'guitest-report',
             });
-          } else {
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: commentBody,
-            });
-          }
 
-    - name: Final Workflow Status
-      if: always()
-      run: |
-        echo "=== Final GUI Workflow Status ==="
-        if [ "${{ steps.check_results.outputs.has_screenshots }}" = "true" ]; then
-          echo "✅ GUI WORKFLOW SUCCEEDED"
-          echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
-          echo "   - PR comment: $([ '${{ github.event_name }}' = 'pull_request' ] && echo 'created' || echo 'not applicable')"
-          exit 0
-        else
-          echo "❌ GUI WORKFLOW FAILED"
-          echo "   - Screenshots generated: $(find screenshots -name '*.png' 2>/dev/null | wc -l)"
-          exit 1
-        fi
+      - name: Final workflow status
+        if: always()
+        run: |
+          echo "=== Final GUI Workflow Status ==="
+          echo "testing 目录内容："
+          ls -la testing/ || true

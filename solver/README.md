@@ -32,6 +32,8 @@ result = simulate_sma(
 )
 ```
 
+说明：SMA 现已完全通过统一模拟器执行，不再依赖独立的第三方回测执行路径。
+
 ### 2. 均值成本策略（Mean Cost Strategy）
 文件：`mean_cost_strategy.py`
 
@@ -113,9 +115,10 @@ def decide(self, open_price: float, close_price: float | None = None,
 
 1. 在本目录创建新文件，如 `my_strategy.py`
 2. 实现决策类，包含 `decide()` 方法
-3. 在 `simulator/simulator.py` 中添加便捷函数（可选）
-4. 在 `tests/` 目录添加测试文件
-5. 更新本 README 文档
+3. 在 `stocks.py` 的策略注册表中声明策略名、展示名、独立参数和执行函数
+4. 复用 `simulator/simulator.py` 的统一模拟流程；仅在确有必要时新增便捷函数
+5. 在 `tests/` 目录添加测试文件
+6. 更新本 README 文档
 
 **示例：**
 ```python
@@ -175,8 +178,9 @@ python -m unittest tests.test_fixed_amount_strategy -v
 
 1. **lot_size（交易手数）**：A股市场1手 = 100股，所以 lot_size 通常设为 100
 2. **资金不足**：策略决定买入时，如果资金不足，交易会失败
-3. **向后兼容**：修改策略接口时，应保持向后兼容
-4. **测试驱动**：新增策略必须先编写测试，确保功能正确
+3. **交易时点**：当前统一按开盘价成交，后续若扩展到收盘或盘中，应先在统一注册和模拟入口中增加支持
+4. **向后兼容**：修改策略接口时，应保持向后兼容
+5. **测试驱动**：新增策略必须先编写测试，确保功能正确
 
 ## 相关模块
 

@@ -12,6 +12,9 @@
 ## 关键接口
 `BaseEngine` 统一约定：`buy()`、`sell()`、`get_cash()`、`get_position()`、`get_account()`、`get_total_value()`、`get_summary()`。
 
+`Simulator.simulate()` 负责统一遍历日线数据、调用策略决策、按指定交易价格字段执行成交。
+当前默认使用 `open`，但内部已经为后续扩展到 `close`、`high`、`low` 等字段预留了统一入口。
+
 ## 运行方式
 - 推荐使用 `Simulator`：内部封装引擎与策略执行。
 - 直接使用 `SimulatorEngine`：手动控制买卖。

@@ -18,6 +18,110 @@ app.secret_key = os.environ.get('SECRET_KEY', 'stocks-quantitative-backtest-secr
 _STOCK_LIST = None
 _STOCK_INDEX = None
 
+
+def _get_cache_dir() -> str:
+    """返回项目内的数据缓存目录绝对路径。"""
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+
+
+def _validate_optional_date_range(start: str, end: str) -> tuple[str, str]:
+    """校验可选日期范围，支持空字符串与 YYYYMMDD。"""
+    import re
+
+    start = (start or '').strip()
+    end = (end or '').strip()
+    date_pattern = re.compile(r'^\d{8}$')
+
+    if start and not date_pattern.match(start):
+        raise ValueError('起始日期格式必须为YYYYMMDD')
+    if end and not date_pattern.match(end):
+        raise ValueError('结束日期格式必须为YYYYMMDD')
+    if start and end and start > end:
+        raise ValueError('起始日期不能晚于结束日期')
+
+    return start, end
+
+
+def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', source: str = 'auto') -> dict:
+    """构造时间段页面的日线开盘价走势图数据。"""
+    cache_dir = _get_cache_dir()
+    df = stocks.get_data(
+        symbol=stock_code,
+        source=source,
+        start_date=start or None,
+        end_date=end or None,
+        cache_dir=cache_dir,
+    )
+
+    if df is None or df.empty:
+        raise RuntimeError('无法获取该时间段的股票日线数据')
+
+    labels = []
+    open_prices = []
+    for _, row in df.iterrows():
+        date_value = row['date']
+        if hasattr(date_value, 'strftime'):
+            labels.append(date_value.strftime('%Y-%m-%d'))
+        else:
+            labels.append(str(date_value))
+        open_prices.append(float(row['open']))
+
+    available_start = labels[0]
+    available_end = labels[-1]
+
+    return {
+        'stock_code': stock_code,
+        'labels': labels,
+        'open_prices': open_prices,
+        'available_start': available_start,
+        'available_end': available_end,
+        'points': len(labels),
+        'price_field': 'open',
+    }
+
+
+def _rebuild_chart_cache(stock_code: str, start: str = '', end: str = '', source: str = 'auto') -> None:
+    """按当前请求区间强制重建当前股票缓存。"""
+    stocks.get_data(
+        symbol=stock_code,
+        source=source,
+        start_date=start or None,
+        end_date=end or None,
+        cache_dir=_get_cache_dir(),
+        force_refresh=True,
+        buffer_days=5,
+    )
+
+
+def _clear_all_cache_files() -> int:
+    """清理 data 目录下所有 CSV 缓存文件。"""
+    cache_dir = _get_cache_dir()
+    if not os.path.isdir(cache_dir):
+        return 0
+
+    removed = 0
+    for file_name in os.listdir(cache_dir):
+        if not file_name.endswith('.csv'):
+            continue
+        file_path = os.path.join(cache_dir, file_name)
+        if not os.path.isfile(file_path):
+            continue
+        os.remove(file_path)
+        removed += 1
+
+    return removed
+
+
+def _collect_strategy_form_params(strategy_key: str) -> dict:
+    """按策略注册表提取当前表单中的策略专属参数。"""
+    params = {}
+    spec = stocks.get_strategy_spec(strategy_key)
+    for parameter in spec.parameters:
+        raw_value = request.form.get(parameter.name, '')
+        if raw_value != '':
+            params[parameter.name] = raw_value
+    return params
+
 def _init_stock_data():
     """初始化股票数据和索引"""
     global _STOCK_LIST, _STOCK_INDEX
@@ -236,6 +340,57 @@ def select_time_range_api():
     return jsonify({'success': True})
 
 
+@app.route('/api/stock_chart/<stock_code>', methods=['GET'])
+def get_stock_chart(stock_code):
+    """获取时间段页面的股票日线开盘价走势图数据。"""
+    session_stock_code = session.get('stock_code')
+    if not session_stock_code:
+        return jsonify({'error': '请先选择股票'}), 400
+    if session_stock_code != stock_code:
+        return jsonify({'error': '当前股票与会话不一致'}), 400
+
+    try:
+        start, end = _validate_optional_date_range(
+            request.args.get('start', ''),
+            request.args.get('end', ''),
+        )
+        payload = _build_stock_chart_payload(stock_code=stock_code, start=start, end=end)
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': f'获取走势图失败: {str(exc)}'}), 500
+
+
+@app.route('/api/stock_chart/<stock_code>/refresh_cache', methods=['POST'])
+def refresh_stock_chart_cache(stock_code):
+    """清除全部缓存并重新下载当前股票的日线数据。"""
+    session_stock_code = session.get('stock_code')
+    if not session_stock_code:
+        return jsonify({'error': '请先选择股票'}), 400
+    if session_stock_code != stock_code:
+        return jsonify({'error': '当前股票与会话不一致'}), 400
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        start, end = _validate_optional_date_range(
+            data.get('start', ''),
+            data.get('end', ''),
+        )
+        removed_files = _clear_all_cache_files()
+        # 清缓存后按当前请求区间强制重建，并在下载时扩展前后缓冲天数，降低边界日期不稳定问题。
+        _rebuild_chart_cache(stock_code=stock_code, start=start, end=end)
+        payload = _build_stock_chart_payload(stock_code=stock_code, start=start, end=end)
+        payload['removed_cache_files'] = removed_files
+        payload['refreshed'] = True
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': f'清除缓存并重新下载失败: {str(exc)}'}), 500
+
+
 @app.route('/strategy/sma', methods=['GET'])
 def strategy_sma():
     """SMA策略配置页面"""
@@ -243,6 +398,7 @@ def strategy_sma():
     stock_name = session.get('stock_name')
     strategy_type = session.get('strategy_type')
     run_mode = session.get('run_mode')
+    
 
     # 检查是否有必要的信息
     if not stock_code or not stock_name:
@@ -329,10 +485,18 @@ def run():
     strategy = request.form.get('strategy', 'sma')
     lot = int(request.form.get('lot') or 100)
     cash = float(request.form.get('cash') or 100000.0)
-
-    # 在启动线程前提取所有需要的表单参数（避免request context问题）
-    fixed_amount = float(request.form.get('fixed_amount') or 1000.0) if strategy == 'fixed_amount' else None
-    period = int(request.form.get('period') or 20) if strategy == 'sma' else None
+    strategy_params = _collect_strategy_form_params(strategy)
+    request_payload = {
+        'symbol': symbol,
+        'strategy': strategy,
+        'source': source,
+        'start_date': start,
+        'end_date': end,
+        'lot_size': lot,
+        'init_cash': cash,
+        'trade_price': stocks.TRADE_PRICE_OPEN,
+        'strategy_params': strategy_params,
+    }
 
     # 创建回测任务
     progress_mgr = get_progress_manager()
@@ -345,20 +509,11 @@ def run():
     # 在后台线程执行回测
     def run_backtest():
         try:
-            # 根据策略类型执行回测（各策略内部自行获取所需数据）
-            if strategy == 'mean_cost':
-                res = stocks.run_mean_cost(symbol=symbol, start_date=start, end_date=end,
-                                          lot_size=lot, init_cash=cash, source=source,
-                                          progress_callback=progress_callback)
-            elif strategy == 'fixed_amount':
-                res = stocks.run_fixed_amount(symbol=symbol, start_date=start, end_date=end,
-                                            fixed_amount=fixed_amount, lot_size=lot,
-                                            init_cash=cash, source=source,
-                                            progress_callback=progress_callback)
-            else:  # sma
-                res = stocks.run_sma_backtest(symbol=symbol, source=source, start_date=start, end_date=end,
-                                             lot_size=lot, init_cash=cash, period=period,
-                                             progress_callback=progress_callback)
+            backtest_request = stocks.create_backtest_request(
+                progress_callback=progress_callback,
+                **request_payload,
+            )
+            res = stocks.run_backtest(backtest_request)
 
             # 设置任务结果
             progress_mgr.set_result(task_id, res)
@@ -367,9 +522,12 @@ def run():
             # 设置任务错误
             progress_mgr.set_error(task_id, str(e))
 
-    # 启动后台线程
-    thread = threading.Thread(target=run_backtest, daemon=True)
-    thread.start()
+    if app.testing:
+        run_backtest()
+    else:
+        # 启动后台线程
+        thread = threading.Thread(target=run_backtest, daemon=True)
+        thread.start()
 
     # 返回进度页面
     return render_template('backtest_progress.html', task_id=task_id, symbol=symbol, strategy=strategy)

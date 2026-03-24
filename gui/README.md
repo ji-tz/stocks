@@ -123,6 +123,8 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 - ⚡ **快捷时间段选择**：一键设置常用时间段（最近1年、2年、3年、5年、今年至今）
 - ✅ **智能验证**：自动验证起始日期不能晚于结束日期
 - 📝 **可选填写**：支持留空使用全部历史数据
+- 📈 **时间段走势预览**：根据当前日期选择展示该区间日线开盘价走势图
+- ♻️ **缓存重下入口**：支持一键清除全部缓存，并自动重新下载当前股票日线数据
 
 **页面元素：**
 - 显示面包屑导航（已完成：选择股票 → 选择策略 → 选择运行模式 → **当前：设置时间段**）
@@ -133,12 +135,15 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 - 起始日期输入框：HTML5 date类型，可选
 - 结束日期输入框：HTML5 date类型，可选
 - 日期验证：实时验证，错误时显示提示信息
+- 股票走势图：在日期输入区域下方实时展示所选时间段的日线开盘价走势
+- 清缓存按钮：清除 `data/` 下全部 CSV 缓存，并重新下载当前股票的日线数据后刷新图表
 - 提交按钮：保存时间段到session并跳转到策略配置页面
 
 **数据格式：**
 - 前端使用HTML5 date输入（YYYY-MM-DD格式）
 - 提交到后端时自动转换为YYYYMMDD格式
 - 保存在session中，/run 回测时优先读取该时间段
+- 走势预览使用股票日线数据中的 `open` 字段，按交易日绘制折线图
 
 ### 4. SMA 策略配置页面 (`/strategy/sma`)
 
@@ -196,7 +201,9 @@ gunicorn -w 4 -b 0.0.0.0:5000 gui.web:app
 - 显示面包屑导航和已选择信息
 - 提供"返回时间段设置"链接
 - **✨ 新增：实时计算显示**（同SMA策略）
-  - 实时显示每手金额和资金支持手数
+  - 实时显示每手金额、资金支持手数
+  - 实时显示“定投金额是一手金额的整数倍”
+  - 当定投金额不足买入一手时，整数倍显示为 0 且标红提示
   - 参数调整时自动更新
 
 **可配置参数：**
@@ -347,9 +354,9 @@ stocks.run_fixed_amount(symbol, start_date, end_date, fixed_amount, lot_size, in
    def strategy_xxx():
        return render_template('strategy_xxx.html')
    ```
-4. 在 `/run` 路由添加策略处理逻辑
+4. 在 `stocks.py` 的策略注册表中声明新策略参数与执行函数
 5. 在 `index.html` 首页添加新策略卡片
-6. 在 `stocks.py` 添加对应的后端函数（如需要）
+6. 如确有必要，再补充专用模板或说明文档
 
 ## 测试
 
@@ -385,22 +392,23 @@ with sync_playwright() as p:
 - 关键 UI 元素添加了 `data-testid` 属性以提高 E2E 交互测试的稳定性
 - **截图测试**：推荐使用 `page.goto()` 直接导航，避免点击操作的不确定性
 - **交互测试**：推荐使用 `data-testid` 或 CSS 类选择器，而非文本选择器（避免 emoji 和文本变化导致的不稳定）
-- 详见 `tests/guitests/screenshot_main.py` 中的实现
+- 完整流程实现详见 `tests/guitests/test_gui_backtest_report_e2e.py`
 
-### GUI 截图脚本
+### GUI 回测报告测试
 
-推荐使用统一入口脚本：
+推荐运行统一的完整流程测试：
 
 ```bash
-python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-python tests/guitests/screenshot_main.py strategy --output-dir screenshots
+python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 ```
+
+运行成功后，截图与 Markdown 报告会统一生成在 `testing/`。
 
 ## 依赖
 
 - Flask：Web 框架
 - pandas：数据处理
-- backtrader：SMA 策略回测
+- 统一模拟器：所有策略的回测执行核心
 - Chart.js：图表可视化库
 - chartjs-plugin-zoom：图表缩放和平移插件
 - hammerjs：触摸手势支持库

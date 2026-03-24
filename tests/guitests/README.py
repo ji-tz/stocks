@@ -1,13 +1,13 @@
 """GUI 测试说明文档。
 
-此目录下包含端到端测试（使用 Playwright）和截图脚本。
+此目录下保留浏览器自动化测试，但不再保留旧的分散截图脚本。
 
 测试组织约定：
 
-- GUI 测试优先验证完整用户流程，而不是只验证彼此分离的页面。
-- `test_gui_workflow_e2e.py` 是主流程回归测试（从首页到结果页）。
-- `test_time_range_e2e.py` 的每个用例也从首页出发，先完成选股/选策略/选模式，再验证时间段功能。
-- 页面专项断言可以保留，但不得绕过主流程作为唯一验证方式。
+- GUI 测试优先验证完整用户流程。
+- `test_gui_backtest_report_e2e.py` 是唯一的完整回测报告入口。
+- 该测试会把 8 张步骤截图和 `testing/guitest.md` 统一输出到 `testing/`。
+- 页面专项测试可以保留，但不再承担 test-gui 主流程产物职责。
 
 使用指南：
 
@@ -17,39 +17,16 @@
    python -m pip install -r requirements.txt
    ```
 
-2. 第一次运行测试时，Playwright 需要下载浏览器二进制文件。
-   为了简化本地开发，我们已在 `tests/guitests/__init__.py` 中
-   添加了自动检查逻辑——只要导入任何 guitests 模块，
-   就会尝试启动 Chromium。若二进制文件缺失，会自动调用：
+2. Playwright 浏览器只会在完整浏览器测试启动前显式检查；若缺少浏览器或系统依赖，会自动执行 `playwright install --with-deps chromium`。
+
+3. 运行完整 GUI 回测报告测试
 
    ```bash
-   python -m playwright install chromium
-   python -m playwright install-deps chromium
+   python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
    ```
 
-   因此通常无需手动执行上述命令，但如果你的网络环境
-   较差，也可以手动运行以节省首次测试时间。
+4. 运行后检查 `testing/`：
 
-3. 运行端到端测试
-
-   ```bash
-   python -m unittest tests.guitests.test_time_range_e2e
-   python -m unittest tests.guitests.test_gui_workflow_e2e
-   ```
-
-   或者直接运行全部测试：
-
-   ```bash
-   python -m unittest discover
-   ```
-
-4. 截图脚本
-
-   这些脚本依赖 Playwright 浏览器，执行前会自动进行
-   安装检测。可以通过类似以下命令调用：
-
-   ```bash
-   python -m tests.guitests.screenshot_time_range
-   ```
-
+   - `01_open_home.png` 到 `08_backtest_result.png`
+   - `guitest.md`
 """

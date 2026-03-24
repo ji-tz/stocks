@@ -19,7 +19,8 @@
 
 4. **测试**
    - 单元/集成测试放在根目录 `tests/`。
-   - GUI 端到端测试位于 `tests/guitests/`，使用 Playwright；还有截图脚本供文档和 PR 使用。
+   - GUI 端到端测试位于 `tests/guitests/`，使用 Playwright。
+   - `tests/guitests/test_gui_backtest_report_e2e.py` 会完成一次完整量化回测，并把截图与 `testing/guitest.md` 输出到 `testing/`。
    - 测试工具如 `tests/test_utils.py` 提供通用 helper 函数。
 
 5. **运行入口**
@@ -39,18 +40,13 @@
 
 ## Playwright & GUI 测试特殊说明
 - `tests/guitests/__init__.py` 会在模块导入时检查并自动安装 Chromium 浏览器。
-- 截图脚本（`tests/guitests/screenshot_*.py`）同样调用该逻辑以便独立运行。
 - GUI 测试通过 `unittest` 直接运行，推荐命令
   ```bash
-  python -m unittest tests.guitests.test_time_range_e2e
-  python -m unittest tests.guitests.test_gui_workflow_e2e
+   python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
   ```
   或 `python -m unittest discover` 执行全部。
-- 所有 GUI 测试结果需要将截图添加到 PR，CI workflow 会自动存储并显示。
-- PR 评论区截图渲染走 GitLab 上传接口（见 `.github/workflows/testgui.yml`）：
-   - 需要配置 secrets：`GITLAB_PROJECT_ID`、`GITLAB_TOKEN`
-   - 可选 secrets：`GITLAB_API_URL`（默认 `https://gitlab.com/api/v4`）、`GITLAB_BASE_URL`
-   - 若未配置 GitLab secrets，workflow 会自动回退为 Artifact 链接，不会阻塞测试通过。
+- 完整 GUI 测试会在 `testing/` 下输出 8 张截图与 `guitest.md`。
+- `testgui.yml` 会上传 `testing/`，并将 `testing/guitest.md` 评论到 PR。
 
 ## 典型开发/调试流程
 1. 阅读根目录 `README.md` 了解功能和用户操作流。
@@ -63,7 +59,7 @@
    ```
    也可使用 `runTests` 工具针对单个文件。
 6. 如果涉及 Playwright，请注意首次运行时可能需要下载浏览器（自动完成）。
-7. 确保截图脚本可执行并生成图片，便于在 PR 中展示。
+7. 确保 `testing/` 已生成截图与 `guitest.md`，便于在 PR 中展示。
 8. 提交并附带中文 commit 信息。
 
 ## 代码和风格约定
@@ -79,7 +75,8 @@
 | `stocks.py` | 回测核心 API；数据缓存与策略调度。 |
 | `gui/web.py` | Flask 路由、Session 管理、回测启动逻辑。|
 | `gui/templates/*.html` | 页面模板，注意表单字段名称与后端对应。|
-| `tests/guitests/*.py` | End‑to‑end GUI 测试和截图脚本。|
+| `tests/guitests/*.py` | End‑to‑end GUI 测试。|
+| `testing/` | GUI 主流程截图与 Markdown 报告输出目录。|
 | `tests/test_utils.py` | 测试工具，如随机股票选择。|
 | `docs/` | 文档目录，包含流程图和测试指南。|
 

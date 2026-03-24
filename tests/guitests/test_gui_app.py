@@ -1,16 +1,23 @@
 import json
+import os
 import re
 import time
 import unittest
 from unittest.mock import patch
 
+from gui import web as web_module
 from gui.web import app
 import pandas as pd
 
 
 class TestGuiRoutes(unittest.TestCase):
     def setUp(self):
+        self._previous_testing = app.testing
+        app.testing = True
         self.client = app.test_client()
+
+    def tearDown(self):
+        app.testing = self._previous_testing
 
     def _extract_task_id(self, body: str) -> str:
         match = re.search(r"const taskId = '([^']+)'", body)
@@ -285,6 +292,12 @@ class TestGuiRoutes(unittest.TestCase):
         # 验证JavaScript验证函数
         self.assertIn('function validateDates', body)
         self.assertIn('function setPreset', body)
+        self.assertIn('id="time-range-chart"', body)
+        self.assertIn('refresh-cache-btn', body)
+        self.assertIn('function refreshChart', body)
+        self.assertIn('function refreshCacheAndReload', body)
+        self.assertIn('const stockCode = "600900"', body)
+        self.assertIn('yesterday.setDate(yesterday.getDate() - 1)', body)
 
     def test_select_time_range_api_post(self):
         """测试保存回测时间段API"""
@@ -330,6 +343,99 @@ class TestGuiRoutes(unittest.TestCase):
         with self.client.session_transaction() as sess:
             self.assertEqual(sess.get('backtest_start'), '')
             self.assertEqual(sess.get('backtest_end'), '')
+
+    @patch('stocks.get_data')
+    def test_stock_chart_api_success(self, mock_get):
+        """测试时间段页走势图数据接口"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        mock_get.return_value = pd.DataFrame({
+            'date': pd.to_datetime(['2023-01-03', '2023-01-04', '2023-01-05']),
+            'open': [24.1, 24.3, 24.6],
+            'high': [24.5, 24.7, 24.9],
+            'low': [23.9, 24.1, 24.3],
+            'close': [24.2, 24.4, 24.7],
+            'volume': [1000, 1200, 1300],
+        })
+
+        rv = self.client.get('/api/stock_chart/600900?start=20230103&end=20230105')
+        self.assertEqual(rv.status_code, 200)
+        data = rv.get_json()
+        self.assertEqual(data['stock_code'], '600900')
+        self.assertEqual(data['labels'], ['2023-01-03', '2023-01-04', '2023-01-05'])
+        self.assertEqual(data['open_prices'], [24.1, 24.3, 24.6])
+        self.assertEqual(data['price_field'], 'open')
+        self.assertEqual(data['points'], 3)
+
+    def test_stock_chart_api_requires_selected_stock(self):
+        """测试未选股票时走势图接口返回错误"""
+        rv = self.client.get('/api/stock_chart/600900')
+        self.assertEqual(rv.status_code, 400)
+        data = rv.get_json()
+        self.assertIn('error', data)
+
+    @patch('stocks.get_data')
+    @patch('gui.web.os.remove')
+    @patch('gui.web.os.path.isfile')
+    @patch('gui.web.os.listdir')
+    @patch('gui.web.os.path.isdir')
+    def test_refresh_cache_api_success(self, mock_isdir, mock_listdir, mock_isfile, mock_remove, mock_get):
+        """测试清除缓存并自动重下当前股票数据"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        mock_isdir.return_value = True
+        mock_listdir.return_value = ['600900.csv', '000001.csv', 'README.md']
+        mock_isfile.return_value = True
+        mock_get.side_effect = [
+            pd.DataFrame({
+                'date': pd.to_datetime(['2022-12-30', '2023-01-03', '2023-01-04']),
+                'open': [23.8, 24.1, 24.3],
+                'high': [24.0, 24.4, 24.7],
+                'low': [23.5, 23.9, 24.0],
+                'close': [23.9, 24.2, 24.5],
+                'volume': [900, 1000, 1100],
+            }),
+            pd.DataFrame({
+                'date': pd.to_datetime(['2023-01-03', '2023-01-04']),
+                'open': [24.1, 24.3],
+                'high': [24.4, 24.7],
+                'low': [23.9, 24.0],
+                'close': [24.2, 24.5],
+                'volume': [1000, 1100],
+            }),
+        ]
+
+        rv = self.client.post(
+            '/api/stock_chart/600900/refresh_cache',
+            json={'start': '20230103', 'end': '20230104'},
+            content_type='application/json'
+        )
+        self.assertEqual(rv.status_code, 200)
+        data = rv.get_json()
+        self.assertTrue(data['refreshed'])
+        self.assertEqual(data['removed_cache_files'], 2)
+        self.assertEqual(data['labels'], ['2023-01-03', '2023-01-04'])
+        self.assertEqual(data['open_prices'], [24.1, 24.3])
+        cache_dir = web_module._get_cache_dir()
+        mock_remove.assert_any_call(os.path.join(cache_dir, '600900.csv'))
+        mock_remove.assert_any_call(os.path.join(cache_dir, '000001.csv'))
+        self.assertEqual(mock_get.call_count, 2)
+        rebuild_call = mock_get.call_args_list[0].kwargs
+        self.assertEqual(rebuild_call['start_date'], '20230103')
+        self.assertEqual(rebuild_call['end_date'], '20230104')
+        self.assertTrue(rebuild_call['force_refresh'])
+        self.assertEqual(rebuild_call['buffer_days'], 5)
+
+    def test_refresh_cache_api_requires_selected_stock(self):
+        """测试未选股票时无法清缓存重下"""
+        rv = self.client.post('/api/stock_chart/600900/refresh_cache', json={})
+        self.assertEqual(rv.status_code, 400)
+        data = rv.get_json()
+        self.assertIn('error', data)
 
     @patch('stocks.get_data')
     @patch('stocks.run_sma_backtest')

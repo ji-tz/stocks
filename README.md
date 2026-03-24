@@ -1,6 +1,6 @@
 # 量化股票回测系统 Stocks
 
-一个基于 Python 的量化股票回测系统，集成了 Backtrader 策略和 AKShare 数据获取，支持Web界面操作和自动化CI/CD流程。
+一个基于 Python 的量化股票回测系统，基于统一模拟交易模型和 AKShare 数据获取，支持Web界面操作和自动化CI/CD流程。
 
 [![Python Version](https://img.shields.io/badge/python-3.12+-blue.svg)](https://www.python.org/downloads/)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -11,6 +11,7 @@
 - 🚀 **开箱即用**: 提供 Web 界面、命令行工具、Python API 三种使用方式
 - 📊 **多数据源**: 支持 AKShare、Baostock 自动切换，数据稳定可靠
 - 🎯 **策略灵活**: 内置 SMA、定投策略，支持自定义策略扩展
+- 🧩 **统一回测入口**: 通用参数、策略参数和交易时点通过统一请求对象组织，便于扩展新策略
 - 🔍 **详细日志**: verbose 模式提供每日交易明细，便于调试分析
 - 🏗️ **架构清晰**: 分层设计，模拟交易引擎与实盘接口解耦，易于扩展
 - 🧪 **测试完善**: 单元测试、集成测试、CI/CD 全流程自动化
@@ -22,6 +23,12 @@
 - **SMA策略**: 基于简单移动平均线的交易策略
 - **均值成本策略**: 低于成本时买入，高于成本时卖出
 - **定投策略**: 每天投入固定金额，自动计算购买股数，适合长期投资
+
+### 回测执行约定
+- 当前策略统一以开盘价作为成交时点，先保证现有功能稳定。
+- 回测通用参数包括股票、时间范围、初始资金、交易手数、数据源。
+- 策略专属参数通过统一注册表管理，例如 `SMA` 的 `period`、定投的 `fixed_amount`。
+- 新增策略时，优先补充策略注册信息并复用现有模拟交易和数据获取能力。
 
 ### 2. 数据获取
 - 支持 AKShare 和 Baostock 多数据源
@@ -39,7 +46,7 @@
 
 - **Lint**：静态检查（Pylint / Flake8 / Mypy）
 - **Test**：运行单元测试、集成测试和GUI截图测试，将测试日志评论到PR中
-- **Test GUI**：专注于GUI截图测试，将界面截图评论到PR中
+- **Test GUI**：执行一次完整 GUI 回测，生成 testing 目录产物并将报告评论到 PR 中
 - **Package**：打包产物 + Release（tag）
 
 详情见 [.github/workflows/README.md](.github/workflows/README.md)。
@@ -62,16 +69,16 @@ stocks/
 ├── source/                # 数据源
 │   └── data_provider.py  # 数据提供者
 ├── tests/                 # 单元测试
-│   ├── guitests/          # GUI测试与截图脚本
-│   │   └── screenshot_main.py  # GUI截图脚本（统一入口）
+│   ├── guitests/          # GUI测试
+│   │   └── test_gui_backtest_report_e2e.py  # GUI完整回测与报告生成
 │   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 ├── data/                  # 本地数据缓存
-├── screenshot_main.py     # GUI截图脚本（统一入口）
+├── testing/               # GUI测试截图与Markdown报告输出目录
 └── .github/
     └── workflows/
         ├── lint.yml       # 代码检视工作流
         ├── test.yml       # 单元测试和集成测试工作流
-        ├── testgui.yml    # GUI截图测试工作流
+      ├── testgui.yml    # GUI完整回测报告工作流
         └── package.yml    # 打包工作流
 ```
 
@@ -186,18 +193,15 @@ flake8 .
 mypy stocks.py main.py --config-file=mypy.ini
 ```
 
-### GUI 截图
+### GUI 回测报告
 
 ```bash
-# 需要先安装playwright浏览器
-playwright install chromium
-
-# 运行统一截图脚本（推荐）
-python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-python tests/guitests/screenshot_main.py all --output-dir screenshots
+# 运行完整GUI回测报告测试
+python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 
 ```
+
+执行后会在 `testing/` 目录下生成 8 张步骤截图和 `guitest.md`。
 
 ## 命令行工具
 
@@ -322,25 +326,21 @@ python demo_simulator.py
 
 ### 3. 🖼️ Test GUI 工作流 (`.github/workflows/testgui.yml`)
 
-**GUI 截图测试** - 专注于界面截图和可视化反馈
+**GUI 完整回测报告测试** - 专注于一次真实回测和统一报告产物
 
 触发条件：
 - 推送到 main 分支
 - 创建 Pull Request
 
 测试内容：
-1. **主界面截图** - 应用主界面
-2. **策略配置截图** - SMA、均值成本、定投策略配置界面
-3. **完整工作流截图** - 从选股到回测的完整流程
-4. **股票集成测试** - 随机选择股票进行回测
+1. **完整 GUI 主流程** - 从首页到结果页完成一次真实回测
+2. **testing 截图产物** - 固定输出 8 张步骤截图
+3. **Markdown 报告产物** - 生成 `testing/guitest.md`
+4. **PR 评论同步** - 直接读取 `testing/guitest.md` 更新 PR 评论
 
 输出产物：
-- GUI 截图上传到 Artifacts（保留30天）
-- 测试结果 JSON 上传到 Artifacts
-- **自动在 PR 中评论 GUI 测试报告**（包含截图和收益数据）
-- **图片显示方式**：
-  - 小于 1MB 的图片使用 base64 编码直接嵌入评论显示
-  - 大于 1MB 的图片提供 Artifacts 下载链接
+- `testing/` 目录上传到 Artifacts（保留30天）
+- **自动在 PR 中评论 GUI 测试报告**（内容来自 `testing/guitest.md`）
 
 ### 4. 📦 Package 工作流 (`.github/workflows/package.yml`)
 
@@ -367,7 +367,7 @@ python demo_simulator.py
 
 - **Lint**: 无需特殊权限
 - **Test**: `contents: write`, `pull-requests: write`（用于评论测试日志到PR）
-- **Test GUI**: `contents: write`, `pull-requests: write`（用于评论截图到PR）
+- **Test GUI**: `contents: read`, `pull-requests: write`, `issues: write`（用于评论 GUI 报告到 PR）
 - **Package**: `contents: write`（用于创建 Release）
 
 ## 环境要求
@@ -378,7 +378,7 @@ python demo_simulator.py
 
 ## 主要依赖
 
-- **backtrader**: 量化回测框架
+- **统一模拟器**: 回测执行核心，负责策略驱动和成交撮合
 - **akshare/baostock**: 股票数据源
 - **pandas**: 数据处理
 - **matplotlib**: 图表生成
@@ -573,7 +573,6 @@ result = sim.simulate(df=data, strategy=strategy, verbose=True)
 ## 致谢
 
 本项目使用了以下优秀的开源项目：
-- [Backtrader](https://www.backtrader.com/) - 量化回测框架
 - [AKShare](https://github.com/akfamily/akshare) - 金融数据接口
 - [Baostock](http://baostock.com/) - 证券数据平台
 - [Flask](https://flask.palletsprojects.com/) - Web 框架
