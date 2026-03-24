@@ -1,8 +1,7 @@
 """GUI 测试包初始化。
 
-包含在此模块中的代码会在任何 guitests 子模块导入时执行。
-我们在这里确保 Playwright 的浏览器已经安装，以便
-在开发者机器上运行测试时不会因为未安装浏览器而失败。
+仅提供 Playwright Chromium 的显式安装检查工具，避免在导入任意
+guitests 子模块时触发浏览器启动，从而让非浏览器测试保持轻量稳定。
 """
 
 import subprocess
@@ -33,7 +32,3 @@ def _ensure_playwright_chromium():
         else:
             # 如果是其他错误，则重新抛出
             raise
-
-
-# 在模块导入时执行安装检查
-_ensure_playwright_chromium()

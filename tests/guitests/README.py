@@ -17,7 +17,7 @@
    python -m pip install -r requirements.txt
    ```
 
-2. Playwright 浏览器会在导入 `tests.guitests` 时自动检查；若缺失，会自动安装 Chromium。
+2. Playwright 浏览器只会在完整浏览器测试启动前显式检查；若缺失，会自动安装 Chromium。
 
 3. 运行完整 GUI 回测报告测试
 

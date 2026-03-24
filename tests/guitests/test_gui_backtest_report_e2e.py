@@ -17,6 +17,7 @@ from pathlib import Path
 from urllib.request import urlopen
 
 from playwright.sync_api import expect, sync_playwright
+from tests.guitests import _ensure_playwright_chromium
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -43,6 +44,7 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls) -> None:
+        _ensure_playwright_chromium()
         shutil.rmtree(TESTING_DIR, ignore_errors=True)
         TESTING_DIR.mkdir(parents=True, exist_ok=True)
         cls.server_process = subprocess.Popen(
