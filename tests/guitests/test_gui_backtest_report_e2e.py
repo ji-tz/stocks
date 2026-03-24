@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import os
+import socket
 import shutil
 import subprocess
 import sys
@@ -21,17 +22,23 @@ from tests.guitests import _ensure_playwright_chromium
 
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
-BASE_URL = "http://127.0.0.1:5001"
 TESTING_DIR = ROOT_DIR / "testing"
 REPORT_PATH = TESTING_DIR / "guitest.md"
 
 
-def _wait_for_server_ready(timeout: float = 15.0) -> None:
+def _allocate_local_port() -> int:
+    """分配本地空闲端口，避免 CI 上固定端口冲突。"""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
+def _wait_for_server_ready(base_url: str, timeout: float = 15.0) -> None:
     """等待 Flask 服务启动完成。"""
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
-            with urlopen(f"{BASE_URL}/", timeout=2) as response:
+            with urlopen(f"{base_url}/", timeout=2) as response:
                 if response.status == 200:
                     return
         except Exception:
@@ -45,6 +52,8 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         _ensure_playwright_chromium()
+        cls.server_port = _allocate_local_port()
+        cls.base_url = f"http://127.0.0.1:{cls.server_port}"
         shutil.rmtree(TESTING_DIR, ignore_errors=True)
         TESTING_DIR.mkdir(parents=True, exist_ok=True)
         cls.server_process = subprocess.Popen(
@@ -52,9 +61,9 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=str(ROOT_DIR),
-            env={**os.environ, "FLASK_ENV": "production", "PORT": "5001"},
+            env={**os.environ, "FLASK_ENV": "production", "PORT": str(cls.server_port)},
         )
-        _wait_for_server_ready()
+        _wait_for_server_ready(cls.base_url)
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -122,7 +131,7 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
             context = browser.new_context(viewport={"width": 1440, "height": 1024})
             page = context.new_page()
 
-            page.goto(f"{BASE_URL}/", wait_until="networkidle")
+            page.goto(f"{self.base_url}/", wait_until="networkidle")
             page.wait_for_selector("#search-input", timeout=30000)
             steps.append(
                 (
