@@ -1,7 +1,28 @@
 const fs = require('fs');
 const path = require('path');
 
-async function commentGuitestReport({ github, context, core, artifactName = 'guitest-report' }) {
+function rewriteImageLinks(markdown, imageBaseUrl) {
+  if (!imageBaseUrl) {
+    return markdown;
+  }
+  const normalizedBase = imageBaseUrl.replace(/\/$/, '');
+  return markdown.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, (full, alt, link) => {
+    const trimmed = String(link).trim();
+    if (!trimmed || /^(https?:)?\/\//i.test(trimmed) || /^data:/i.test(trimmed)) {
+      return full;
+    }
+    const fileName = path.basename(trimmed);
+    return `![${alt}](${normalizedBase}/${encodeURIComponent(fileName)})`;
+  });
+}
+
+async function commentGuitestReport({
+  github,
+  context,
+  core,
+  artifactName = 'guitest-report',
+  imageBaseUrl = process.env.GUITEST_IMAGE_BASE_URL || '',
+}) {
   const workspace = process.env.GITHUB_WORKSPACE || process.cwd();
   const reportPath = path.join(workspace, 'testing', 'guitest.md');
   const marker = '<!-- guitest-report -->';
@@ -12,11 +33,12 @@ async function commentGuitestReport({ github, context, core, artifactName = 'gui
   }
 
   const reportBody = fs.readFileSync(reportPath, 'utf8').trim();
+  const renderedReportBody = rewriteImageLinks(reportBody, imageBaseUrl);
   const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
   const artifactUrl = `${runUrl}/artifacts`;
   const commentBody = [
     marker,
-    reportBody,
+    renderedReportBody,
     '',
     '---',
     `- Workflow 运行：[#${context.runId}](${runUrl})`,
@@ -50,4 +72,4 @@ async function commentGuitestReport({ github, context, core, artifactName = 'gui
   });
 }
 
-module.exports = { commentGuitestReport };
+module.exports = { commentGuitestReport, rewriteImageLinks };

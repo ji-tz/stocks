@@ -8,7 +8,8 @@
 - tests/guitests/test_gui_app.py 不再硬编码本机缓存目录绝对路径，改为读取 gui.web 运行时缓存目录，避免仅在本地路径下通过、在 GitHub Runner 路径下失败。
 - tests/guitests/test_gui_backtest_report_e2e.py 改为运行时分配空闲端口启动 Flask，避免 CI 上固定 5001 端口冲突导致的偶发失败。
 - 所有截图与测试报告统一输出到 testing/。
-- PR 评论内容直接读取 testing/guitest.md。
+- PR 评论内容读取 testing/guitest.md 后，会将相对图片链接改写为公开绝对 URL，避免评论区无法渲染图片。
+- testgui workflow 会将 testing 目录发布到 guitest-assets 分支的 runs/<run_id>/ 路径，供评论区直接加载图片。
 - 评论脚本位于 .github/scripts/comment_guitest_report.js。
 - tests/test_stocks.py 额外覆盖策略注册表、统一回测请求校验，以及 run_backtest 的分发逻辑。
 - tests/test_run_sma.py 与 tests/test_integration.py 已改为验证统一模拟器下的 SMA 结果契约；requirements.txt 与 .github/workflows/test.yml 中也不再安装 backtrader。
