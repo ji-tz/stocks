@@ -417,6 +417,11 @@ class TestGuiRoutes(unittest.TestCase):
         mock_remove.assert_any_call(os.path.join('/home/jitz/workspace/stocks/data', '600900.csv'))
         mock_remove.assert_any_call(os.path.join('/home/jitz/workspace/stocks/data', '000001.csv'))
         self.assertEqual(mock_get.call_count, 2)
+        rebuild_call = mock_get.call_args_list[0].kwargs
+        self.assertEqual(rebuild_call['start_date'], '20230103')
+        self.assertEqual(rebuild_call['end_date'], '20230104')
+        self.assertTrue(rebuild_call['force_refresh'])
+        self.assertEqual(rebuild_call['buffer_days'], 5)
 
     def test_refresh_cache_api_requires_selected_stock(self):
         """测试未选股票时无法清缓存重下"""

@@ -24,6 +24,11 @@
 - `test_data_provider_cache.py` - 测试数据提供者缓存功能
 - `test_cache_utils.py` - 测试缓存工具函数
 
+缓存测试重点包括：
+- 命中缓存后的按时间段裁剪
+- `force_refresh=True` 时绕过旧缓存并重建
+- `buffer_days` 会在实际下载时扩展前后日期，但最终返回值仍裁剪到原始请求区间
+
 ### 界面测试
 - **`guitests/test_gui_app.py`** - **[已更新]** 使用 Playwright 进行真实浏览器交互测试
   - 使用真实的Chromium浏览器进行测试

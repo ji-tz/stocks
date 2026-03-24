@@ -80,6 +80,19 @@ def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', 
     }
 
 
+def _rebuild_chart_cache(stock_code: str, start: str = '', end: str = '', source: str = 'auto') -> None:
+    """按当前请求区间强制重建当前股票缓存。"""
+    stocks.get_data(
+        symbol=stock_code,
+        source=source,
+        start_date=start or None,
+        end_date=end or None,
+        cache_dir=_get_cache_dir(),
+        force_refresh=True,
+        buffer_days=5,
+    )
+
+
 def _clear_all_cache_files() -> int:
     """清理 data 目录下所有 CSV 缓存文件。"""
     cache_dir = _get_cache_dir()
@@ -366,8 +379,8 @@ def refresh_stock_chart_cache(stock_code):
             data.get('end', ''),
         )
         removed_files = _clear_all_cache_files()
-        # 清缓存后先重新下载当前股票的完整日线数据，再按当前时间段返回开盘价走势。
-        stocks.get_data(symbol=stock_code, source='auto', cache_dir=_get_cache_dir())
+        # 清缓存后按当前请求区间强制重建，并在下载时扩展前后缓冲天数，降低边界日期不稳定问题。
+        _rebuild_chart_cache(stock_code=stock_code, start=start, end=end)
         payload = _build_stock_chart_payload(stock_code=stock_code, start=start, end=end)
         payload['removed_cache_files'] = removed_files
         payload['refreshed'] = True

@@ -56,6 +56,17 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(called_kwargs.get('end_date'), '20230103')
 
     @patch('stocks._get_data')
+    def test_get_data_passes_force_refresh_and_buffer_days(self, mock_get):
+        mock_get.return_value = make_mock_df(3)
+        stocks.get_data(
+            symbol='600900', source='auto', start_date='20230101', end_date='20230103',
+            force_refresh=True, buffer_days=7,
+        )
+        called_kwargs = mock_get.call_args.kwargs
+        self.assertTrue(called_kwargs.get('force_refresh'))
+        self.assertEqual(called_kwargs.get('buffer_days'), 7)
+
+    @patch('stocks._get_data')
     def test_get_data_filters_returned_df_by_date(self, mock_get):
         # Create a dataframe spanning several dates
         dates = pd.date_range(start='2023-01-01', periods=10, freq='D')

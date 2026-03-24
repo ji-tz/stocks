@@ -18,6 +18,9 @@ except Exception:
 from .akshare_provider import AkshareProvider
 from .baostock_provider import BaostockProvider
 
+
+DEFAULT_FETCH_BUFFER_DAYS = 5
+
 def _ensure_cache_dir(cache_dir: str):
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -40,11 +43,54 @@ def _save_cache(df: pd.DataFrame, cache_file: str):
         pass
 
 
-def _read_cache(cache_file: str, start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame | None:
-    """Read cache file and optionally filter by start/end (supports YYYYMMDD and YYYY-MM-DD).
+def _parse_date_input(value: str | None):
+    """将用户输入日期解析为 pandas 时间。"""
+    if value is None:
+        return None
+    value = str(value).strip()
+    if value == "":
+        return None
+    import re
+    if re.fullmatch(r"\d{8}", value):
+        return pd.to_datetime(value, format="%Y%m%d")
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        return pd.to_datetime(value, format="%Y-%m-%d")
+    return pd.to_datetime(value)
 
-    Returns filtered DataFrame or None if cache not present or invalid.
-    """
+
+def _format_date_for_source(value, source_name: str) -> str | None:
+    """按数据源要求输出日期格式。"""
+    if value is None:
+        return None
+    timestamp = pd.to_datetime(value)
+    if source_name == 'baostock':
+        return timestamp.strftime('%Y-%m-%d')
+    return timestamp.strftime('%Y%m%d')
+
+
+def _expand_fetch_range(start_date: str | None,
+                        end_date: str | None,
+                        buffer_days: int) -> tuple[str | None, str | None]:
+    """按配置为下载请求扩展前后缓冲天数。"""
+    start_dt = _parse_date_input(start_date)
+    end_dt = _parse_date_input(end_date)
+
+    if buffer_days <= 0:
+        return start_date, end_date
+
+    if start_dt is not None:
+        start_dt = start_dt - pd.Timedelta(days=buffer_days)
+    if end_dt is not None:
+        end_dt = end_dt + pd.Timedelta(days=buffer_days)
+
+    return (
+        _format_date_for_source(start_dt, 'baostock' if isinstance(start_date, str) and '-' in start_date else 'akshare') if start_dt is not None else start_date,
+        _format_date_for_source(end_dt, 'baostock' if isinstance(end_date, str) and '-' in end_date else 'akshare') if end_dt is not None else end_date,
+    )
+
+
+def _read_cache_raw(cache_file: str) -> pd.DataFrame | None:
+    """读取完整缓存，不做时间裁剪。"""
     if not os.path.exists(cache_file):
         return None
     try:
@@ -52,23 +98,24 @@ def _read_cache(cache_file: str, start_date: str | None = None, end_date: str | 
         req_cols = ["date", "open", "high", "low", "close", "volume"]
         if not set(req_cols).issubset(cached.columns):
             return None
+        return cached.loc[:, req_cols].sort_values('date').reset_index(drop=True)
+    except Exception:
+        return None
 
-        def _parse_date_input(s: str | None):
-            if s is None:
-                return None
-            s = str(s).strip()
-            if s == "":
-                return None
-            import re
-            if re.fullmatch(r"\d{8}", s):
-                return pd.to_datetime(s, format="%Y%m%d")
-            if re.fullmatch(r"\d{4}-\d{2}-\d{2}", s):
-                return pd.to_datetime(s, format="%Y-%m-%d")
-            return pd.to_datetime(s)
 
+def _read_cache(cache_file: str, start_date: str | None = None, end_date: str | None = None) -> pd.DataFrame | None:
+    """Read cache file and optionally filter by start/end (supports YYYYMMDD and YYYY-MM-DD).
+
+    Returns filtered DataFrame or None if cache not present or invalid.
+    """
+    cached = _read_cache_raw(cache_file)
+    if cached is None:
+        return None
+
+    try:
         sd = _parse_date_input(start_date)
         ed = _parse_date_input(end_date)
-        out = cached.loc[:, req_cols]
+        out = cached
         if sd is not None:
             out = out[out['date'] >= sd]
         if ed is not None:
@@ -111,7 +158,9 @@ def get_data(symbol: str = "600900",
              start_date: str = "19700101",
              end_date: str = "20500101",
              cache_dir: str = "data",
-             max_attempts: int = 3) -> pd.DataFrame:
+             max_attempts: int = 3,
+             force_refresh: bool = False,
+             buffer_days: int = DEFAULT_FETCH_BUFFER_DAYS) -> pd.DataFrame:
     """
     获取日线数据的统一接口。
 
@@ -129,23 +178,22 @@ def get_data(symbol: str = "600900",
 
     # 优先尝试从缓存读取（并按时间范围过滤）。使用抽象化函数以便复用。
     cached_out = _read_cache(cache_file, start_date=start_date, end_date=end_date)
-    if cached_out is not None:
+    cached_raw = _read_cache_raw(cache_file)
+    if not force_refresh and cached_out is not None:
         # 如果请求了具体区间，且缓存能覆盖该区间（包含边界），直接返回
         try:
             if start_date or end_date:
                 # 判断缓存覆盖情况
-                if not cached_out.empty:
-                    min_dt = cached_out['date'].min()
-                    max_dt = cached_out['date'].max()
+                if cached_raw is not None and not cached_raw.empty:
+                    min_dt = cached_raw['date'].min()
+                    max_dt = cached_raw['date'].max()
                     ok_start = True
                     ok_end = True
                     if start_date:
-                        import re
-                        sd = pd.to_datetime(start_date, format="%Y%m%d") if re.fullmatch(r"\d{8}", str(start_date)) else pd.to_datetime(start_date)
+                        sd = _parse_date_input(start_date)
                         ok_start = (min_dt <= sd)
                     if end_date:
-                        import re
-                        ed = pd.to_datetime(end_date, format="%Y%m%d") if re.fullmatch(r"\d{8}", str(end_date)) else pd.to_datetime(end_date)
+                        ed = _parse_date_input(end_date)
                         ok_end = (max_dt >= ed)
                     if ok_start and ok_end:
                         return cached_out
@@ -186,7 +234,14 @@ def get_data(symbol: str = "600900",
 
         provider = provider_map[src]()
         try:
-            df = provider.fetch(symbol=symbol, start_date=start_date, end_date=end_date)
+            fetch_start = start_date
+            fetch_end = end_date
+            if start_date or end_date:
+                request_start, request_end = _expand_fetch_range(start_date, end_date, buffer_days)
+                fetch_start = _format_date_for_source(_parse_date_input(request_start), src) if request_start else request_start
+                fetch_end = _format_date_for_source(_parse_date_input(request_end), src) if request_end else request_end
+
+            df = provider.fetch(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
             if df is None or df.empty:
                 errors.append((src, "no data returned"))
                 continue

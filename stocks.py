@@ -130,7 +130,9 @@ def get_data(symbol: str = "600900",
              start_date: Optional[str] = None,
              end_date: Optional[str] = None,
              cache_dir: str = "data",
-             max_attempts: int = 3):
+             max_attempts: int = 3,
+             force_refresh: bool = False,
+             buffer_days: int = 5):
     """获取数据，直接调用 `source.data_provider.get_data`。
 
     该函数是 tests 应该直接调用的入口。
@@ -143,9 +145,12 @@ def get_data(symbol: str = "600900",
 
     # 如果没有传入日期参数，则不显式将 start_date/end_date 传给底层，使用底层默认行为（避免传 None 给 provider）
     if sd is None and ed is None:
-        df = _get_data(symbol=symbol, source=source, cache_dir=cache_dir, max_attempts=max_attempts)
+        df = _get_data(symbol=symbol, source=source, cache_dir=cache_dir, max_attempts=max_attempts,
+                       force_refresh=force_refresh, buffer_days=buffer_days)
     else:
-        df = _get_data(symbol=symbol, source=source, start_date=normalized_start or start_date, end_date=normalized_end or end_date, cache_dir=cache_dir, max_attempts=max_attempts)
+        df = _get_data(symbol=symbol, source=source, start_date=normalized_start or start_date,
+                       end_date=normalized_end or end_date, cache_dir=cache_dir, max_attempts=max_attempts,
+                       force_refresh=force_refresh, buffer_days=buffer_days)
 
     # 无论底层如何返回（例如从缓存返回整表），在这里对返回的数据按传入的 start/end 进行二次过滤，
     # 以确保前端传入的时间段生效。

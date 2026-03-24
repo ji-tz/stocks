@@ -378,6 +378,7 @@
       const refreshCacheBtn = document.getElementById('refresh-cache-btn');
       const submitBtn = document.querySelector('.submit-btn');
       let timeRangeChart = null;
+      let refreshChartTimer = null;
 
       function setChartStatus(message, type) {
         chartStatus.textContent = message;
@@ -467,6 +468,15 @@
         }
 
         const range = getSelectedRange();
+        if (!range.start && !range.end) {
+          chartMeta.textContent = '请选择时间段后再加载走势图；如保持留空，提交时将使用全部历史数据。';
+          setChartStatus('当前未选择时间段，暂不自动加载全历史走势图。', 'info');
+          if (timeRangeChart) {
+            timeRangeChart.destroy();
+            timeRangeChart = null;
+          }
+          return Promise.resolve();
+        }
         const params = new URLSearchParams(range);
         if (showLoading) {
           setChartStatus('正在加载走势图...', 'info');
@@ -492,6 +502,11 @@
       function refreshCacheAndReload() {
         if (!validateDates()) {
           return;
+        }
+
+        if (refreshChartTimer) {
+          clearTimeout(refreshChartTimer);
+          refreshChartTimer = null;
         }
 
         setBusy(true);
@@ -522,9 +537,24 @@
         });
       }
 
+      function scheduleChartRefresh() {
+        if (refreshChartTimer) {
+          clearTimeout(refreshChartTimer);
+        }
+        refreshChartTimer = setTimeout(() => {
+          refreshChartTimer = null;
+          refreshChart(false);
+        }, 300);
+      }
+
       // 表单提交
       document.getElementById('timeRangeForm').addEventListener('submit', function(e) {
         e.preventDefault();
+
+        if (refreshChartTimer) {
+          clearTimeout(refreshChartTimer);
+          refreshChartTimer = null;
+        }
         
         if (!validateDates()) {
           return false;
@@ -567,12 +597,12 @@
       // 实时验证
       startInput.addEventListener('change', function() {
         if (validateDates()) {
-          refreshChart(false);
+          scheduleChartRefresh();
         }
       });
       endInput.addEventListener('change', function() {
         if (validateDates()) {
-          refreshChart(false);
+          scheduleChartRefresh();
         }
       });
       refreshCacheBtn.addEventListener('click', refreshCacheAndReload);
