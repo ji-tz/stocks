@@ -12,3 +12,4 @@ build/
 .mypy_cache/
 data/*.csv
 data/backtest_records.json
+testing

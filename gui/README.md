@@ -385,16 +385,17 @@ with sync_playwright() as p:
 - 关键 UI 元素添加了 `data-testid` 属性以提高 E2E 交互测试的稳定性
 - **截图测试**：推荐使用 `page.goto()` 直接导航，避免点击操作的不确定性
 - **交互测试**：推荐使用 `data-testid` 或 CSS 类选择器，而非文本选择器（避免 emoji 和文本变化导致的不稳定）
-- 详见 `tests/guitests/screenshot_main.py` 中的实现
+- 完整流程实现详见 `tests/guitests/test_gui_backtest_report_e2e.py`
 
-### GUI 截图脚本
+### GUI 回测报告测试
 
-推荐使用统一入口脚本：
+推荐运行统一的完整流程测试：
 
 ```bash
-python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-python tests/guitests/screenshot_main.py strategy --output-dir screenshots
+python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 ```
+
+运行成功后，截图与 Markdown 报告会统一生成在 `testing/`。
 
 ## 依赖
 

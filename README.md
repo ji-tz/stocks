@@ -39,7 +39,7 @@
 
 - **Lint**：静态检查（Pylint / Flake8 / Mypy）
 - **Test**：运行单元测试、集成测试和GUI截图测试，将测试日志评论到PR中
-- **Test GUI**：专注于GUI截图测试，将界面截图评论到PR中
+- **Test GUI**：执行一次完整 GUI 回测，生成 testing 目录产物并将报告评论到 PR 中
 - **Package**：打包产物 + Release（tag）
 
 详情见 [.github/workflows/README.md](.github/workflows/README.md)。
@@ -62,16 +62,16 @@ stocks/
 ├── source/                # 数据源
 │   └── data_provider.py  # 数据提供者
 ├── tests/                 # 单元测试
-│   ├── guitests/          # GUI测试与截图脚本
-│   │   └── screenshot_main.py  # GUI截图脚本（统一入口）
+│   ├── guitests/          # GUI测试
+│   │   └── test_gui_backtest_report_e2e.py  # GUI完整回测与报告生成
 │   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
 ├── data/                  # 本地数据缓存
-├── screenshot_main.py     # GUI截图脚本（统一入口）
+├── testing/               # GUI测试截图与Markdown报告输出目录
 └── .github/
     └── workflows/
         ├── lint.yml       # 代码检视工作流
         ├── test.yml       # 单元测试和集成测试工作流
-        ├── testgui.yml    # GUI截图测试工作流
+      ├── testgui.yml    # GUI完整回测报告工作流
         └── package.yml    # 打包工作流
 ```
 
@@ -186,18 +186,15 @@ flake8 .
 mypy stocks.py main.py --config-file=mypy.ini
 ```
 
-### GUI 截图
+### GUI 回测报告
 
 ```bash
-# 需要先安装playwright浏览器
-playwright install chromium
-
-# 运行统一截图脚本（推荐）
-python tests/guitests/screenshot_main.py main --output screenshots/main_gui.png
-python tests/guitests/screenshot_main.py strategy --output-dir screenshots
-python tests/guitests/screenshot_main.py all --output-dir screenshots
+# 运行完整GUI回测报告测试
+python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 
 ```
+
+执行后会在 `testing/` 目录下生成 8 张步骤截图和 `guitest.md`。
 
 ## 命令行工具
 
@@ -322,25 +319,21 @@ python demo_simulator.py
 
 ### 3. 🖼️ Test GUI 工作流 (`.github/workflows/testgui.yml`)
 
-**GUI 截图测试** - 专注于界面截图和可视化反馈
+**GUI 完整回测报告测试** - 专注于一次真实回测和统一报告产物
 
 触发条件：
 - 推送到 main 分支
 - 创建 Pull Request
 
 测试内容：
-1. **主界面截图** - 应用主界面
-2. **策略配置截图** - SMA、均值成本、定投策略配置界面
-3. **完整工作流截图** - 从选股到回测的完整流程
-4. **股票集成测试** - 随机选择股票进行回测
+1. **完整 GUI 主流程** - 从首页到结果页完成一次真实回测
+2. **testing 截图产物** - 固定输出 8 张步骤截图
+3. **Markdown 报告产物** - 生成 `testing/guitest.md`
+4. **PR 评论同步** - 直接读取 `testing/guitest.md` 更新 PR 评论
 
 输出产物：
-- GUI 截图上传到 Artifacts（保留30天）
-- 测试结果 JSON 上传到 Artifacts
-- **自动在 PR 中评论 GUI 测试报告**（包含截图和收益数据）
-- **图片显示方式**：
-  - 小于 1MB 的图片使用 base64 编码直接嵌入评论显示
-  - 大于 1MB 的图片提供 Artifacts 下载链接
+- `testing/` 目录上传到 Artifacts（保留30天）
+- **自动在 PR 中评论 GUI 测试报告**（内容来自 `testing/guitest.md`）
 
 ### 4. 📦 Package 工作流 (`.github/workflows/package.yml`)
 
@@ -367,7 +360,7 @@ python demo_simulator.py
 
 - **Lint**: 无需特殊权限
 - **Test**: `contents: write`, `pull-requests: write`（用于评论测试日志到PR）
-- **Test GUI**: `contents: write`, `pull-requests: write`（用于评论截图到PR）
+- **Test GUI**: `contents: read`, `pull-requests: write`, `issues: write`（用于评论 GUI 报告到 PR）
 - **Package**: `contents: write`（用于创建 Release）
 
 ## 环境要求

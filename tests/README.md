@@ -31,8 +31,11 @@
   - 测试完整的用户流程：选择股票 → 选择策略 → 选择运行模式 → 配置参数 → 查看结果
   - 验证页面元素、URL跳转、客户端验证等
   - 回测启动为异步进度页，结果页通过 `/api/result/<task_id>` 和 `/view_result` 获取
-- `guitests/test_gui_workflow_e2e.py` - 完整GUI工作流截图集成测试（不含历史记录功能，使用较短时间范围以加快测试速度）
-- `guitests/test_screenshot_cli.py` - 截图脚本 CLI 逻辑测试
+- `guitests/test_gui_backtest_report_e2e.py` - 完整 GUI 回测报告测试
+  - 启动真实 Flask 服务
+  - 在 Chromium 浏览器中完成一次完整量化回测
+  - 把 8 张步骤截图和 `testing/guitest.md` 统一输出到 `testing/`
+- `test_guitest_workflow_report.py` - 校验 `testgui.yml` 只消费 `testing/` 报告产物
 - `test_main_run.py` - 测试主程序启动
 
 ## 运行测试
@@ -57,6 +60,9 @@ python -m unittest tests.test_run_sma -v
 
 # 运行GUI真实交互测试
 python -m unittest tests.guitests.test_gui_app -v
+
+# 运行GUI完整回测报告测试
+python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
 ```
 
 ### 运行特定测试类或方法
@@ -133,6 +139,12 @@ GUI测试使用Playwright进行真实的浏览器操作：
   playwright install chromium
   ```
 
+### GUI报告产物
+`tests.guitests.test_gui_backtest_report_e2e` 运行成功后会生成：
+
+- `testing/01_open_home.png` 到 `testing/08_backtest_result.png`
+- `testing/guitest.md`
+
 ## 测试最佳实践
 
 1. **隔离性** - 每个测试相互独立，不依赖执行顺序
@@ -157,14 +169,15 @@ GUI测试使用Playwright进行真实的浏览器操作：
 7. 运行测试确保通过后再提交
 
 ### GUI真实交互测试
-1. 在 `tests/guitests/test_gui_app.py` 中添加测试方法
+1. 在 `tests/guitests/` 中添加或修改测试方法
 2. 使用 Playwright API 进行页面操作
 3. 模拟真实用户操作流程
 4. 使用 `page.goto()`, `page.click()`, `page.fill()` 等方法
 5. 使用 `page.wait_for_url()`, `page.wait_for_selector()` 等待页面变化
 6. 验证页面内容、URL、元素可见性等
 7. 打印清晰的步骤日志，便于调试
-8. 运行测试确保通过后再提交
+8. 如果是完整流程测试，统一将截图和报告输出到 `testing/`
+9. 运行测试确保通过后再提交
 
 ## 贡献指南
 
