@@ -5,6 +5,7 @@ import time
 import unittest
 from unittest.mock import patch
 
+from gui import web as web_module
 from gui.web import app
 import pandas as pd
 
@@ -419,8 +420,9 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertEqual(data['removed_cache_files'], 2)
         self.assertEqual(data['labels'], ['2023-01-03', '2023-01-04'])
         self.assertEqual(data['open_prices'], [24.1, 24.3])
-        mock_remove.assert_any_call(os.path.join('/home/jitz/workspace/stocks/data', '600900.csv'))
-        mock_remove.assert_any_call(os.path.join('/home/jitz/workspace/stocks/data', '000001.csv'))
+        cache_dir = web_module._get_cache_dir()
+        mock_remove.assert_any_call(os.path.join(cache_dir, '600900.csv'))
+        mock_remove.assert_any_call(os.path.join(cache_dir, '000001.csv'))
         self.assertEqual(mock_get.call_count, 2)
         rebuild_call = mock_get.call_args_list[0].kwargs
         self.assertEqual(rebuild_call['start_date'], '20230103')
