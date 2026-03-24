@@ -11,7 +11,12 @@ import pandas as pd
 
 class TestGuiRoutes(unittest.TestCase):
     def setUp(self):
+        self._previous_testing = app.testing
+        app.testing = True
         self.client = app.test_client()
+
+    def tearDown(self):
+        app.testing = self._previous_testing
 
     def _extract_task_id(self, body: str) -> str:
         match = re.search(r"const taskId = '([^']+)'", body)

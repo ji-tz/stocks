@@ -522,9 +522,12 @@ def run():
             # 设置任务错误
             progress_mgr.set_error(task_id, str(e))
 
-    # 启动后台线程
-    thread = threading.Thread(target=run_backtest, daemon=True)
-    thread.start()
+    if app.testing:
+        run_backtest()
+    else:
+        # 启动后台线程
+        thread = threading.Thread(target=run_backtest, daemon=True)
+        thread.start()
 
     # 返回进度页面
     return render_template('backtest_progress.html', task_id=task_id, symbol=symbol, strategy=strategy)
