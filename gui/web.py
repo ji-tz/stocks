@@ -398,6 +398,7 @@ def strategy_sma():
     stock_name = session.get('stock_name')
     strategy_type = session.get('strategy_type')
     run_mode = session.get('run_mode')
+    
 
     # 检查是否有必要的信息
     if not stock_code or not stock_name:
