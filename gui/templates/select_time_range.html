@@ -4,6 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>设置回测时间段 - 量化回测平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
       body { font-family: Arial, sans-serif; max-width: 800px; margin: 2rem auto; padding: 0 1rem; }
       .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
@@ -127,6 +128,76 @@
       .quick-tip strong {
         color: #ff9800;
       }
+
+      .chart-panel {
+        background: #ffffff;
+        border: 1px solid #dfe7df;
+        border-radius: 10px;
+        padding: 1.25rem;
+        margin-top: 1.5rem;
+        box-shadow: 0 6px 20px rgba(76, 175, 80, 0.08);
+      }
+      .chart-panel h4 {
+        margin: 0 0 0.75rem 0;
+        color: #2f5f35;
+        font-size: 1.1rem;
+      }
+      .chart-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: space-between;
+        gap: 0.8rem;
+        margin-bottom: 0.8rem;
+      }
+      .chart-meta {
+        color: #666;
+        font-size: 0.92rem;
+      }
+      .danger-btn {
+        padding: 0.7rem 1.2rem;
+        background: #fff5f5;
+        color: #d32f2f;
+        border: 1px solid #f0b4b4;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .danger-btn:hover {
+        background: #d32f2f;
+        color: white;
+      }
+      .danger-btn:disabled,
+      .submit-btn:disabled {
+        opacity: 0.7;
+        cursor: not-allowed;
+        transform: none;
+      }
+      .chart-status {
+        margin: 0.75rem 0;
+        padding: 0.75rem 0.9rem;
+        border-radius: 6px;
+        font-size: 0.92rem;
+        display: none;
+      }
+      .chart-status.info {
+        display: block;
+        background: #e3f2fd;
+        color: #1565c0;
+      }
+      .chart-status.success {
+        display: block;
+        background: #e8f5e9;
+        color: #2e7d32;
+      }
+      .chart-status.error {
+        display: block;
+        background: #ffebee;
+        color: #c62828;
+      }
+      .chart-canvas-wrap {
+        position: relative;
+        min-height: 320px;
+      }
     </style>
   </head>
   <body>
@@ -206,6 +277,18 @@
 
         <div class="date-error" id="date-error">日期验证错误</div>
 
+        <div class="chart-panel">
+          <h4>📈 所选时间段股票走势</h4>
+          <div class="chart-toolbar">
+            <div class="chart-meta" id="chart-meta">将展示当前时间段内的日线开盘价走势。</div>
+            <button type="button" class="danger-btn" id="refresh-cache-btn">清除全部缓存并自动重下当前股票日线数据</button>
+          </div>
+          <div class="chart-status info" id="chart-status">正在加载走势图...</div>
+          <div class="chart-canvas-wrap">
+            <canvas id="time-range-chart" height="280"></canvas>
+          </div>
+        </div>
+
         <div class="submit-section">
           <button type="submit" class="submit-btn">下一步：配置策略参数 →</button>
         </div>
@@ -244,12 +327,14 @@
             startInput.value = '';
             endInput.value = '';
             validateDates();
+            refreshChart();
             return;
         }
         
         startInput.value = startDate;
         endInput.value = endDate;
         validateDates();
+        refreshChart();
       }
       
       // 格式化日期为 YYYY-MM-DD
@@ -281,6 +366,158 @@
 
         errEl.style.display = 'none';
         return true;
+      }
+
+      const stockCode = {{ stock_code | tojson }};
+      const startInput = document.getElementById('start-date');
+      const endInput = document.getElementById('end-date');
+      const chartStatus = document.getElementById('chart-status');
+      const chartMeta = document.getElementById('chart-meta');
+      const refreshCacheBtn = document.getElementById('refresh-cache-btn');
+      const submitBtn = document.querySelector('.submit-btn');
+      let timeRangeChart = null;
+
+      function setChartStatus(message, type) {
+        chartStatus.textContent = message;
+        chartStatus.className = 'chart-status ' + type;
+      }
+
+      function setBusy(isBusy) {
+        refreshCacheBtn.disabled = isBusy;
+        submitBtn.disabled = isBusy;
+      }
+
+      function renderChart(labels, openPrices) {
+        const ctx = document.getElementById('time-range-chart').getContext('2d');
+        if (timeRangeChart) {
+          timeRangeChart.destroy();
+        }
+
+        timeRangeChart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '日线开盘价',
+              data: openPrices,
+              borderColor: '#2e7d32',
+              backgroundColor: 'rgba(76, 175, 80, 0.12)',
+              fill: true,
+              tension: 0.18,
+              pointRadius: labels.length > 120 ? 0 : 2,
+              pointHoverRadius: 4,
+            }]
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: {
+              mode: 'index',
+              intersect: false,
+            },
+            plugins: {
+              legend: {
+                display: true,
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    return '开盘价：' + Number(context.parsed.y).toFixed(2) + ' 元';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                ticks: {
+                  maxTicksLimit: 10,
+                }
+              },
+              y: {
+                ticks: {
+                  callback: function(value) {
+                    return value + ' 元';
+                  }
+                }
+              }
+            }
+          }
+        });
+      }
+
+      function updateDateBounds(payload) {
+        startInput.min = payload.available_start;
+        startInput.max = payload.available_end;
+        endInput.min = payload.available_start;
+        endInput.max = payload.available_end;
+      }
+
+      function getSelectedRange() {
+        return {
+          start: startInput.value ? startInput.value.replace(/-/g, '') : '',
+          end: endInput.value ? endInput.value.replace(/-/g, '') : '',
+        };
+      }
+
+      function refreshChart(showLoading = true) {
+        if (!validateDates()) {
+          return Promise.resolve();
+        }
+
+        const range = getSelectedRange();
+        const params = new URLSearchParams(range);
+        if (showLoading) {
+          setChartStatus('正在加载走势图...', 'info');
+        }
+
+        return fetch('/api/stock_chart/' + encodeURIComponent(stockCode) + '?' + params.toString())
+          .then(response => response.json().then(data => ({ ok: response.ok, data: data })))
+          .then(({ ok, data }) => {
+            if (!ok) {
+              throw new Error(data.error || '走势图加载失败');
+            }
+
+            renderChart(data.labels, data.open_prices);
+            updateDateBounds(data);
+            chartMeta.textContent = '显示 ' + data.available_start + ' 至 ' + data.available_end + ' 的日线开盘价，共 ' + data.points + ' 个交易日。';
+            setChartStatus('走势图已更新。', 'success');
+          })
+          .catch(error => {
+            setChartStatus(error.message || '走势图加载失败', 'error');
+          });
+      }
+
+      function refreshCacheAndReload() {
+        if (!validateDates()) {
+          return;
+        }
+
+        setBusy(true);
+        setChartStatus('正在清除缓存并重新下载当前股票日线数据...', 'info');
+        fetch('/api/stock_chart/' + encodeURIComponent(stockCode) + '/refresh_cache', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(getSelectedRange())
+        })
+        .then(response => response.json().then(data => ({ ok: response.ok, data: data })))
+        .then(({ ok, data }) => {
+          if (!ok) {
+            throw new Error(data.error || '清理缓存失败');
+          }
+
+          renderChart(data.labels, data.open_prices);
+          updateDateBounds(data);
+          chartMeta.textContent = '已清除 ' + data.removed_cache_files + ' 个缓存文件，并重新下载当前股票日线数据。';
+          setChartStatus('缓存已清除并完成重新下载。', 'success');
+        })
+        .catch(error => {
+          setChartStatus(error.message || '清理缓存失败', 'error');
+        })
+        .finally(() => {
+          setBusy(false);
+        });
       }
 
       // 表单提交
@@ -326,8 +563,19 @@
       });
       
       // 实时验证
-      document.getElementById('start-date').addEventListener('change', validateDates);
-      document.getElementById('end-date').addEventListener('change', validateDates);
+      startInput.addEventListener('change', function() {
+        if (validateDates()) {
+          refreshChart(false);
+        }
+      });
+      endInput.addEventListener('change', function() {
+        if (validateDates()) {
+          refreshChart(false);
+        }
+      });
+      refreshCacheBtn.addEventListener('click', refreshCacheAndReload);
+
+      refreshChart();
     </script>
   </body>
 </html>

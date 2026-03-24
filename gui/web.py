@@ -18,6 +18,86 @@ app.secret_key = os.environ.get('SECRET_KEY', 'stocks-quantitative-backtest-secr
 _STOCK_LIST = None
 _STOCK_INDEX = None
 
+
+def _get_cache_dir() -> str:
+    """返回项目内的数据缓存目录绝对路径。"""
+    return os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data')
+
+
+def _validate_optional_date_range(start: str, end: str) -> tuple[str, str]:
+    """校验可选日期范围，支持空字符串与 YYYYMMDD。"""
+    import re
+
+    start = (start or '').strip()
+    end = (end or '').strip()
+    date_pattern = re.compile(r'^\d{8}$')
+
+    if start and not date_pattern.match(start):
+        raise ValueError('起始日期格式必须为YYYYMMDD')
+    if end and not date_pattern.match(end):
+        raise ValueError('结束日期格式必须为YYYYMMDD')
+    if start and end and start > end:
+        raise ValueError('起始日期不能晚于结束日期')
+
+    return start, end
+
+
+def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', source: str = 'auto') -> dict:
+    """构造时间段页面的日线开盘价走势图数据。"""
+    cache_dir = _get_cache_dir()
+    df = stocks.get_data(
+        symbol=stock_code,
+        source=source,
+        start_date=start or None,
+        end_date=end or None,
+        cache_dir=cache_dir,
+    )
+
+    if df is None or df.empty:
+        raise RuntimeError('无法获取该时间段的股票日线数据')
+
+    labels = []
+    open_prices = []
+    for _, row in df.iterrows():
+        date_value = row['date']
+        if hasattr(date_value, 'strftime'):
+            labels.append(date_value.strftime('%Y-%m-%d'))
+        else:
+            labels.append(str(date_value))
+        open_prices.append(float(row['open']))
+
+    available_start = labels[0]
+    available_end = labels[-1]
+
+    return {
+        'stock_code': stock_code,
+        'labels': labels,
+        'open_prices': open_prices,
+        'available_start': available_start,
+        'available_end': available_end,
+        'points': len(labels),
+        'price_field': 'open',
+    }
+
+
+def _clear_all_cache_files() -> int:
+    """清理 data 目录下所有 CSV 缓存文件。"""
+    cache_dir = _get_cache_dir()
+    if not os.path.isdir(cache_dir):
+        return 0
+
+    removed = 0
+    for file_name in os.listdir(cache_dir):
+        if not file_name.endswith('.csv'):
+            continue
+        file_path = os.path.join(cache_dir, file_name)
+        if not os.path.isfile(file_path):
+            continue
+        os.remove(file_path)
+        removed += 1
+
+    return removed
+
 def _init_stock_data():
     """初始化股票数据和索引"""
     global _STOCK_LIST, _STOCK_INDEX
@@ -234,6 +314,57 @@ def select_time_range_api():
     session['backtest_end'] = end
 
     return jsonify({'success': True})
+
+
+@app.route('/api/stock_chart/<stock_code>', methods=['GET'])
+def get_stock_chart(stock_code):
+    """获取时间段页面的股票日线开盘价走势图数据。"""
+    session_stock_code = session.get('stock_code')
+    if not session_stock_code:
+        return jsonify({'error': '请先选择股票'}), 400
+    if session_stock_code != stock_code:
+        return jsonify({'error': '当前股票与会话不一致'}), 400
+
+    try:
+        start, end = _validate_optional_date_range(
+            request.args.get('start', ''),
+            request.args.get('end', ''),
+        )
+        payload = _build_stock_chart_payload(stock_code=stock_code, start=start, end=end)
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': f'获取走势图失败: {str(exc)}'}), 500
+
+
+@app.route('/api/stock_chart/<stock_code>/refresh_cache', methods=['POST'])
+def refresh_stock_chart_cache(stock_code):
+    """清除全部缓存并重新下载当前股票的日线数据。"""
+    session_stock_code = session.get('stock_code')
+    if not session_stock_code:
+        return jsonify({'error': '请先选择股票'}), 400
+    if session_stock_code != stock_code:
+        return jsonify({'error': '当前股票与会话不一致'}), 400
+
+    data = request.get_json(silent=True) or {}
+
+    try:
+        start, end = _validate_optional_date_range(
+            data.get('start', ''),
+            data.get('end', ''),
+        )
+        removed_files = _clear_all_cache_files()
+        # 清缓存后先重新下载当前股票的完整日线数据，再按当前时间段返回开盘价走势。
+        stocks.get_data(symbol=stock_code, source='auto', cache_dir=_get_cache_dir())
+        payload = _build_stock_chart_payload(stock_code=stock_code, start=start, end=end)
+        payload['removed_cache_files'] = removed_files
+        payload['refreshed'] = True
+        return jsonify(payload)
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': f'清除缓存并重新下载失败: {str(exc)}'}), 500
 
 
 @app.route('/strategy/sma', methods=['GET'])
