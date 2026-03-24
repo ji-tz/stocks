@@ -291,6 +291,7 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('function refreshChart', body)
         self.assertIn('function refreshCacheAndReload', body)
         self.assertIn('const stockCode = "600900"', body)
+        self.assertIn('yesterday.setDate(yesterday.getDate() - 1)', body)
 
     def test_select_time_range_api_post(self):
         """测试保存回测时间段API"""

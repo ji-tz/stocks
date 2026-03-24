@@ -299,11 +299,13 @@
       // 快捷设置预设时间段
       function setPreset(type) {
         const today = new Date();
+        const yesterday = new Date(today);
+        yesterday.setDate(yesterday.getDate() - 1);
         const startInput = document.getElementById('start-date');
         const endInput = document.getElementById('end-date');
         
-        // 设置结束日期为今天
-        const endDate = formatDate(today);
+        // 设置结束日期为昨天，避免包含当天导致数据缺失
+        const endDate = formatDate(yesterday);
         
         let startDate = '';
         
