@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   testgui:
-    name: GUI 回测报告测试
+    name: GUI截图测试
     runs-on: ubuntu-latest
     env:
       PORT: '5001'
