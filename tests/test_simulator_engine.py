@@ -80,6 +80,16 @@ class TestSimulatorEngine(unittest.TestCase):
         self.assertEqual(engine.get_position().shares, 100)
         self.assertEqual(engine.get_cash(), 90000.0)
 
+    def test_buy_success_with_fractional_shares(self):
+        """测试基金场景：支持小数份额买入。"""
+        engine = SimulatorEngine(init_cash=10000.0, lot_size=0.01)
+        date = datetime(2023, 1, 1)
+        result = engine.buy(date=date, price=1.234, shares=100.25)
+
+        self.assertTrue(result.success)
+        self.assertAlmostEqual(result.shares_after, 100.25, places=6)
+        self.assertAlmostEqual(result.cash_after, 10000.0 - 1.234 * 100.25, places=6)
+
     def test_buy_insufficient_cash(self):
         """测试资金不足无法买入"""
         engine = SimulatorEngine(init_cash=5000.0, lot_size=100)

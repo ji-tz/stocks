@@ -3,6 +3,7 @@
 每次投入固定金额购买股票，不考虑市场价格波动。
 """
 import dataclasses
+import math
 from typing import Any
 
 
@@ -40,25 +41,25 @@ class FixedAmountDecision:
         # 定投策略：每天都买入
         return 'buy'
     
-    def calculate_shares(self, price: float, lot_size: int = 100) -> int:
+    def calculate_shares(self, price: float, lot_size: float = 100.0) -> float:
         """计算应该购买的股数
         
-        根据固定金额和当前价格，计算能买多少股（必须是 lot_size 的整数倍）
+        根据固定金额和当前价格，计算能买多少份额（按 lot_size 粒度向下取整）。
         
         Args:
             price: 当前股价
-            lot_size: 交易手数（默认 100 股）
+            lot_size: 交易粒度（股票常用 100，基金可用 1 或 0.01）
             
         Returns:
-            应该购买的股数（lot_size 的整数倍）
+            应该购买的股数/份额（lot_size 的整数倍）
         """
-        if price <= 0:
-            return 0
+        if price <= 0 or lot_size <= 0:
+            return 0.0
         
         # 计算能买多少股
-        affordable_shares = int(self.fixed_amount / price)
+        affordable_shares = self.fixed_amount / price
         
         # 向下取整到 lot_size 的整数倍
-        lots = affordable_shares // lot_size
-        
-        return lots * lot_size
+        lots = math.floor((affordable_shares + 1e-12) / lot_size)
+
+        return round(lots * lot_size, 6)

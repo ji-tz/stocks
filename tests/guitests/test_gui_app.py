@@ -58,6 +58,44 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('600519', body)
         self.assertIn('贵州茅台', body)
 
+    def test_search_stock_api_supports_etf_and_fund(self):
+        """测试可搜索到指数基金与场外基金。"""
+        rv_etf = self.client.get('/api/search_stock?query=510300')
+        self.assertEqual(rv_etf.status_code, 200)
+        data_etf = rv_etf.get_json()
+        self.assertEqual(data_etf.get('code'), '510300')
+
+        rv_fund = self.client.get('/api/search_stock?query=白酒')
+        self.assertEqual(rv_fund.status_code, 200)
+        data_fund = rv_fund.get_json()
+        self.assertEqual(data_fund.get('code'), '161725')
+
+    @patch('stocks.create_backtest_request')
+    @patch('stocks.run_backtest')
+    def test_run_post_accepts_fractional_lot(self, mock_run_backtest, mock_create_request):
+        """测试回测接口可接收小数交易单位。"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '161725'
+            sess['stock_name'] = '招商中证白酒指数(LOF)'
+
+        def _fake_create_request(**kwargs):
+            return kwargs
+
+        mock_create_request.side_effect = _fake_create_request
+        mock_run_backtest.return_value = {
+            'symbol': '161725',
+            'trades_list': [],
+            'history': [],
+            'total_value': 100000.0,
+        }
+
+        rv = self.client.post('/run', data={'strategy': 'fixed_amount', 'lot': '0.01', 'cash': '100000'})
+        self.assertEqual(rv.status_code, 200)
+
+        self.assertTrue(mock_create_request.called)
+        kwargs = mock_create_request.call_args.kwargs
+        self.assertAlmostEqual(kwargs['lot_size'], 0.01)
+
     @patch('stocks.get_data')
     @patch('stocks.run_mean_cost')
     def test_run_mean_cost_post(self, mock_mean, mock_get):

@@ -18,7 +18,7 @@ class SimulatorEngine(BaseEngine):
     - 支持完整的买卖操作和账户管理
     """
 
-    def __init__(self, init_cash: float = 100000.0, lot_size: int = 100, verbose: bool = False):
+    def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0, verbose: bool = False):
         """初始化模拟引擎
 
         Args:
@@ -30,7 +30,7 @@ class SimulatorEngine(BaseEngine):
         self.verbose = verbose
         self.trade_count = 0  # 交易次数
 
-    def buy(self, date: datetime, price: float, shares: Optional[int] = None) -> TradeResult:
+    def buy(self, date: datetime, price: float, shares: Optional[float] = None) -> TradeResult:
         """买入股票
 
         检查资金是否充足，如果充足则执行买入操作。
@@ -44,7 +44,7 @@ class SimulatorEngine(BaseEngine):
             TradeResult: 交易结果，包含是否成功及详细信息
         """
         # 如果没有指定股数，使用默认的 lot_size
-        buy_shares = shares if shares is not None else self.lot_size
+        buy_shares = float(shares) if shares is not None else self.lot_size
         
         # 股数必须是正数
         if buy_shares <= 0:

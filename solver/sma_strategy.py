@@ -13,7 +13,7 @@ class SmaDecision:
         self.period = period
         self.df = df
 
-    def decide(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: int = 0,
+    def decide(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: float = 0.0,
                date: Any = None, trade_price: float | None = None, trade_price_field: str = 'open'):
         # close_price 对比 sma 决策由 simulator 预先计算 sma 并放入 df；此处使用 close_price 与 df 中对应 sma 值比较具有上下文耦合。
         # 为了保持简单，假设调用方在构造时给定了 df，并且当前 date 可用于查询 sma。
@@ -28,9 +28,9 @@ class SmaDecision:
         except Exception:
             return None
 
-        if shares == 0 and close_price > sma:
+        if shares <= 0 and close_price > sma:
             return 'buy'
-        if shares >= 1 and close_price < sma:
+        if shares > 0 and close_price < sma:
             return 'sell'
         return None
 

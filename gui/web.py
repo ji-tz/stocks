@@ -142,9 +142,19 @@ def get_stock_list():
     return _STOCK_LIST
 
 def search_stock_by_query(query: str):
-    """通过代码或名称搜索股票（精确匹配）"""
+    """通过代码或名称搜索标的（优先精确匹配，其次模糊匹配）。"""
     _init_stock_data()
-    return _STOCK_INDEX.get(query)
+    exact = _STOCK_INDEX.get(query)
+    if exact:
+        return exact
+
+    query_lower = query.lower()
+    for stock in _STOCK_LIST:
+        code = str(stock.get('code', ''))
+        name = str(stock.get('name', ''))
+        if query in code or query_lower in name.lower():
+            return stock
+    return None
 
 
 @app.route('/', methods=['GET'])
@@ -483,7 +493,7 @@ def run():
 
     source = request.form.get('source', 'auto')
     strategy = request.form.get('strategy', 'sma')
-    lot = int(request.form.get('lot') or 100)
+    lot = float(request.form.get('lot') or 100.0)
     cash = float(request.form.get('cash') or 100000.0)
     strategy_params = _collect_strategy_form_params(strategy)
     request_payload = {

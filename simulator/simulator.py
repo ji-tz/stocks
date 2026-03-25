@@ -26,7 +26,7 @@ class Simulator:
     - 为实盘交易（real）做好接口准备
     """
 
-    def __init__(self, lot_size: int = 100, init_cash: float = 100000.0, verbose: bool = False):
+    def __init__(self, lot_size: float = 100.0, init_cash: float = 100000.0, verbose: bool = False):
         """初始化模拟器
 
         Args:
@@ -232,7 +232,7 @@ class Simulator:
 def simulate_mean_cost(symbol: str = "600900",
                        start_date: str = "20250101",
                        end_date: Optional[str] = None,
-                       lot_size: int = 100,
+                       lot_size: float = 100.0,
                        init_cash: float = 100000.0,
                        source: str = "auto",
                        progress_callback: Optional[Callable[[int, int], None]] = None,
@@ -254,7 +254,7 @@ def simulate_mean_cost(symbol: str = "600900",
 def simulate_sma(symbol: str = "600900",
                  df=None,
                  period: int = 20,
-                 lot_size: int = 100,
+                 lot_size: float = 100.0,
                  init_cash: float = 100000.0,
                  progress_callback: Optional[Callable[[int, int], None]] = None,
                  trade_price: str = 'open'):
@@ -278,7 +278,7 @@ def simulate_fixed_amount(symbol: str = "600900",
                          start_date: str = "20250101",
                          end_date: Optional[str] = None,
                          fixed_amount: float = 1000.0,
-                         lot_size: int = 100,
+                         lot_size: float = 100.0,
                          init_cash: float = 100000.0,
                          source: str = "auto",
                          verbose: bool = False,

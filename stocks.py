@@ -66,7 +66,7 @@ class BacktestRequest:
     source: object = 'auto'
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    lot_size: int = 100
+    lot_size: float = 100.0
     init_cash: float = 100000.0
     trade_price: str = TRADE_PRICE_OPEN
     strategy_params: Dict[str, Any] = field(default_factory=dict)
@@ -172,7 +172,7 @@ def get_data(symbol: str = "600900",
 
 
 def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
-                  lot_size: int = 100, init_cash: float = 100000.0, source: object = "auto", 
+                  lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto", 
                   progress_callback: Optional[Callable[[int, int], None]] = None,
                   trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """调用均值成本模拟（封装自 solver.mean_cost_strategy.simulate_mean_cost）。"""
@@ -187,7 +187,7 @@ def run_fixed_amount(symbol: str = "600900",
                     start_date: Optional[str] = None,
                     end_date: Optional[str] = None,
                     fixed_amount: float = 1000.0,
-                    lot_size: int = 100,
+                    lot_size: float = 100.0,
                     init_cash: float = 100000.0,
                     source: object = "auto",
                     progress_callback: Optional[Callable[[int, int], None]] = None,
@@ -222,7 +222,7 @@ def run_fixed_amount(symbol: str = "600900",
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      start_date: Optional[str] = None, end_date: Optional[str] = None,
-                     lot_size: int = 100, init_cash: float = 100000.0, period: int = 20,
+                     lot_size: float = 100.0, init_cash: float = 100000.0, period: int = 20,
                      progress_callback: Optional[Callable[[int, int], None]] = None,
                      trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """使用统一模拟器运行 SMA 回测并返回统一的展示结果。
@@ -319,7 +319,7 @@ def create_backtest_request(symbol: str = '600900',
                             source: object = 'auto',
                             start_date: Optional[str] = None,
                             end_date: Optional[str] = None,
-                            lot_size: int = 100,
+                            lot_size: float = 100.0,
                             init_cash: float = 100000.0,
                             trade_price: str = TRADE_PRICE_OPEN,
                             strategy_params: Optional[Mapping[str, Any]] = None,
@@ -337,7 +337,7 @@ def create_backtest_request(symbol: str = '600900',
         source=source,
         start_date=_validate_date_str(start_date),
         end_date=_validate_date_str(end_date),
-        lot_size=int(lot_size),
+        lot_size=float(lot_size),
         init_cash=float(init_cash),
         trade_price=trade_price,
         strategy_params=_normalize_strategy_params(spec, strategy_params),

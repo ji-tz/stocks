@@ -91,6 +91,18 @@ class TestFixedAmountDecision(unittest.TestCase):
         shares = strategy.calculate_shares(price=5.0, lot_size=100)
         self.assertEqual(shares, 400)  # 2000/5 = 400
 
+    def test_calculate_shares_with_fund_unit(self):
+        """测试基金场景：支持按0.01份进行买入。"""
+        strategy = FixedAmountDecision(fixed_amount=1000.0)
+        shares = strategy.calculate_shares(price=1.234, lot_size=0.01)
+        self.assertAlmostEqual(shares, 810.37, places=2)
+
+    def test_calculate_shares_invalid_lot_size(self):
+        """测试非法交易单位时返回0。"""
+        strategy = FixedAmountDecision(fixed_amount=1000.0)
+        shares = strategy.calculate_shares(price=10.0, lot_size=0)
+        self.assertEqual(shares, 0.0)
+
 
 class TestFixedAmountSimulation(unittest.TestCase):
     """测试定投策略的完整模拟"""
