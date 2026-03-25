@@ -142,19 +142,27 @@ def get_stock_list():
     return _STOCK_LIST
 
 def search_stock_by_query(query: str):
-    """通过代码或名称搜索标的（优先精确匹配，其次模糊匹配）。"""
+    """通过代码或名称搜索标的。
+
+    返回匹配结果列表（可能为空）。实现策略：
+    - 优先精确匹配代码或名称（若存在，则返回该项为唯一结果）
+    - 否则进行模糊匹配，返回所有包含查询字符串的项目列表
+    """
     _init_stock_data()
+    results = []
+    # 先尝试精确匹配（代码或名称）
     exact = _STOCK_INDEX.get(query)
     if exact:
-        return exact
+        return [exact]
 
     query_lower = query.lower()
     for stock in _STOCK_LIST:
         code = str(stock.get('code', ''))
         name = str(stock.get('name', ''))
         if query in code or query_lower in name.lower():
-            return stock
-    return None
+            results.append(stock)
+
+    return results
 
 
 @app.route('/', methods=['GET'])
@@ -171,11 +179,18 @@ def search_stock():
         return jsonify({'error': '请输入股票代码或名称'})
 
     # 使用优化后的索引查找
-    stock = search_stock_by_query(query)
-    if stock:
+    matches = search_stock_by_query(query)
+    if not matches:
+        return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
+
+    # 若只有一项匹配，保持向后兼容：返回单个对象（code/name）
+    if len(matches) == 1:
+        stock = matches[0]
         return jsonify({'code': stock['code'], 'name': stock['name']})
 
-    return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
+    # 多项时返回 results 数组，供前端选择
+    simplified = [{'code': s['code'], 'name': s['name']} for s in matches]
+    return jsonify({'results': simplified})
 
 
 @app.route('/api/stock_price/<stock_code>', methods=['GET'])
