@@ -8,13 +8,13 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
   pull-requests: write
   issues: write
 
 jobs:
   testgui:
-    name: GUI 回测报告测试
+    name: GUI截图测试
     runs-on: ubuntu-latest
     env:
       PORT: '5001'
@@ -64,9 +64,21 @@ jobs:
           path: testing/
           retention-days: 30
 
+      - name: Publish GUI screenshots to branch
+        if: always()
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_branch: guitest-assets
+          destination_dir: runs/${{ github.run_id }}
+          publish_dir: testing
+          keep_files: true
+
       - name: Comment PR with GUI report
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
+        env:
+          GUITEST_IMAGE_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/guitest-assets/runs/${{ github.run_id }}
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           script: |
@@ -78,6 +90,7 @@ jobs:
               context,
               core,
               artifactName: 'guitest-report',
+              imageBaseUrl: process.env.GUITEST_IMAGE_BASE_URL,
             });
 
       - name: Final workflow status

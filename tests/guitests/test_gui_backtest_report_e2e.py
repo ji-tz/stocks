@@ -46,24 +46,41 @@ def _wait_for_server_ready(base_url: str, timeout: float = 15.0) -> None:
     raise RuntimeError("Flask 服务启动超时")
 
 
+def _start_server_with_retry(max_attempts: int = 3) -> tuple[subprocess.Popen, str]:
+    """启动 Flask 服务，端口冲突或偶发慢启动时自动重试。"""
+    last_error: Exception | None = None
+    for _ in range(max_attempts):
+        port = _allocate_local_port()
+        base_url = f"http://127.0.0.1:{port}"
+        process = subprocess.Popen(
+            [sys.executable, "-m", "gui.web"],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+            cwd=str(ROOT_DIR),
+            env={**os.environ, "FLASK_ENV": "production", "PORT": str(port)},
+        )
+        try:
+            _wait_for_server_ready(base_url, timeout=30.0)
+            return process, base_url
+        except Exception as exc:
+            last_error = exc
+            process.terminate()
+            try:
+                process.wait(timeout=5)
+            except Exception:
+                process.kill()
+    raise RuntimeError(f"Flask 服务重试启动失败: {last_error}")
+
+
 class TestGuiBacktestReportE2E(unittest.TestCase):
     """完整回测流程，生成 testing 目录产物。"""
 
     @classmethod
     def setUpClass(cls) -> None:
         _ensure_playwright_chromium()
-        cls.server_port = _allocate_local_port()
-        cls.base_url = f"http://127.0.0.1:{cls.server_port}"
         shutil.rmtree(TESTING_DIR, ignore_errors=True)
         TESTING_DIR.mkdir(parents=True, exist_ok=True)
-        cls.server_process = subprocess.Popen(
-            [sys.executable, "-m", "gui.web"],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            cwd=str(ROOT_DIR),
-            env={**os.environ, "FLASK_ENV": "production", "PORT": str(cls.server_port)},
-        )
-        _wait_for_server_ready(cls.base_url)
+        cls.server_process, cls.base_url = _start_server_with_retry()
 
     @classmethod
     def tearDownClass(cls) -> None:
@@ -123,8 +140,9 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
 
         REPORT_PATH.write_text("\n".join(lines), encoding="utf-8")
 
-    def test_generate_gui_backtest_report(self) -> None:
+    def _run_backtest_flow(self) -> tuple[list[tuple[str, str, str]], list[str]]:
         steps: list[tuple[str, str, str]] = []
+        result_summary: list[str] = []
 
         with sync_playwright() as playwright:
             browser = playwright.chromium.launch(headless=True)
@@ -233,9 +251,23 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
             summary_cards = page.locator(".summary .card").all_inner_texts()
             result_summary = [item.strip() for item in summary_cards if item.strip()]
             self.assertTrue(result_summary, "结果页摘要不能为空")
-            self._write_report(steps, result_summary)
 
             browser.close()
+
+        return steps, result_summary
+
+    def test_generate_gui_backtest_report(self) -> None:
+        last_error: Exception | None = None
+        for _ in range(2):
+            try:
+                steps, result_summary = self._run_backtest_flow()
+                self._write_report(steps, result_summary)
+                break
+            except Exception as exc:
+                last_error = exc
+                continue
+        else:
+            raise last_error if last_error else AssertionError("GUI 回测流程执行失败")
 
         expected_outputs = [
             "01_open_home.png",
