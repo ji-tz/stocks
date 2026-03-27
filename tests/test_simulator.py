@@ -49,6 +49,22 @@ class TestSimulator(unittest.TestCase):
             sim.simulate(df=empty_df, strategy=MeanCostDecision())
         self.assertIn("数据为空", str(ctx.exception))
 
+    def test_simulator_backtest_clock_marker(self):
+        """测试回测由自有时钟驱动并返回时钟标记"""
+        sim = Simulator(lot_size=100, init_cash=100000.0)
+        df = make_test_df(3, start_price=10.0)
+        result = sim.simulate(df=df, strategy=MeanCostDecision(), symbol="TEST")
+        self.assertEqual(result.get('clock_type'), 'backtest')
+        self.assertEqual(result.get('mode'), 'backtest')
+
+    def test_simulator_non_backtest_mode_not_run(self):
+        """测试非 backtest 模式不允许运行"""
+        sim = Simulator(lot_size=100, init_cash=100000.0)
+        df = make_test_df(3, start_price=10.0)
+        with self.assertRaises(RuntimeError) as ctx:
+            sim.simulate(df=df, strategy=MeanCostDecision(), symbol="TEST", mode='realtime')
+        self.assertIn('仅支持 backtest 模式', str(ctx.exception))
+
 
 class TestMeanCostStrategy(unittest.TestCase):
     """测试 MeanCostDecision 策略的模拟交易"""
@@ -224,8 +240,7 @@ class TestSmaStrategy(unittest.TestCase):
     def test_sma_simulator_basic(self):
         """测试 SMA 策略的基本模拟"""
         df = make_test_df(30, start_price=100.0)
-        
-        sim = Simulator(lot_size=100, init_cash=100000.0)
+
         result = simulate_sma(symbol="TEST", df=df, period=20, lot_size=100, init_cash=100000.0)
         
         # 验证返回结构
@@ -373,6 +388,110 @@ class TestProfitLossCalculation(unittest.TestCase):
         # 应该有未实现盈亏
         self.assertIn('unrealized_pl', result)
         self.assertIsInstance(result['unrealized_pl'], (int, float))
+
+
+class TestScheduledOrdersAndTPlusOne(unittest.TestCase):
+    """测试预约单、粒度配置、T+1 与底仓行为"""
+
+    @staticmethod
+    def make_hourly_df():
+        dates = pd.date_range(start="2023-01-03 09:30:00", periods=6, freq="h")
+        prices = [10.0, 10.2, 10.1, 10.3, 10.4, 10.5]
+        return pd.DataFrame({
+            "date": dates,
+            "open": prices,
+            "high": [p + 0.1 for p in prices],
+            "low": [p - 0.1 for p in prices],
+            "close": [p + 0.05 for p in prices],
+            "volume": [1000] * len(prices),
+        })
+
+    def test_schedule_order_executes_after_one_hour(self):
+        class BuyThenScheduleSellStrategy:
+            def __init__(self):
+                self.did_buy = False
+
+            def decide(self, open_price, close_price=None, avg_cost=0.0, shares=0, date=None, schedule_order=None, **kwargs):
+                _ = open_price, close_price, avg_cost, date, kwargs
+                if not self.did_buy and shares == 0:
+                    self.did_buy = True
+                    if callable(schedule_order):
+                        schedule_order(action='sell', after_hours=1, tag='exit_1h')
+                    return 'buy'
+                return None
+
+        df = self.make_hourly_df()
+        sim = Simulator(lot_size=100, init_cash=100000.0)
+        result = sim.simulate(
+            df=df,
+            strategy=BuyThenScheduleSellStrategy(),
+            symbol="TEST",
+            granularity='1h',
+            enable_scheduled_orders=True,
+            enforce_t_plus_one=False,
+        )
+
+        self.assertEqual(result['trades'], 2)
+        self.assertEqual(len(result['trades_list']), 2)
+        self.assertEqual(result['trades_list'][0]['action'], 'buy')
+        self.assertEqual(result['trades_list'][1]['action'], 'sell')
+        self.assertIn('scheduled', result['trades_list'][1]['source'])
+
+    def test_t_plus_one_intraday_requires_base_position(self):
+        class IntradaySellStrategy:
+            def decide(self, open_price, close_price=None, avg_cost=0.0, shares=0, date=None, schedule_order=None, **kwargs):
+                _ = open_price, close_price, avg_cost, date, kwargs
+                if shares == 0:
+                    if callable(schedule_order):
+                        schedule_order(action='sell', after_hours=1, tag='exit_1h')
+                    return 'buy'
+                return None
+
+        df = self.make_hourly_df()
+        sim = Simulator(lot_size=100, init_cash=100000.0)
+        with self.assertRaises(RuntimeError) as ctx:
+            sim.simulate(
+                df=df,
+                strategy=IntradaySellStrategy(),
+                symbol="TEST",
+                granularity='1h',
+                enable_scheduled_orders=True,
+                enforce_t_plus_one=True,
+                require_base_position_for_t_plus_one_intraday=True,
+                base_position_lots=0,
+            )
+        self.assertIn('底仓', str(ctx.exception))
+
+    def test_t_plus_one_intraday_default_base_position_is_two_lots(self):
+        class IntradaySellStrategy:
+            def __init__(self):
+                self.did_buy = False
+
+            def decide(self, open_price, close_price=None, avg_cost=0.0, shares=0, date=None, schedule_order=None, **kwargs):
+                _ = open_price, close_price, avg_cost, shares, date, kwargs
+                if not self.did_buy:
+                    self.did_buy = True
+                    if callable(schedule_order):
+                        schedule_order(action='sell', after_hours=1, tag='exit_1h')
+                    return 'buy'
+                return None
+
+        df = self.make_hourly_df()
+        sim = Simulator(lot_size=100, init_cash=100000.0)
+        result = sim.simulate(
+            df=df,
+            strategy=IntradaySellStrategy(),
+            symbol="TEST",
+            granularity='1h',
+            enable_scheduled_orders=True,
+            enforce_t_plus_one=True,
+            require_base_position_for_t_plus_one_intraday=True,
+        )
+
+        self.assertEqual(result['base_position_lots'], 2)
+        self.assertEqual(result['base_position_shares'], 200)
+        # 买入+卖出均成功，最终应回到底仓
+        self.assertEqual(result['shares'], 200)
 
 
 if __name__ == '__main__':
