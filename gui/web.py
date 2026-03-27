@@ -614,6 +614,6 @@ def view_result():
 if __name__ == '__main__':
     # 支持通过环境变量自定义主机和端口，方便测试使用非默认端口
     host = os.environ.get('HOST', '127.0.0.1')
-    port = int(os.environ.get('PORT', '5000'))
+    port = int(os.environ.get('PORT', '5001'))
     debug = os.environ.get('FLASK_ENV', '') != 'production'
     app.run(host=host, port=port, debug=debug)

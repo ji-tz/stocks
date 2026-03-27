@@ -2,12 +2,16 @@
 测试新的交易引擎架构
 """
 import unittest
+import inspect
 from datetime import datetime
 import pandas as pd
 
 from simulator.base_engine import Position, Account, TradeOrder, TradeResult
 from simulator.simulator_engine import SimulatorEngine
 from simulator.real_engine import RealEngine
+from simulator.backtest.exchange import BacktestExchange
+from simulator.realtime.exchange import RealtimeSimExchange
+from simulator.live.exchange import LiveExchange
 
 
 class TestBaseEngineStructures(unittest.TestCase):
@@ -219,6 +223,31 @@ class TestRealEngineInterface(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             engine.cancel_order("order123")
+
+
+class TestUnifiedExchangeInterface(unittest.TestCase):
+    """测试三个子目录实现具备完全一致的核心接口签名"""
+
+    def test_interface_signatures_are_consistent(self):
+        backtest = BacktestExchange
+        realtime = RealtimeSimExchange
+        live = LiveExchange
+
+        methods = [
+            "connect",
+            "disconnect",
+            "buy",
+            "sell",
+            "get_real_time_price",
+            "cancel_order",
+        ]
+
+        for method_name in methods:
+            sig1 = inspect.signature(getattr(backtest, method_name))
+            sig2 = inspect.signature(getattr(realtime, method_name))
+            sig3 = inspect.signature(getattr(live, method_name))
+            self.assertEqual(str(sig1), str(sig2))
+            self.assertEqual(str(sig1), str(sig3))
 
 
 class TestSimulatorWithVerbose(unittest.TestCase):
