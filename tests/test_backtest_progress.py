@@ -105,6 +105,21 @@ class TestBacktestProgress(unittest.TestCase):
         # 任务应该不存在了
         self.assertIsNone(self.progress.get_task(task_id))
 
+    def test_cancel_task(self):
+        """测试取消任务会推送取消事件。"""
+        task_id = self.progress.create_task()
+
+        self.progress.cancel_task(task_id)
+
+        task = self.progress.get_task(task_id)
+        self.assertIsNotNone(task)
+        self.assertEqual(task['status'], 'cancelled')
+        self.assertTrue(self.progress.is_cancelled(task_id))
+
+        events = list(self.progress.get_events(task_id))
+        self.assertEqual(len(events), 1)
+        self.assertEqual(events[0]['type'], 'cancelled')
+
 
 class TestSimulatorProgressCallback(unittest.TestCase):
     """测试模拟器进度回调"""

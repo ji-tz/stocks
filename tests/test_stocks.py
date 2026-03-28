@@ -103,8 +103,10 @@ class TestStocksModule(unittest.TestCase):
         self.assertIn('sma', specs)
         self.assertIn('mean_cost', specs)
         self.assertIn('fixed_amount', specs)
+        self.assertIn('a50_prev_night_1h', specs)
         self.assertEqual(specs['sma'].parameters[0].name, 'period')
         self.assertEqual(specs['fixed_amount'].parameters[0].name, 'fixed_amount')
+        self.assertEqual(specs['a50_prev_night_1h'].parameters[0].name, 'futures_symbol')
         self.assertEqual(specs['mean_cost'].supported_trade_prices, (stocks.TRADE_PRICE_OPEN,))
 
     @patch('stocks.run_fixed_amount')
@@ -167,6 +169,36 @@ class TestStocksModule(unittest.TestCase):
             progress_callback=None,
             trade_price='open',
             period=15,
+        )
+
+    @patch('stocks.run_futures_a50_prev_night')
+    def test_run_backtest_dispatches_a50_strategy(self, mock_run_a50):
+        mock_run_a50.return_value = {'symbol': '600900', 'total_value': 103000.0}
+
+        request = stocks.create_backtest_request(
+            symbol='600900',
+            strategy='a50_prev_night_1h',
+            source='auto',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=100,
+            init_cash=100000.0,
+            strategy_params={'futures_symbol': 'FTSE_A50', 'base_position_lots': '2'},
+        )
+        result = stocks.run_backtest(request)
+
+        self.assertEqual(result['symbol'], '600900')
+        mock_run_a50.assert_called_once_with(
+            symbol='600900',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=100,
+            init_cash=100000.0,
+            source='auto',
+            progress_callback=None,
+            trade_price='open',
+            futures_symbol='FTSE_A50',
+            base_position_lots=2,
         )
 
 

@@ -77,6 +77,20 @@ class AkshareProvider(BaseProvider):
                 volume_col="成交量",
             )
 
+        def _fetch_global_futures_hist() -> pd.DataFrame:
+            futures_df = ak.futures_global_hist_em(symbol=symbol)
+            if futures_df is None or futures_df.empty:
+                return pd.DataFrame()
+            return _normalize_ohlcv(
+                futures_df,
+                date_col="日期",
+                open_col="开盘",
+                high_col="最高",
+                low_col="最低",
+                close_col="最新价",
+                volume_col="总量",
+            )
+
         def _fetch_etf_hist() -> pd.DataFrame:
             etf_df = ak.fund_etf_hist_em(symbol=symbol,
                                          period="daily",
@@ -119,7 +133,10 @@ class AkshareProvider(BaseProvider):
             norm_df["volume"] = 0.0
             return norm_df[["date", "open", "high", "low", "close", "volume"]].sort_values("date").reset_index(drop=True)
 
-        fetchers = (_fetch_stock_hist, _fetch_etf_hist, _fetch_open_fund_nav)
+        fetchers = []
+        if any(ch.isalpha() for ch in symbol):
+            fetchers.append(_fetch_global_futures_hist)
+        fetchers.extend((_fetch_stock_hist, _fetch_etf_hist, _fetch_open_fund_nav))
 
         for attempt in range(1, self.max_attempts + 1):
             sess = requests.Session()

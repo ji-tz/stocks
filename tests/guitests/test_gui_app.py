@@ -57,6 +57,18 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('长江电力', body)
         self.assertIn('600519', body)
         self.assertIn('贵州茅台', body)
+        self.assertIn('缓存股票', body)
+        self.assertIn('最近使用', body)
+
+    def test_index_get_shows_recent_stock_history(self):
+        """测试首页会展示最近使用股票。"""
+        with self.client.session_transaction() as sess:
+            sess['recent_stock_codes'] = ['161725']
+
+        rv = self.client.get('/')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('161725', body)
 
     def test_search_stock_api_supports_etf_and_fund(self):
         """测试可搜索到指数基金与场外基金。"""
@@ -69,6 +81,20 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertEqual(rv_fund.status_code, 200)
         data_fund = rv_fund.get_json()
         self.assertEqual(data_fund.get('code'), '161725')
+
+    def test_select_stock_api_records_recent_history(self):
+        """测试选择股票会记录到最近使用列表。"""
+        rv = self.client.post(
+            '/api/select_stock',
+            json={'code': '161725', 'name': '招商中证白酒指数(LOF)'},
+            content_type='application/json',
+        )
+        self.assertEqual(rv.status_code, 200)
+        data = rv.get_json()
+        self.assertTrue(data['success'])
+
+        with self.client.session_transaction() as sess:
+            self.assertEqual(sess.get('recent_stock_codes'), ['161725'])
 
     @patch('stocks.create_backtest_request')
     @patch('stocks.run_backtest')
@@ -123,6 +149,9 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('600900', body)  # Stock code should be shown
         # Verify SSE connection setup is present
         self.assertIn('EventSource', body)
+        self.assertIn('交易瀑布流', body)
+        self.assertIn('跳过动画，直接看结果', body)
+        self.assertIn('放弃仿真并返回', body)
         task_id = self._extract_task_id(body)
         self._wait_for_task_completion(task_id)
 
@@ -238,6 +267,35 @@ class TestGuiRoutes(unittest.TestCase):
         # 日期输入框已移除
         self.assertNotIn('起始日期', body)
         self.assertNotIn('结束日期', body)
+
+    def test_select_strategy_page_contains_auto_registered_strategy(self):
+        """测试策略选择页会自动展示注册的新策略。"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        rv = self.client.get('/select_strategy')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('A50 前夜信号(1h)策略', body)
+        self.assertIn('a50_prev_night_1h', body)
+
+    def test_strategy_dynamic_page_get(self):
+        """测试自动注册策略可进入通用参数页。"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'a50_prev_night_1h'
+            sess['strategy_name'] = 'A50 前夜信号(1h)'
+            sess['run_mode'] = 'backtest'
+
+        rv = self.client.get('/strategy/a50_prev_night_1h')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('第五步：配置参数', body)
+        self.assertIn('策略说明', body)
+        self.assertIn('A50 期货代码', body)
+        self.assertIn('底仓手数', body)
 
     def test_result_page_contains_stock_price_chart(self):
         """测试复盘界面包含股价波动线（使用mock数据避免污染缓存）"""

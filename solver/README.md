@@ -120,6 +120,36 @@ def decide(self, open_price: float, close_price: float | None = None,
 5. 在 `tests/` 目录添加测试文件
 6. 更新本 README 文档
 
+### 自动接入（重要）
+
+从现在开始，策略支持自动接入，不需要再手工去 `stocks.py` 的注册表里加一条。
+
+约定如下：
+
+1. 策略文件放在 `solver/`，文件名以 `_strategy.py` 结尾。
+2. 在策略模块里声明 `AUTO_STRATEGY_SPEC`（字典），至少包含：
+   - `key`：策略唯一标识
+   - `label`：展示名
+   - `runner`：`stocks.py` 中执行函数名（字符串）
+3. 参数通过 `parameters` 数组声明，每项包含：
+   - `name`、`label`、`caster`（`int|float|str`）、`default`
+4. `stocks.py` 会在构建策略注册表时自动扫描并接入。
+
+示例（简化）：
+
+```python
+AUTO_STRATEGY_SPEC = {
+    "key": "a50_prev_night_1h",
+    "label": "A50 前夜信号(1h)",
+    "runner": "run_futures_a50_prev_night",
+    "parameters": [
+        {"name": "futures_symbol", "label": "A50 期货代码", "caster": "str", "default": "FTSE_A50"},
+        {"name": "base_position_lots", "label": "底仓手数", "caster": "int", "default": 2},
+    ],
+    "supported_trade_prices": ["open"],
+}
+```
+
 **示例：**
 ```python
 import dataclasses

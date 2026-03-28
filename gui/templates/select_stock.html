@@ -125,6 +125,7 @@
         border-radius: 8px; 
         padding: 2rem; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
       }
       .popular-stocks h3 { 
         margin-top: 0; 
@@ -159,6 +160,22 @@
         color: #666; 
         font-size: 0.9rem;
       }
+      .section-card {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+      }
+      .section-card h3 {
+        margin-top: 0;
+        color: #333;
+        margin-bottom: 1rem;
+      }
+      .empty-tip {
+        color: #777;
+        font-size: 0.95rem;
+      }
     </style>
   </head>
   <body>
@@ -182,6 +199,38 @@
 
     <div class="result-section" id="result-section">
       <div id="result-content"></div>
+    </div>
+
+    <div class="section-card">
+      <h3>🕘 最近使用</h3>
+      {% if recent_stocks %}
+      <div class="stock-grid">
+        {% for stock in recent_stocks %}
+        <div class="stock-card" onclick="selectStock('{{ stock.code }}', '{{ stock.name }}')">
+          <div class="code">{{ stock.code }}</div>
+          <div class="name">{{ stock.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-tip">当前还没有最近使用记录，选择过的股票会出现在这里。</div>
+      {% endif %}
+    </div>
+
+    <div class="section-card">
+      <h3>🗂️ 缓存股票</h3>
+      {% if cached_stocks %}
+      <div class="stock-grid">
+        {% for stock in cached_stocks %}
+        <div class="stock-card" onclick="selectStock('{{ stock.code }}', '{{ stock.name }}')">
+          <div class="code">{{ stock.code }}</div>
+          <div class="name">{{ stock.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-tip">当前还没有检测到本地缓存股票。</div>
+      {% endif %}
     </div>
 
     <div class="popular-stocks">
