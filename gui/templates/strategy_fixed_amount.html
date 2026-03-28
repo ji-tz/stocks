@@ -126,9 +126,9 @@
           <div class="param-hint">数据源选择，推荐使用"自动选择"</div>
         </label>
 
-        <label>每手股数
-          <input type="number" id="lot" name="lot" value="100" min="100" step="100" required />
-          <div class="param-hint">A股市场 1 手 = 100 股</div>
+        <label>交易单位（股/份）
+          <input type="number" id="lot" name="lot" value="100" min="0.01" step="0.01" required />
+          <div class="param-hint">股票常用 100；ETF/场外基金可设置为 1 或 0.01</div>
         </label>
 
         <label>初始资金（元）
@@ -144,11 +144,11 @@
             <span id="lot-amount" style="color: #e65100; font-weight: bold;">-</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
-            <span style="color: #333;">定投金额是一手金额的整数倍：</span>
+            <span style="color: #333;">定投金额是一手金额的整数倍（按交易单位折算）：</span>
             <span id="fixed-amount-multiple" style="color: #e65100; font-weight: bold;">-</span>
           </div>
           <div style="display: flex; justify-content: space-between; margin-top: 0.5rem;">
-            <span style="color: #333;">资金支持手数：</span>
+            <span style="color: #333;">资金支持交易单位数：</span>
             <span id="affordable-lots" style="color: #2e7d32; font-weight: bold;">-</span>
           </div>
           <div id="price-info" style="color: #999; font-size: 0.85rem; margin-top: 0.5rem;">加载中...</div>
@@ -225,7 +225,7 @@
           if (latestPrice === null) return;
 
           const fixedAmount = parseFloat(fixedAmountInput.value) || 0;
-          const lot = parseInt(lotInput.value) || 100;
+          const lot = parseFloat(lotInput.value) || 100;
           const cash = parseFloat(cashInput.value) || 0;
 
           // 计算每手金额
@@ -239,7 +239,7 @@
 
           // 计算资金支持手数
           const affordableLots = cash > 0 ? Math.floor(cash / lotAmount) : 0;
-          affordableLotsSpan.textContent = affordableLots + ' 手';
+          affordableLotsSpan.textContent = affordableLots + ' 单位';
 
           // 根据是否足够购买一手调整颜色
           if (affordableLots > 0) {

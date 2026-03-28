@@ -10,3 +10,5 @@
 - tests/guitests/test_gui_app.py 负责校验时间段页面的走势图与清缓存接口。
 - gui/web.py 的 /run 路由不再直接按 if/elif 分发策略，而是先收集通用参数与策略专属参数，再交给 stocks.create_backtest_request 和 stocks.run_backtest 统一执行。
 - gui/web.py 的策略专属参数提取由 _collect_strategy_form_params 负责，参数定义来源于 stocks.py 中的策略注册表。
+- gui/web.py 的 search_stock_by_query 已支持“精确匹配优先 + 模糊匹配兜底”，并在 gui/stock_list.json 中新增常用指数基金与场外基金代码。
+- strategy_* 模板与 /run 参数解析已放开交易单位为小数（lot 支持 float），满足基金按 1 或 0.01 份额粒度回测。

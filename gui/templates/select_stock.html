@@ -125,6 +125,7 @@
         border-radius: 8px; 
         padding: 2rem; 
         box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
       }
       .popular-stocks h3 { 
         margin-top: 0; 
@@ -159,6 +160,22 @@
         color: #666; 
         font-size: 0.9rem;
       }
+      .section-card {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        margin-bottom: 2rem;
+      }
+      .section-card h3 {
+        margin-top: 0;
+        color: #333;
+        margin-bottom: 1rem;
+      }
+      .empty-tip {
+        color: #777;
+        font-size: 0.95rem;
+      }
     </style>
   </head>
   <body>
@@ -182,6 +199,38 @@
 
     <div class="result-section" id="result-section">
       <div id="result-content"></div>
+    </div>
+
+    <div class="section-card">
+      <h3>🕘 最近使用</h3>
+      {% if recent_stocks %}
+      <div class="stock-grid">
+        {% for stock in recent_stocks %}
+        <div class="stock-card" onclick="selectStock('{{ stock.code }}', '{{ stock.name }}')">
+          <div class="code">{{ stock.code }}</div>
+          <div class="name">{{ stock.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-tip">当前还没有最近使用记录，选择过的股票会出现在这里。</div>
+      {% endif %}
+    </div>
+
+    <div class="section-card">
+      <h3>🗂️ 缓存股票</h3>
+      {% if cached_stocks %}
+      <div class="stock-grid">
+        {% for stock in cached_stocks %}
+        <div class="stock-card" onclick="selectStock('{{ stock.code }}', '{{ stock.name }}')">
+          <div class="code">{{ stock.code }}</div>
+          <div class="name">{{ stock.name }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty-tip">当前还没有检测到本地缓存股票。</div>
+      {% endif %}
     </div>
 
     <div class="popular-stocks">
@@ -235,24 +284,54 @@
           .then(data => {
             const resultSection = document.getElementById('result-section');
             const resultContent = document.getElementById('result-content');
-            
+
             if (data.error) {
               resultContent.innerHTML = '<div class="error-message">' + data.error + '</div>';
               resultSection.classList.add('show');
-            } else {
-              resultContent.innerHTML = 
-                '<div class="success-message">✓ 找到匹配的股票</div>' +
+              return;
+            }
+
+            // 支持单项返回（兼容旧API）和多项返回（results数组）
+            let items = [];
+            if (data.results && Array.isArray(data.results)) {
+              items = data.results;
+            } else if (data.code && data.name) {
+              items = [{ code: data.code, name: data.name }];
+            }
+
+            if (items.length === 0) {
+              resultContent.innerHTML = '<div class="error-message">未找到匹配的股票</div>';
+              resultSection.classList.add('show');
+              return;
+            }
+
+            // 构造结果列表；若仅有一项，保持旧的布局和按钮文案以兼容现有测试/流程
+            let html = '<div class="success-message">✓ 找到匹配的股票</div>';
+            if (items.length === 1) {
+              const it = items[0];
+              html +=
                 '<div class="stock-info">' +
                   '<div class="stock-info-left">' +
-                    '<h2>' + data.code + ' - ' + data.name + '</h2>' +
+                    '<h2>' + it.code + ' - ' + it.name + '</h2>' +
                     '<p>点击右侧按钮继续选择策略</p>' +
                   '</div>' +
                   '<div class="stock-info-right">' +
-                    '<button onclick="selectStock(\'' + data.code + '\', \'' + data.name + '\')">选择此股票 →</button>' +
+                      '<button onclick="selectStock(\'' + it.code + '\', \'' + it.name + '\')">选择此股票</button>' +
                   '</div>' +
                 '</div>';
-              resultSection.classList.add('show');
+            } else {
+              html += '<div class="search-results-list">';
+              for (const it of items) {
+                html += '<div class="search-result-item">' +
+                          '<div class="sr-left"><strong>' + it.code + '</strong> - ' + it.name + '</div>' +
+                          '<div class="sr-right"><button onclick="selectStock(\'' + it.code + '\', \'' + it.name + '\')">选择</button></div>' +
+                        '</div>';
+              }
+              html += '</div>';
             }
+
+            resultContent.innerHTML = html;
+            resultSection.classList.add('show');
           })
           .catch(err => {
             const resultSection = document.getElementById('result-section');

@@ -2,7 +2,7 @@
 
 ## 概述
 
-本模块提供统一的股票数据获取接口，支持多个数据源，并实现了数据缓存机制。
+本模块提供统一的行情获取接口，支持股票、ETF、场外基金，并实现了数据缓存机制。
 
 ## 架构设计
 
@@ -53,6 +53,12 @@ df = ak.stock_zh_a_hist(
     ...
 )
 ```
+
+当 `stock_zh_a_hist` 无数据时，`AkshareProvider` 会按顺序自动回退：
+1. `fund_etf_hist_em`（ETF 日线）
+2. `fund_open_fund_info_em`（场外基金单位净值走势）
+
+其中场外基金净值接口不提供日内 OHLC，系统会使用单位净值回填 open/high/low/close，volume 置为 0，以保持回测字段统一。
 
 参数说明：
 - `adjust=""`: 不复权

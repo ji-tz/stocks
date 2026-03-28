@@ -8,6 +8,8 @@
 """
 import os
 import traceback
+import importlib
+import pkgutil
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable, Mapping
 
@@ -66,7 +68,7 @@ class BacktestRequest:
     source: object = 'auto'
     start_date: Optional[str] = None
     end_date: Optional[str] = None
-    lot_size: int = 100
+    lot_size: float = 100.0
     init_cash: float = 100000.0
     trade_price: str = TRADE_PRICE_OPEN
     strategy_params: Dict[str, Any] = field(default_factory=dict)
@@ -118,6 +120,76 @@ def _normalize_strategy_params(spec: StrategySpec, strategy_params: Optional[Map
         normalized[parameter.name] = parameter.parse(params.get(parameter.name))
 
     return normalized
+
+
+def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
+    """自动发现 solver 下声明了 AUTO_STRATEGY_SPEC 的策略。"""
+    discovered: Dict[str, StrategySpec] = {}
+    caster_map: Dict[str, Callable[[Any], Any]] = {
+        'int': int,
+        'float': float,
+        'str': str,
+    }
+
+    try:
+        import solver
+    except Exception:
+        return discovered
+
+    for mod in pkgutil.iter_modules(solver.__path__):
+        if not mod.name.endswith('_strategy'):
+            continue
+        module_name = f"solver.{mod.name}"
+        try:
+            module = importlib.import_module(module_name)
+            raw = getattr(module, 'AUTO_STRATEGY_SPEC', None)
+            if not raw:
+                continue
+
+            key = str(raw.get('key', '')).strip()
+            label = str(raw.get('label', '')).strip()
+            runner_name = raw.get('runner')
+            if not key or not label or not isinstance(runner_name, str):
+                continue
+
+            runner = globals().get(runner_name)
+            if not callable(runner):
+                continue
+
+            parameters_raw = raw.get('parameters', []) or []
+            parameters: list[StrategyParameter] = []
+            for item in parameters_raw:
+                caster_name = str(item.get('caster', 'str'))
+                caster = caster_map.get(caster_name)
+                if caster is None:
+                    continue
+                parameters.append(
+                    StrategyParameter(
+                        name=str(item.get('name', '')).strip(),
+                        label=str(item.get('label', '')).strip(),
+                        caster=caster,
+                        default=item.get('default'),
+                        description=str(item.get('description', '')).strip(),
+                        required=bool(item.get('required', False)),
+                    )
+                )
+
+            supported_trade_prices_raw = raw.get('supported_trade_prices', [TRADE_PRICE_OPEN])
+            supported_trade_prices = tuple(str(v) for v in supported_trade_prices_raw)
+
+            discovered[key] = StrategySpec(
+                key=key,
+                label=label,
+                runner=runner,
+                parameters=tuple(parameters),
+                description=str(raw.get('description', '')).strip(),
+                supported_trade_prices=supported_trade_prices if supported_trade_prices else (TRADE_PRICE_OPEN,),
+            )
+        except Exception:
+            # 自动发现应是 best-effort，单个策略异常不应影响其他策略
+            continue
+
+    return discovered
 
 
 def init(cache_dir: str = "data") -> None:
@@ -172,7 +244,7 @@ def get_data(symbol: str = "600900",
 
 
 def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
-                  lot_size: int = 100, init_cash: float = 100000.0, source: object = "auto", 
+                  lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto", 
                   progress_callback: Optional[Callable[[int, int], None]] = None,
                   trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """调用均值成本模拟（封装自 solver.mean_cost_strategy.simulate_mean_cost）。"""
@@ -187,7 +259,7 @@ def run_fixed_amount(symbol: str = "600900",
                     start_date: Optional[str] = None,
                     end_date: Optional[str] = None,
                     fixed_amount: float = 1000.0,
-                    lot_size: int = 100,
+                    lot_size: float = 100.0,
                     init_cash: float = 100000.0,
                     source: object = "auto",
                     progress_callback: Optional[Callable[[int, int], None]] = None,
@@ -222,7 +294,7 @@ def run_fixed_amount(symbol: str = "600900",
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      start_date: Optional[str] = None, end_date: Optional[str] = None,
-                     lot_size: int = 100, init_cash: float = 100000.0, period: int = 20,
+                     lot_size: float = 100.0, init_cash: float = 100000.0, period: int = 20,
                      progress_callback: Optional[Callable[[int, int], None]] = None,
                      trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """使用统一模拟器运行 SMA 回测并返回统一的展示结果。
@@ -240,7 +312,7 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
     try:
         from simulator.simulator import simulate_sma
     except Exception as e:
-        raise RuntimeError(f"SMA 模拟器不可用: {e}")
+        raise RuntimeError(f"SMA 模拟器不可用: {e}") from e
 
     # 以传入的日期范围优先；若未传则使用 get_data 的默认参数
     if start_date is None and end_date is None:
@@ -259,9 +331,62 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
     return sim_res
 
 
+def run_futures_a50_prev_night(symbol: str = "600900", source: object = "auto",
+                               start_date: Optional[str] = None, end_date: Optional[str] = None,
+                               lot_size: float = 100.0, init_cash: float = 100000.0,
+                               futures_symbol: str = "CN00Y",
+                               base_position_lots: int = 2,
+                               progress_callback: Optional[Callable[[int, int], None]] = None,
+                               trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
+    """前一晚 A50 涨跌信号策略：上涨则买入并预约1小时后卖出。"""
+    try:
+        from simulator.simulator import Simulator
+        from solver.futures_open_hour_strategy import FuturesOpenHourDecision
+    except Exception as e:
+        raise RuntimeError(f"A50 策略模块不可用: {e}") from e
+
+    if start_date is None and end_date is None:
+        df = get_data(symbol=symbol, source=source)
+    else:
+        df = get_data(symbol=symbol, source=source, start_date=start_date or "19700101", end_date=end_date or "20500101")
+
+    df = df[["date", "open", "high", "low", "close", "volume"]]
+
+    strategy = FuturesOpenHourDecision(futures_symbol=futures_symbol, source=source)
+    # 运行前尝试确认能获取到期货数据，若无法获取则给出友好错误提示，避免回测悄悄无成交。
+    try:
+        futures_df = get_data(symbol=futures_symbol, source=source, cache_dir='data')
+    except Exception:
+        futures_df = None
+
+    if futures_df is None or getattr(futures_df, 'empty', False):
+        raise RuntimeError(
+            f"无法获取期货数据: {futures_symbol}. 策略需要前一晚的期货收盘价以生成买入信号。\n"
+            "请确认已在本地缓存该期货数据（data/ 目录）或在 web 界面中指定可用的 futures_symbol。"
+        )
+
+    # 将已获取的期货数据注入决策器，避免在回测循环中重复下载
+    strategy.futures_df = futures_df
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+    return sim.simulate(
+        df=df,
+        strategy=strategy,
+        symbol=symbol,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+        granularity='1h',
+        enable_scheduled_orders=True,
+        enforce_t_plus_one=True,
+        require_base_position_for_t_plus_one_intraday=True,
+        base_position_lots=base_position_lots,
+        mode='backtest',
+    )
+
+
 def _build_strategy_registry() -> Dict[str, StrategySpec]:
     """构建策略注册表。"""
-    return {
+    registry = {
         'sma': StrategySpec(
             key='sma',
             label='SMA',
@@ -300,6 +425,10 @@ def _build_strategy_registry() -> Dict[str, StrategySpec]:
         ),
     }
 
+    # 自动接入：扫描 solver 下声明了 AUTO_STRATEGY_SPEC 的策略
+    registry.update(_discover_auto_strategy_specs())
+    return registry
+
 
 def list_strategy_specs() -> list[StrategySpec]:
     """返回当前所有已注册策略。"""
@@ -319,7 +448,7 @@ def create_backtest_request(symbol: str = '600900',
                             source: object = 'auto',
                             start_date: Optional[str] = None,
                             end_date: Optional[str] = None,
-                            lot_size: int = 100,
+                            lot_size: float = 100.0,
                             init_cash: float = 100000.0,
                             trade_price: str = TRADE_PRICE_OPEN,
                             strategy_params: Optional[Mapping[str, Any]] = None,
@@ -337,7 +466,7 @@ def create_backtest_request(symbol: str = '600900',
         source=source,
         start_date=_validate_date_str(start_date),
         end_date=_validate_date_str(end_date),
-        lot_size=int(lot_size),
+        lot_size=float(lot_size),
         init_cash=float(init_cash),
         trade_price=trade_price,
         strategy_params=_normalize_strategy_params(spec, strategy_params),

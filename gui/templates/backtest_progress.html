@@ -5,277 +5,351 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>回测仿真进行中 - Stocks</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            background: linear-gradient(135deg, #0f172a 0%, #1d4ed8 55%, #93c5fd 100%);
             min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
             padding: 20px;
         }
-
         .container {
-            background: white;
-            border-radius: 12px;
-            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-            padding: 40px;
-            max-width: 600px;
+            background: rgba(255, 255, 255, 0.96);
+            border-radius: 18px;
+            box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+            padding: 32px;
+            max-width: 1100px;
             width: 100%;
+            margin: 0 auto;
         }
-
-        h1 {
-            color: #333;
-            margin-bottom: 10px;
-            font-size: 28px;
-            text-align: center;
+        h1 { color: #0f172a; margin-bottom: 10px; font-size: 30px; text-align: center; }
+        .subtitle { color: #475569; text-align: center; margin-bottom: 24px; font-size: 16px; }
+        .layout {
+            display: grid;
+            grid-template-columns: minmax(320px, 1fr) minmax(320px, 1.2fr);
+            gap: 20px;
         }
-
-        .subtitle {
-            color: #666;
-            text-align: center;
-            margin-bottom: 30px;
-            font-size: 16px;
-        }
-
-        .info-card {
-            background: #f8f9fa;
-            border-radius: 8px;
+        .panel {
+            background: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 14px;
             padding: 20px;
-            margin-bottom: 30px;
         }
-
-        .info-item {
-            display: flex;
-            justify-content: space-between;
-            margin-bottom: 10px;
-            font-size: 14px;
-        }
-
-        .info-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .info-label {
-            color: #666;
-            font-weight: 500;
-        }
-
-        .info-value {
-            color: #333;
-            font-weight: 600;
-        }
-
-        .progress-section {
-            margin-bottom: 30px;
-        }
-
-        .progress-label {
-            color: #333;
-            font-size: 14px;
-            margin-bottom: 10px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .progress-percentage {
-            font-size: 18px;
-            font-weight: 600;
-            color: #667eea;
-        }
-
-        .progress-bar-container {
-            background: #e9ecef;
-            border-radius: 10px;
-            height: 20px;
-            overflow: hidden;
-            position: relative;
-        }
-
-        .progress-bar {
-            background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
-            height: 100%;
-            width: 0%;
-            transition: width 0.3s ease;
-            border-radius: 10px;
-        }
-
-        .progress-text {
-            color: #666;
-            font-size: 14px;
-            margin-top: 10px;
-            text-align: center;
-        }
-
+        .info-item { display: flex; justify-content: space-between; margin-bottom: 10px; font-size: 14px; }
+        .info-item:last-child { margin-bottom: 0; }
+        .info-label { color: #64748b; font-weight: 500; }
+        .info-value { color: #0f172a; font-weight: 700; }
         .status {
             text-align: center;
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 18px;
             font-size: 14px;
         }
-
-        .status.running {
-            background: #e3f2fd;
-            color: #1976d2;
-        }
-
-        .status.completed {
-            background: #e8f5e9;
-            color: #2e7d32;
-        }
-
-        .status.error {
-            background: #ffebee;
-            color: #c62828;
-        }
-
+        .status.running { background: #dbeafe; color: #1d4ed8; }
+        .status.completed { background: #dcfce7; color: #15803d; }
+        .status.error { background: #fee2e2; color: #b91c1c; }
+        .status.cancelled { background: #fef3c7; color: #b45309; }
         .spinner {
             display: inline-block;
             width: 16px;
             height: 16px;
-            border: 3px solid rgba(102, 126, 234, 0.3);
+            border: 3px solid rgba(29, 78, 216, 0.25);
             border-radius: 50%;
-            border-top-color: #667eea;
+            border-top-color: #1d4ed8;
             animation: spin 1s ease-in-out infinite;
             margin-right: 8px;
             vertical-align: middle;
         }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .progress-label {
+            color: #0f172a;
+            font-size: 14px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-
+        .progress-percentage { font-size: 22px; font-weight: 700; color: #1d4ed8; }
+        .progress-bar-container {
+            background: #dbeafe;
+            border-radius: 999px;
+            height: 18px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-bar {
+            background: linear-gradient(90deg, #1d4ed8 0%, #0ea5e9 100%);
+            height: 100%;
+            width: 0%;
+            transition: width 0.25s ease;
+            border-radius: 999px;
+        }
+        .progress-text { color: #475569; font-size: 14px; margin-top: 10px; }
+        .button-row {
+            display: flex;
+            gap: 12px;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
         .button {
-            display: inline-block;
-            padding: 12px 24px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 12px 18px;
+            background: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 100%);
             color: white;
             text-decoration: none;
-            border-radius: 6px;
-            font-size: 16px;
-            font-weight: 500;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 600;
             border: none;
             cursor: pointer;
             transition: transform 0.2s, box-shadow 0.2s;
-            width: 100%;
+            flex: 1 1 180px;
+        }
+        .button.secondary { background: #e2e8f0; color: #0f172a; }
+        .button.warning { background: linear-gradient(135deg, #f59e0b 0%, #ea580c 100%); }
+        .button:hover { transform: translateY(-1px); box-shadow: 0 6px 18px rgba(30, 64, 175, 0.18); }
+        .button:disabled { opacity: 0.55; cursor: not-allowed; transform: none; box-shadow: none; }
+        .hidden { display: none; }
+        .log-panel-title {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        .log-panel-title h2 { font-size: 18px; color: #0f172a; }
+        .log-hint { color: #64748b; font-size: 13px; }
+        .log-stream {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 12px;
+            padding: 14px;
+            min-height: 420px;
+            max-height: 560px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .log-entry {
+            border-left: 3px solid #38bdf8;
+            padding: 10px 12px;
+            background: rgba(30, 41, 59, 0.9);
+            border-radius: 8px;
+        }
+        .log-entry.buy { border-left-color: #22c55e; }
+        .log-entry.sell { border-left-color: #f97316; }
+        .log-entry.meta { border-left-color: #a78bfa; }
+        .log-title {
+            display: flex;
+            justify-content: space-between;
+            gap: 10px;
+            font-weight: 700;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+        .log-body { color: #cbd5e1; font-size: 13px; line-height: 1.6; }
+        .log-empty {
+            color: #94a3b8;
             text-align: center;
+            padding: 40px 12px;
+            font-size: 14px;
         }
-
-        .button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
-        }
-
-        .button:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
-        }
-
-        .hidden {
-            display: none;
+        @media (max-width: 960px) {
+            .layout { grid-template-columns: 1fr; }
+            .container { padding: 20px; }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <h1>回测仿真进行中</h1>
-        <p class="subtitle">正在执行回测策略，请稍候...</p>
+        <p class="subtitle">回测完成后会按 10 秒左右的节奏回放交易过程，你也可以随时跳过或返回上一步。</p>
 
-        <div class="info-card">
-            <div class="info-item">
-                <span class="info-label">股票代码</span>
-                <span class="info-value">{{ symbol }}</span>
+        <div class="layout">
+            <div class="panel">
+                <div class="info-item">
+                    <span class="info-label">股票代码</span>
+                    <span class="info-value">{{ symbol }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">策略类型</span>
+                    <span class="info-value" id="strategy-name">{{ strategy_label }}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">回退入口</span>
+                    <span class="info-value">参数配置页</span>
+                </div>
+
+                <div id="status-running" class="status running" style="margin-top: 18px;">
+                    <span class="spinner"></span>
+                    正在执行回测...
+                </div>
+
+                <div id="status-completed" class="status completed hidden">
+                    ✓ 回放完成，可以查看结果。
+                </div>
+
+                <div id="status-error" class="status error hidden">
+                    ✗ 回测失败：<span id="error-message"></span>
+                </div>
+
+                <div id="status-cancelled" class="status cancelled hidden">
+                    已放弃当前回测，正在返回上一步。
+                </div>
+
+                <div class="progress-section">
+                    <div class="progress-label">
+                        <span>回测进度</span>
+                        <span class="progress-percentage" id="progress-percentage">0%</span>
+                    </div>
+                    <div class="progress-bar-container">
+                        <div class="progress-bar" id="progress-bar"></div>
+                    </div>
+                    <div class="progress-text" id="progress-text">准备开始...</div>
+                </div>
+
+                <div class="button-row">
+                    <button id="skip-btn" class="button warning" onclick="skipReplay()">跳过动画，直接看结果</button>
+                    <button id="cancel-btn" class="button secondary" onclick="cancelAndGoBack()">放弃仿真并返回</button>
+                    <button id="view-result-btn" class="button hidden" onclick="viewResult()">查看回测结果</button>
+                </div>
             </div>
-            <div class="info-item">
-                <span class="info-label">策略类型</span>
-                <span class="info-value" id="strategy-name">{{ strategy }}</span>
+
+            <div class="panel">
+                <div class="log-panel-title">
+                    <h2>交易瀑布流</h2>
+                    <div class="log-hint" id="log-hint">等待回测结果...</div>
+                </div>
+                <div class="log-stream" id="log-stream">
+                    <div class="log-empty" id="log-empty">回测完成后，将按时间顺序展示每次交易触发、成交金额、时间和剩余资金。</div>
+                </div>
             </div>
         </div>
-
-        <div id="status-running" class="status running">
-            <span class="spinner"></span>
-            正在执行回测...
-        </div>
-
-        <div id="status-completed" class="status completed hidden">
-            ✓ 回测完成！
-        </div>
-
-        <div id="status-error" class="status error hidden">
-            ✗ 回测失败：<span id="error-message"></span>
-        </div>
-
-        <div class="progress-section">
-            <div class="progress-label">
-                <span>回测进度</span>
-                <span class="progress-percentage" id="progress-percentage">0%</span>
-            </div>
-            <div class="progress-bar-container">
-                <div class="progress-bar" id="progress-bar"></div>
-            </div>
-            <div class="progress-text" id="progress-text">准备开始...</div>
-        </div>
-
-        <button id="view-result-btn" class="button hidden" onclick="viewResult()">
-            查看回测结果
-        </button>
     </div>
 
     <script>
         const taskId = '{{ task_id }}';
-        let resultData = null;
-
-        // 策略名称映射
-        const strategyNames = {
-            'sma': 'SMA 策略',
-            'mean_cost': '均值成本策略',
-            'fixed_amount': '定投策略'
-        };
-
-        // 更新策略名称显示
-        const strategyElement = document.getElementById('strategy-name');
         const strategy = {{ strategy|tojson }};
-        if (strategyNames[strategy]) {
-            strategyElement.textContent = strategyNames[strategy];
+        const backUrl = {{ back_url|tojson }};
+        const replayDurationMs = 10000;
+        let resultData = null;
+        let replayFinished = false;
+        let skipRequested = false;
+        let eventSource = new EventSource(`/api/progress/${taskId}`);
+
+        function setProgress(percentage, text) {
+            document.getElementById('progress-bar').style.width = percentage + '%';
+            document.getElementById('progress-percentage').textContent = `${Math.max(0, Math.min(100, Math.round(percentage)))}%`;
+            document.getElementById('progress-text').textContent = text;
         }
 
-        // 连接SSE获取进度更新
-        const eventSource = new EventSource(`/api/progress/${taskId}`);
+        function appendLogEntry(entry) {
+            const logStream = document.getElementById('log-stream');
+            const empty = document.getElementById('log-empty');
+            if (empty) {
+                empty.remove();
+            }
+
+            const wrapper = document.createElement('div');
+            wrapper.className = `log-entry ${entry.kind || 'meta'}`;
+            wrapper.innerHTML = `
+                <div class="log-title">
+                    <span>${entry.title}</span>
+                    <span>${entry.time || ''}</span>
+                </div>
+                <div class="log-body">${entry.body}</div>
+            `;
+            logStream.appendChild(wrapper);
+            logStream.scrollTop = logStream.scrollHeight;
+        }
+
+        function buildTradeEntries(result) {
+            const trades = Array.isArray(result.trades_list) ? result.trades_list : [];
+            if (!trades.length) {
+                return [{
+                    kind: 'meta',
+                    title: '未触发交易',
+                    time: result.end_date || '',
+                    body: '本次回测没有触发实际买卖，可能是策略条件未满足，或仅保留底仓未发生额外交易。'
+                }];
+            }
+
+            return trades.map((trade, index) => {
+                const amount = Number(trade.price || 0) * Number(trade.shares || 0);
+                const actionLabel = trade.action === 'buy' ? '买入触发' : '卖出触发';
+                return {
+                    kind: trade.action,
+                    title: `${String(index + 1).padStart(2, '0')} | ${actionLabel}`,
+                    time: trade.date || '',
+                    body: `数量 ${trade.shares || 0}，成交价 ${trade.price || 0}，成交金额 ${amount.toFixed(2)}，剩余资金 ${trade.cash ?? '-'}，来源 ${trade.source || 'strategy'}`
+                };
+            });
+        }
+
+        function finishReplay() {
+            replayFinished = true;
+            document.getElementById('status-running').classList.add('hidden');
+            document.getElementById('status-completed').classList.remove('hidden');
+            document.getElementById('view-result-btn').classList.remove('hidden');
+            document.getElementById('skip-btn').disabled = true;
+            document.getElementById('skip-btn').textContent = '已完成';
+            setProgress(100, '交易回放完成，可以查看结果。');
+            document.getElementById('log-hint').textContent = '回放完成';
+        }
+
+        function startReplay(result) {
+            resultData = result;
+            const entries = buildTradeEntries(result);
+            const logHint = document.getElementById('log-hint');
+            logHint.textContent = `共 ${entries.length} 条交易事件`;
+
+            if (skipRequested) {
+                entries.forEach(appendLogEntry);
+                finishReplay();
+                return;
+            }
+
+            const startedAt = Date.now();
+            appendLogEntry({
+                kind: 'meta',
+                title: '回测完成',
+                time: result.end_date || '',
+                body: `总资产 ${result.total_value ?? '-'}，交易次数 ${result.trades ?? 0}，开始回放交易过程。`
+            });
+
+            entries.forEach((entry, index) => {
+                const delay = Math.floor((replayDurationMs / Math.max(entries.length, 1)) * index);
+                window.setTimeout(() => {
+                    appendLogEntry(entry);
+                    const elapsed = Date.now() - startedAt;
+                    const percentage = Math.min(100, (elapsed / replayDurationMs) * 100);
+                    setProgress(percentage, `正在回放交易日志（${index + 1}/${entries.length}）`);
+                    if (index === entries.length - 1) {
+                        window.setTimeout(finishReplay, 250);
+                    }
+                }, delay);
+            });
+        }
 
         eventSource.onmessage = function(event) {
             const data = JSON.parse(event.data);
 
             if (data.type === 'progress') {
-                // 更新进度条
-                const percentage = data.percentage;
-                document.getElementById('progress-bar').style.width = percentage + '%';
-                document.getElementById('progress-percentage').textContent = percentage + '%';
-                document.getElementById('progress-text').textContent = 
-                    `正在处理第 ${data.current} / ${data.total} 天的数据`;
+                setProgress(data.percentage, `正在处理第 ${data.current} / ${data.total} 条行情数据`);
             } else if (data.type === 'completed') {
-                // 回测完成
-                resultData = data.result;
-                document.getElementById('status-running').classList.add('hidden');
-                document.getElementById('status-completed').classList.remove('hidden');
-                document.getElementById('progress-percentage').textContent = '100%';
-                document.getElementById('progress-bar').style.width = '100%';
-                document.getElementById('progress-text').textContent = '回测完成！';
-                document.getElementById('view-result-btn').classList.remove('hidden');
                 eventSource.close();
+                startReplay(data.result);
             } else if (data.type === 'error') {
-                // 回测出错
                 document.getElementById('status-running').classList.add('hidden');
                 document.getElementById('status-error').classList.remove('hidden');
                 document.getElementById('error-message').textContent = data.error;
+                document.getElementById('skip-btn').disabled = true;
+                eventSource.close();
+            } else if (data.type === 'cancelled') {
+                document.getElementById('status-running').classList.add('hidden');
+                document.getElementById('status-cancelled').classList.remove('hidden');
                 eventSource.close();
             }
         };
@@ -285,22 +359,42 @@
             eventSource.close();
         };
 
-        function viewResult() {
-            if (resultData) {
-                // 创建一个表单并提交结果数据
-                const form = document.createElement('form');
-                form.method = 'POST';
-                form.action = '/view_result';
-                
-                const input = document.createElement('input');
-                input.type = 'hidden';
-                input.name = 'result_json';
-                input.value = JSON.stringify(resultData);
-                
-                form.appendChild(input);
-                document.body.appendChild(form);
-                form.submit();
+        function skipReplay() {
+            skipRequested = true;
+            if (resultData && !replayFinished) {
+                document.getElementById('log-stream').innerHTML = '';
+                buildTradeEntries(resultData).forEach(appendLogEntry);
+                finishReplay();
+                return;
             }
+            document.getElementById('skip-btn').disabled = true;
+            document.getElementById('skip-btn').textContent = '回测完成后将直接展示';
+            document.getElementById('log-hint').textContent = '已请求跳过动画';
+        }
+
+        function cancelAndGoBack() {
+            fetch(`/api/progress/${taskId}/cancel`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            }).finally(() => {
+                window.location.href = backUrl;
+            });
+        }
+
+        function viewResult() {
+            if (!resultData) {
+                return;
+            }
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '/view_result';
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = 'result_json';
+            input.value = JSON.stringify(resultData);
+            form.appendChild(input);
+            document.body.appendChild(form);
+            form.submit();
         }
     </script>
 </body>

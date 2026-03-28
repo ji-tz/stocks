@@ -1,55 +1,66 @@
-# Simulator 模块（精简版）
+# Simulator 模块
 
 ## 目标
-提供统一的交易引擎接口，支持模拟交易并为实盘扩展预留。
+
+提供统一的股票交易所接口，支持在三种运行形态之间无缝切换：
+
+- 回测仿真（backtest）
+- 实时仿真（realtime）
+- 实盘交易（live）
 
 ## 目录结构
+
 - `simulator/base_engine.py`：抽象接口与数据结构
-- `simulator/simulator_engine.py`：内存模拟引擎
-- `simulator/real_engine.py`：实盘接口占位
-- `simulator/simulator.py`：高层 `Simulator`（向后兼容）
+- `simulator/exchange_interface.py`：股票交易所统一接口（`StockExchange`）
+- `simulator/backtest/`：回测仿真实现（`BacktestExchange`）
+- `simulator/backtest/clock.py`：回测时钟（`BacktestClock`）
+- `simulator/realtime/`：实时仿真实现（`RealtimeSimExchange`）
+- `simulator/live/`：实盘交易实现（`LiveExchange`）
+- `simulator/simulated_exchange.py`：仿真类实现的公共逻辑
+- `simulator/simulator_engine.py`：兼容层（等价 `BacktestExchange`）
+- `simulator/real_engine.py`：兼容层（等价 `LiveExchange`）
+- `simulator/simulator.py`：高层回测执行器（`BacktestExchangeRunner`，兼容别名 `Simulator`）
 
 ## 关键接口
-`BaseEngine` 统一约定：`buy()`、`sell()`、`get_cash()`、`get_position()`、`get_account()`、`get_total_value()`、`get_summary()`。
 
-`Simulator.simulate()` 负责统一遍历日线数据、调用策略决策、按指定交易价格字段执行成交。
-当前默认使用 `open`，但内部已经为后续扩展到 `close`、`high`、`low` 等字段预留了统一入口。
+三种交易所实现接口保持一致，核心方法为：
 
-## 运行方式
-- 推荐使用 `Simulator`：内部封装引擎与策略执行。
-- 直接使用 `SimulatorEngine`：手动控制买卖。
+- `connect()` / `disconnect()`
+- `buy(date, price, shares=None)`
+- `sell(date, price, shares=None)`
+- `get_real_time_price(symbol)`
+- `cancel_order(order_id)`
 
-## 日志与报告
-`verbose=True` 时输出逐日交易日志与最终汇总报告。
+同时保留 `BaseEngine` 的账户查询方法：`get_cash()`、`get_position()`、`get_account()`、`get_total_value()`、`get_summary()`。
 
-## 进度回调支持（新功能）
-`Simulator.simulate()` 和相关函数支持 `progress_callback` 参数：
+## 回测时钟驱动
+
+高层回测执行器（`BacktestExchangeRunner`，兼容别名 `Simulator`）在 `mode='backtest'` 下运行。
+
+- 回测模式下，行情推进与策略执行由 `BacktestClock` 驱动：每个 tick 推进一个 bar。
+- 返回结果中会包含：`clock_type='backtest'`、`mode='backtest'`。
+- 当 `mode` 不是 `backtest` 时，会直接报错，不执行回测循环。
+
+## 进度回调支持
+
+`BacktestExchangeRunner.run()`/`Simulator.simulate()` 和相关便捷函数支持 `progress_callback` 参数：
+
 - 回调函数签名：`def callback(current: int, total: int) -> None`
-- 在处理每一天数据后调用，报告当前进度
-- 用于Web界面实时显示回测进度，避免长时间无响应
-- 示例：
-  ```python
-  def progress_callback(current, total):
-      percentage = int(current / total * 100)
-      print(f"进度: {percentage}%")
-  
-  sim = Simulator(lot_size=100, init_cash=100000)
-  result = sim.simulate(df=df, strategy=strategy, progress_callback=progress_callback)
-  ```
+- 在处理每个 tick 后调用，报告当前进度
+- 可用于 Web 界面实时显示回测进度
 
 ## 返回结果字段
-`Simulator.simulate()` 返回包含以下关键字段的字典：
-- `max_capital_used`：最大占用资金（初始资金 - 最小现金余额），表示完成策略所需的最低本金
-- `min_cash`：最小现金余额，投资过程中现金的最低点
-- `total_value`：最终总资产
-- `realized_pl`：已实现盈亏
-- `unrealized_pl`：未实现盈亏
-- `trades`：交易次数
-- `history`：每日资产历史记录
-- `trades_list`：交易明细列表
+
+`Simulator.simulate()` 返回包含以下关键字段：
+
+- `clock_type`、`mode`
+- `trade_price_field`、`granularity`
+- `max_capital_used`、`min_cash`
+- `total_value`、`realized_pl`、`unrealized_pl`
+- `trades`、`history`、`trades_list`
 
 ## 测试入口
+
 - `tests/test_simulator.py`
 - `tests/test_simulator_engine.py`
-- `tests/test_backtest_progress.py` - 进度回调测试
-- `demo_simulator.py`
+- `tests/test_backtest_progress.py`

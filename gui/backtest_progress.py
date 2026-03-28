@@ -32,6 +32,7 @@ class BacktestProgress:
                 'progress': 0,
                 'total': 0,
                 'status': 'pending',
+                'cancelled': False,
                 'error': None,
                 'result': None,
                 'queue': Queue()
@@ -52,6 +53,8 @@ class BacktestProgress:
                 return
             
             task = self._tasks[task_id]
+            if task.get('cancelled'):
+                return
             task['progress'] = current
             task['total'] = total
             task['status'] = 'running'
@@ -79,6 +82,8 @@ class BacktestProgress:
                 return
             
             task = self._tasks[task_id]
+            if task.get('cancelled'):
+                return
             task['result'] = result
             task['status'] = 'completed'
             
@@ -100,6 +105,8 @@ class BacktestProgress:
                 return
             
             task = self._tasks[task_id]
+            if task.get('cancelled'):
+                return
             task['error'] = error
             task['status'] = 'error'
             
@@ -108,6 +115,30 @@ class BacktestProgress:
                 'type': 'error',
                 'error': error
             })
+
+    def cancel_task(self, task_id: str):
+        """取消任务并通知前端停止等待。"""
+        with self._lock:
+            if task_id not in self._tasks:
+                return
+
+            task = self._tasks[task_id]
+            if task.get('cancelled'):
+                return
+
+            task['cancelled'] = True
+            task['status'] = 'cancelled'
+            task['queue'].put({
+                'type': 'cancelled'
+            })
+
+    def is_cancelled(self, task_id: str) -> bool:
+        """判断任务是否已取消。"""
+        with self._lock:
+            task = self._tasks.get(task_id)
+            if not task:
+                return False
+            return bool(task.get('cancelled'))
     
     def get_task(self, task_id: str) -> Optional[Dict[str, Any]]:
         """获取任务信息
@@ -141,7 +172,7 @@ class BacktestProgress:
             yield event
             
             # 如果是完成或错误事件，结束流
-            if event['type'] in ('completed', 'error'):
+            if event['type'] in ('completed', 'error', 'cancelled'):
                 break
     
     def cleanup_task(self, task_id: str):

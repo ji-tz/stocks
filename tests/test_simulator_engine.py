@@ -2,12 +2,16 @@
 测试新的交易引擎架构
 """
 import unittest
+import inspect
 from datetime import datetime
 import pandas as pd
 
 from simulator.base_engine import Position, Account, TradeOrder, TradeResult
 from simulator.simulator_engine import SimulatorEngine
 from simulator.real_engine import RealEngine
+from simulator.backtest.exchange import BacktestExchange
+from simulator.realtime.exchange import RealtimeSimExchange
+from simulator.live.exchange import LiveExchange
 
 
 class TestBaseEngineStructures(unittest.TestCase):
@@ -79,6 +83,16 @@ class TestSimulatorEngine(unittest.TestCase):
         self.assertEqual(result.cash_after, 90000.0)
         self.assertEqual(engine.get_position().shares, 100)
         self.assertEqual(engine.get_cash(), 90000.0)
+
+    def test_buy_success_with_fractional_shares(self):
+        """测试基金场景：支持小数份额买入。"""
+        engine = SimulatorEngine(init_cash=10000.0, lot_size=0.01)
+        date = datetime(2023, 1, 1)
+        result = engine.buy(date=date, price=1.234, shares=100.25)
+
+        self.assertTrue(result.success)
+        self.assertAlmostEqual(result.shares_after, 100.25, places=6)
+        self.assertAlmostEqual(result.cash_after, 10000.0 - 1.234 * 100.25, places=6)
 
     def test_buy_insufficient_cash(self):
         """测试资金不足无法买入"""
@@ -209,6 +223,31 @@ class TestRealEngineInterface(unittest.TestCase):
 
         with self.assertRaises(NotImplementedError):
             engine.cancel_order("order123")
+
+
+class TestUnifiedExchangeInterface(unittest.TestCase):
+    """测试三个子目录实现具备完全一致的核心接口签名"""
+
+    def test_interface_signatures_are_consistent(self):
+        backtest = BacktestExchange
+        realtime = RealtimeSimExchange
+        live = LiveExchange
+
+        methods = [
+            "connect",
+            "disconnect",
+            "buy",
+            "sell",
+            "get_real_time_price",
+            "cancel_order",
+        ]
+
+        for method_name in methods:
+            sig1 = inspect.signature(getattr(backtest, method_name))
+            sig2 = inspect.signature(getattr(realtime, method_name))
+            sig3 = inspect.signature(getattr(live, method_name))
+            self.assertEqual(str(sig1), str(sig2))
+            self.assertEqual(str(sig1), str(sig3))
 
 
 class TestSimulatorWithVerbose(unittest.TestCase):

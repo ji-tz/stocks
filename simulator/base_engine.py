@@ -12,7 +12,7 @@ from datetime import datetime
 @dataclass
 class Position:
     """持仓信息"""
-    shares: int = 0  # 持股数量
+    shares: float = 0.0  # 持股数量（支持基金按份额小数交易）
     avg_cost: float = 0.0  # 平均成本
     total_cost: float = 0.0  # 总成本
 
@@ -39,7 +39,7 @@ class TradeOrder:
     date: datetime  # 交易日期
     action: str  # 'buy' 或 'sell'
     price: float  # 交易价格
-    shares: int  # 交易股数
+    shares: float  # 交易股数
 
 
 @dataclass
@@ -49,7 +49,7 @@ class TradeResult:
     message: str = ""  # 消息说明
     order: Optional[TradeOrder] = None  # 订单信息
     cash_after: float = 0.0  # 交易后现金
-    shares_after: int = 0  # 交易后持股
+    shares_after: float = 0.0  # 交易后持股
     realized_pl: float = 0.0  # 已实现盈亏
 
 
@@ -66,14 +66,14 @@ class BaseEngine(ABC):
     - RealEngine: 实盘交易引擎（实际交易，预留）
     """
 
-    def __init__(self, init_cash: float = 100000.0, lot_size: int = 100):
+    def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0):
         """初始化交易引擎
 
         Args:
             init_cash: 初始资金
             lot_size: 交易手数（每次买卖的股数）
         """
-        self.lot_size = lot_size
+        self.lot_size = float(lot_size)
         self.account = Account(cash=init_cash)
         self.realized_pl = 0.0  # 累计已实现盈亏
 

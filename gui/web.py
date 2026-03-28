@@ -122,6 +122,101 @@ def _collect_strategy_form_params(strategy_key: str) -> dict:
             params[parameter.name] = raw_value
     return params
 
+
+def _list_strategy_specs() -> list[stocks.StrategySpec]:
+    """返回按 key 排序的策略列表，保证页面展示稳定。"""
+    specs = stocks.list_strategy_specs()
+    return sorted(specs, key=lambda item: item.key)
+
+
+def _build_strategy_parameter_view(strategy_key: str) -> list[dict]:
+    """构造策略参数在前端渲染所需的视图模型。"""
+    spec = stocks.get_strategy_spec(strategy_key)
+    items: list[dict] = []
+    for parameter in spec.parameters:
+        input_type = 'text'
+        input_step = None
+        if parameter.caster is int:
+            input_type = 'number'
+            input_step = '1'
+        elif parameter.caster is float:
+            input_type = 'number'
+            input_step = '0.01'
+
+        items.append(
+            {
+                'name': parameter.name,
+                'label': parameter.label,
+                'default': parameter.default,
+                'description': parameter.description,
+                'required': parameter.required,
+                'input_type': input_type,
+                'input_step': input_step,
+            }
+        )
+    return items
+
+
+def _render_strategy_selection(stock_code: str, stock_name: str):
+    """渲染策略选择页（动态策略注册）。"""
+    strategy_specs = _list_strategy_specs()
+    return render_template(
+        'select_strategy.html',
+        stock_code=stock_code,
+        stock_name=stock_name,
+        strategy_specs=strategy_specs,
+    )
+
+
+def _lookup_stock_info(stock_code: str) -> dict[str, str]:
+    """按股票代码返回展示信息。"""
+    _init_stock_data()
+    stock = _STOCK_INDEX.get(stock_code) if _STOCK_INDEX else None
+    if isinstance(stock, dict):
+        return {'code': stock['code'], 'name': stock['name']}
+    return {'code': stock_code, 'name': '缓存股票'}
+
+
+def _list_cached_stocks() -> list[dict[str, str]]:
+    """列出 data 目录下所有有缓存的股票。"""
+    cache_dir = _get_cache_dir()
+    if not os.path.isdir(cache_dir):
+        return []
+
+    items: list[dict[str, str]] = []
+    for file_name in sorted(os.listdir(cache_dir)):
+        if not file_name.endswith('.csv'):
+            continue
+        stock_code = file_name[:-4]
+        items.append(_lookup_stock_info(stock_code))
+    return items
+
+
+def _list_recent_stocks() -> list[dict[str, str]]:
+    """读取会话中的最近选择历史。"""
+    recent_codes = session.get('recent_stock_codes', [])
+    if not isinstance(recent_codes, list):
+        return []
+    return [_lookup_stock_info(stock_code) for stock_code in recent_codes]
+
+
+def _render_stock_selection():
+    """渲染股票选择页。"""
+    return render_template(
+        'select_stock.html',
+        recent_stocks=_list_recent_stocks(),
+        cached_stocks=_list_cached_stocks(),
+    )
+
+
+def _push_recent_stock(code: str) -> None:
+    """将股票加入最近使用记录。"""
+    recent_codes = session.get('recent_stock_codes', [])
+    if not isinstance(recent_codes, list):
+        recent_codes = []
+    recent_codes = [code] + [item for item in recent_codes if item != code]
+    session['recent_stock_codes'] = recent_codes[:20]
+
 def _init_stock_data():
     """初始化股票数据和索引"""
     global _STOCK_LIST, _STOCK_INDEX
@@ -142,15 +237,33 @@ def get_stock_list():
     return _STOCK_LIST
 
 def search_stock_by_query(query: str):
-    """通过代码或名称搜索股票（精确匹配）"""
+    """通过代码或名称搜索标的。
+
+    返回匹配结果列表（可能为空）。实现策略：
+    - 优先精确匹配代码或名称（若存在，则返回该项为唯一结果）
+    - 否则进行模糊匹配，返回所有包含查询字符串的项目列表
+    """
     _init_stock_data()
-    return _STOCK_INDEX.get(query)
+    results = []
+    # 先尝试精确匹配（代码或名称）
+    exact = _STOCK_INDEX.get(query)
+    if exact:
+        return [exact]
+
+    query_lower = query.lower()
+    for stock in _STOCK_LIST:
+        code = str(stock.get('code', ''))
+        name = str(stock.get('name', ''))
+        if query in code or query_lower in name.lower():
+            results.append(stock)
+
+    return results
 
 
 @app.route('/', methods=['GET'])
 def index():
     """首页：股票选择"""
-    return render_template('select_stock.html')
+    return _render_stock_selection()
 
 
 @app.route('/api/search_stock', methods=['GET'])
@@ -161,11 +274,18 @@ def search_stock():
         return jsonify({'error': '请输入股票代码或名称'})
 
     # 使用优化后的索引查找
-    stock = search_stock_by_query(query)
-    if stock:
+    matches = search_stock_by_query(query)
+    if not matches:
+        return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
+
+    # 若只有一项匹配，保持向后兼容：返回单个对象（code/name）
+    if len(matches) == 1:
+        stock = matches[0]
         return jsonify({'code': stock['code'], 'name': stock['name']})
 
-    return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
+    # 多项时返回 results 数组，供前端选择
+    simplified = [{'code': s['code'], 'name': s['name']} for s in matches]
+    return jsonify({'results': simplified})
 
 
 @app.route('/api/stock_price/<stock_code>', methods=['GET'])
@@ -210,6 +330,7 @@ def select_stock():
     # 保存到session
     session['stock_code'] = code
     session['stock_name'] = name
+    _push_recent_stock(code)
 
     return jsonify({'success': True})
 
@@ -239,9 +360,9 @@ def select_strategy():
 
     if not stock_code or not stock_name:
         # 如果没有选择股票，跳转回首页
-        return render_template('select_stock.html')
+        return _render_stock_selection()
 
-    return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+    return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
 
 
 @app.route('/select_mode', methods=['GET'])
@@ -255,8 +376,8 @@ def select_mode():
     if not stock_code or not stock_name or not strategy_type or not strategy_name:
         # 如果缺少必要信息，跳转回相应页面
         if not stock_code or not stock_name:
-            return render_template('select_stock.html')
-        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+            return _render_stock_selection()
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
 
     return render_template('select_mode.html',
                          stock_code=stock_code,
@@ -292,8 +413,8 @@ def select_time_range():
     if not stock_code or not stock_name or not strategy_type or not strategy_name:
         # 如果缺少必要信息，跳转回相应页面
         if not stock_code or not stock_name:
-            return render_template('select_stock.html')
-        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+            return _render_stock_selection()
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
 
     if not run_mode or run_mode != 'backtest':
         # 只有回测模式需要设置时间段
@@ -402,9 +523,9 @@ def strategy_sma():
 
     # 检查是否有必要的信息
     if not stock_code or not stock_name:
-        return render_template('select_stock.html')
+        return _render_stock_selection()
     if not strategy_type:
-        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
     if not run_mode:
         return render_template('select_mode.html',
                              stock_code=stock_code,
@@ -424,9 +545,9 @@ def strategy_mean_cost():
     run_mode = session.get('run_mode')
 
     if not stock_code or not stock_name:
-        return render_template('select_stock.html')
+        return _render_stock_selection()
     if not strategy_type:
-        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
     if not run_mode:
         return render_template('select_mode.html',
                              stock_code=stock_code,
@@ -446,9 +567,9 @@ def strategy_fixed_amount():
     run_mode = session.get('run_mode')
 
     if not stock_code or not stock_name:
-        return render_template('select_stock.html')
+        return _render_stock_selection()
     if not strategy_type:
-        return render_template('select_strategy.html', stock_code=stock_code, stock_name=stock_name)
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
     if not run_mode:
         return render_template('select_mode.html',
                              stock_code=stock_code,
@@ -457,6 +578,51 @@ def strategy_fixed_amount():
                              strategy_name=session.get('strategy_name', '定投'))
 
     return render_template('strategy_fixed_amount.html', stock_code=stock_code, stock_name=stock_name)
+
+
+@app.route('/strategy/<strategy_key>', methods=['GET'])
+def strategy_dynamic(strategy_key: str):
+    """通用策略配置页面，支持自动注册的新策略。"""
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+    strategy_type = session.get('strategy_type')
+    run_mode = session.get('run_mode')
+
+    if not stock_code or not stock_name:
+        return _render_stock_selection()
+    if not strategy_type:
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
+    if not run_mode:
+        return render_template(
+            'select_mode.html',
+            stock_code=stock_code,
+            stock_name=stock_name,
+            strategy_type=strategy_type,
+            strategy_name=session.get('strategy_name', strategy_key),
+        )
+
+    # 兼容历史三大策略的原有页面，避免破坏现有交互和测试。
+    if strategy_key == 'sma':
+        return strategy_sma()
+    if strategy_key == 'mean_cost':
+        return strategy_mean_cost()
+    if strategy_key == 'fixed_amount':
+        return strategy_fixed_amount()
+
+    try:
+        spec = stocks.get_strategy_spec(strategy_key)
+    except Exception:
+        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
+
+    return render_template(
+        'strategy_dynamic.html',
+        stock_code=stock_code,
+        stock_name=stock_name,
+        strategy_key=spec.key,
+        strategy_label=spec.label,
+        strategy_description=spec.description,
+        parameters=_build_strategy_parameter_view(strategy_key=spec.key),
+    )
 
 
 @app.route('/run', methods=['POST'])
@@ -483,7 +649,7 @@ def run():
 
     source = request.form.get('source', 'auto')
     strategy = request.form.get('strategy', 'sma')
-    lot = int(request.form.get('lot') or 100)
+    lot = float(request.form.get('lot') or 100.0)
     cash = float(request.form.get('cash') or 100000.0)
     strategy_params = _collect_strategy_form_params(strategy)
     request_payload = {
@@ -515,6 +681,9 @@ def run():
             )
             res = stocks.run_backtest(backtest_request)
 
+            if progress_mgr.is_cancelled(task_id):
+                return
+
             # 设置任务结果
             progress_mgr.set_result(task_id, res)
 
@@ -530,7 +699,15 @@ def run():
         thread.start()
 
     # 返回进度页面
-    return render_template('backtest_progress.html', task_id=task_id, symbol=symbol, strategy=strategy)
+    strategy_spec = stocks.get_strategy_spec(strategy)
+    return render_template(
+        'backtest_progress.html',
+        task_id=task_id,
+        symbol=symbol,
+        strategy=strategy,
+        strategy_label=strategy_spec.label,
+        back_url=f'/strategy/{strategy}',
+    )
 
 
 @app.route('/api/progress/<task_id>')
@@ -550,6 +727,18 @@ def progress_stream(task_id):
     return Response(generate(), mimetype='text/event-stream')
 
 
+@app.route('/api/progress/<task_id>/cancel', methods=['POST'])
+def cancel_progress(task_id):
+    """用户放弃等待当前回测。"""
+    progress_mgr = get_progress_manager()
+    task = progress_mgr.get_task(task_id)
+    if not task:
+        return jsonify({'success': False, 'error': '任务不存在'}), 404
+
+    progress_mgr.cancel_task(task_id)
+    return jsonify({'success': True})
+
+
 @app.route('/api/result/<task_id>')
 def get_result(task_id):
     """获取回测结果"""
@@ -561,6 +750,9 @@ def get_result(task_id):
 
     if task['status'] == 'error':
         return jsonify({'error': task['error']}), 500
+
+    if task['status'] == 'cancelled':
+        return jsonify({'error': '任务已取消'}), 410
 
     if task['status'] != 'completed':
         return jsonify({'error': '任务未完成'}), 400
@@ -589,6 +781,6 @@ def view_result():
 if __name__ == '__main__':
     # 支持通过环境变量自定义主机和端口，方便测试使用非默认端口
     host = os.environ.get('HOST', '127.0.0.1')
-    port = int(os.environ.get('PORT', '5000'))
+    port = int(os.environ.get('PORT', '5001'))
     debug = os.environ.get('FLASK_ENV', '') != 'production'
     app.run(host=host, port=port, debug=debug)

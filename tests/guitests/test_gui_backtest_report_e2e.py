@@ -220,14 +220,17 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
             page.evaluate("() => document.querySelector('form').submit()")
             page.wait_for_selector("h1", timeout=30000)
             expect(page.locator("h1")).to_contain_text("回测仿真进行中")
+            expect(page.locator("#skip-btn")).to_be_visible()
+            expect(page.locator("#log-stream")).to_be_visible()
             steps.append(
                 (
                     "运行回测",
-                    "提交参数后进入回测进度页，确认进度展示页面正常加载。",
+                    "提交参数后进入回测进度页，确认进度展示页面、跳过按钮和交易瀑布流正常加载。",
                     self._screenshot(page, "07_backtest_progress.png"),
                 )
             )
 
+            page.click("#skip-btn")
             page.wait_for_function(
                 """
                 () => {
