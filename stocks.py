@@ -384,6 +384,78 @@ def run_futures_a50_prev_night(symbol: str = "600900", source: object = "auto",
     )
 
 
+def run_signal_template(
+    symbol: str = "600900",
+    source: object = "auto",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    lot_size: float = 100.0,
+    init_cash: float = 100000.0,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    trade_price: str = TRADE_PRICE_OPEN,
+    buy_trigger: str = 'price_below',
+    buy_price_value: float = 0.0,
+    buy_exec_mode: str = 'all_in',
+    buy_fixed_amount: float = 10000.0,
+    buy_position_pct: float = 30.0,
+    take_profit_pct: float = 0.0,
+    stop_loss_pct: float = 0.0,
+    sell_trigger: str = 'price_above',
+    sell_price_value: float = 0.0,
+    sell_profit_pct: float = 0.0,
+    sell_loss_pct: float = 0.0,
+    sell_exec_mode: str = 'all',
+    sell_fixed_shares: float = 100.0,
+    sell_ratio_pct: float = 50.0,
+) -> Dict[str, Any]:
+    """模板化买卖信号策略：按前端配置执行。"""
+    try:
+        from simulator.simulator import simulate_signal_template
+        from solver.signal_template_strategy import SignalTemplateDecision
+    except Exception as e:
+        raise RuntimeError(f"信号模板策略模块不可用: {e}") from e
+
+    if start_date is None and end_date is None:
+        df = get_data(symbol=symbol, source=source)
+    else:
+        df = get_data(symbol=symbol, source=source, start_date=start_date or "19700101", end_date=end_date or "20500101")
+
+    df = df[["date", "open", "high", "low", "close", "volume"]]
+    feature_df = SignalTemplateDecision.build_features(df)
+
+    strategy = SignalTemplateDecision(
+        df=feature_df,
+        lot_size=float(lot_size),
+        buy_trigger=buy_trigger,
+        buy_price_value=float(buy_price_value),
+        buy_exec_mode=buy_exec_mode,
+        buy_fixed_amount=float(buy_fixed_amount),
+        buy_position_pct=float(buy_position_pct),
+        take_profit_pct=float(take_profit_pct),
+        stop_loss_pct=float(stop_loss_pct),
+        sell_trigger=sell_trigger,
+        sell_price_value=float(sell_price_value),
+        sell_profit_pct=float(sell_profit_pct),
+        sell_loss_pct=float(sell_loss_pct),
+        sell_exec_mode=sell_exec_mode,
+        sell_fixed_shares=float(sell_fixed_shares),
+        sell_ratio_pct=float(sell_ratio_pct),
+    )
+
+    sim_res = simulate_signal_template(
+        symbol=symbol,
+        df=feature_df,
+        strategy=strategy,
+        lot_size=lot_size,
+        init_cash=init_cash,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+    )
+    sim_res.setdefault('init_cash', init_cash)
+    sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
+    return sim_res
+
+
 def _build_strategy_registry() -> Dict[str, StrategySpec]:
     """构建策略注册表。"""
     registry = {

@@ -104,9 +104,11 @@ class TestStocksModule(unittest.TestCase):
         self.assertIn('mean_cost', specs)
         self.assertIn('fixed_amount', specs)
         self.assertIn('a50_prev_night_1h', specs)
+        self.assertIn('signal_template', specs)
         self.assertEqual(specs['sma'].parameters[0].name, 'period')
         self.assertEqual(specs['fixed_amount'].parameters[0].name, 'fixed_amount')
         self.assertEqual(specs['a50_prev_night_1h'].parameters[0].name, 'futures_symbol')
+        self.assertEqual(specs['signal_template'].parameters[0].name, 'buy_trigger')
         self.assertEqual(specs['mean_cost'].supported_trade_prices, (stocks.TRADE_PRICE_OPEN,))
 
     @patch('stocks.run_fixed_amount')
@@ -199,6 +201,57 @@ class TestStocksModule(unittest.TestCase):
             trade_price='open',
             futures_symbol='FTSE_A50',
             base_position_lots=2,
+        )
+
+    @patch('stocks.run_signal_template')
+    def test_run_backtest_dispatches_signal_template_strategy(self, mock_run_signal_template):
+        mock_run_signal_template.return_value = {'symbol': '600900', 'total_value': 104000.0}
+
+        request = stocks.create_backtest_request(
+            symbol='600900',
+            strategy='signal_template',
+            source='auto',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=100,
+            init_cash=100000.0,
+            trade_price='close',
+            strategy_params={
+                'buy_trigger': 'macd_golden',
+                'buy_exec_mode': 'fixed_amount',
+                'buy_fixed_amount': '20000',
+                'sell_trigger': 'profit_target',
+                'sell_profit_pct': '8',
+                'sell_exec_mode': 'ratio',
+                'sell_ratio_pct': '50',
+            },
+        )
+        result = stocks.run_backtest(request)
+
+        self.assertEqual(result['symbol'], '600900')
+        mock_run_signal_template.assert_called_once_with(
+            symbol='600900',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=100,
+            init_cash=100000.0,
+            source='auto',
+            progress_callback=None,
+            trade_price='close',
+            buy_trigger='macd_golden',
+            buy_price_value=0.0,
+            buy_exec_mode='fixed_amount',
+            buy_fixed_amount=20000.0,
+            buy_position_pct=30.0,
+            take_profit_pct=0.0,
+            stop_loss_pct=0.0,
+            sell_trigger='profit_target',
+            sell_price_value=0.0,
+            sell_profit_pct=8.0,
+            sell_loss_pct=0.0,
+            sell_exec_mode='ratio',
+            sell_fixed_shares=100.0,
+            sell_ratio_pct=50.0,
         )
 
 
