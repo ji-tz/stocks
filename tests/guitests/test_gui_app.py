@@ -279,6 +279,8 @@ class TestGuiRoutes(unittest.TestCase):
         body = rv.data.decode('utf-8')
         self.assertIn('A50 前夜信号(1h)策略', body)
         self.assertIn('a50_prev_night_1h', body)
+        self.assertIn('信号模板策略', body)
+        self.assertIn('signal_template', body)
 
     def test_strategy_dynamic_page_get(self):
         """测试自动注册策略可进入通用参数页。"""
@@ -296,6 +298,25 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('策略说明', body)
         self.assertIn('A50 期货代码', body)
         self.assertIn('底仓手数', body)
+
+    def test_strategy_signal_template_page_get(self):
+        """测试信号模板策略页面。"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+            sess['strategy_type'] = 'signal_template'
+            sess['strategy_name'] = '信号模板'
+            sess['run_mode'] = 'backtest'
+
+        rv = self.client.get('/strategy/signal_template')
+        self.assertEqual(rv.status_code, 200)
+        body = rv.data.decode('utf-8')
+        self.assertIn('买入填写', body)
+        self.assertIn('卖出填写', body)
+        self.assertIn('MACD金叉', body)
+        self.assertIn('MACD死叉', body)
+        self.assertIn('止盈', body)
+        self.assertIn('止损', body)
 
     def test_result_page_contains_stock_price_chart(self):
         """测试复盘界面包含股价波动线（使用mock数据避免污染缓存）"""
