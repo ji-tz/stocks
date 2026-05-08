@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import patch
+from types import SimpleNamespace
 
 import pandas as pd
 
@@ -87,6 +88,26 @@ class TestRsiDecision(unittest.TestCase):
 
 
 class TestLowFrequencyBacktests(unittest.TestCase):
+    def test_generic_runner_rejects_empty_strategy_key(self):
+        with self.assertRaises(ValueError):
+            stocks.run_module_strategy_backtest(strategy_key='')
+
+    def test_generic_runner_requires_create_strategy(self):
+        with patch("stocks.get_strategy_spec") as mock_get_strategy_spec, \
+                patch("stocks.importlib.import_module") as mock_import_module, \
+                patch("stocks._fetch_data_for_backtest") as mock_fetch_data:
+            mock_get_strategy_spec.return_value = stocks.StrategySpec(
+                key='dual_ma',
+                label='双均线交叉',
+                runner=stocks.run_module_strategy_backtest,
+                module_name='solver.dual_ma_strategy',
+                module_interface=True,
+            )
+            mock_fetch_data.return_value = make_test_df([10, 11, 12])
+            mock_import_module.return_value = SimpleNamespace()
+            with self.assertRaises(RuntimeError):
+                stocks.run_module_strategy_backtest(strategy_key='dual_ma')
+
     @patch("stocks.run_module_strategy_backtest")
     def test_run_backtest_dispatches_generic_module_runner(self, mock_runner):
         mock_runner.return_value = {'symbol': '600900', 'total_value': 101000.0}

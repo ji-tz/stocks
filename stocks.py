@@ -61,6 +61,7 @@ class StrategySpec:
     description: str = ''
     supported_trade_prices: tuple[str, ...] = (TRADE_PRICE_OPEN,)
     module_name: Optional[str] = None
+    module_interface: bool = False
 
 
 @dataclass
@@ -153,13 +154,14 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
             key = str(raw.get('key', '')).strip()
             label = str(raw.get('label', '')).strip()
             runner_name = raw.get('runner')
+            module_interface = bool(raw.get('module_interface', False))
             if not key or not label or not isinstance(runner_name, str):
                 continue
 
             runner = globals().get(runner_name)
             if not callable(runner):
                 continue
-            if runner_name == 'run_module_strategy_backtest':
+            if module_interface:
                 runner = partial(runner, strategy_key=key)
 
             parameters_raw = raw.get('parameters', []) or []
@@ -191,6 +193,7 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
                 description=str(raw.get('description', '')).strip(),
                 supported_trade_prices=supported_trade_prices if supported_trade_prices else (TRADE_PRICE_OPEN,),
                 module_name=module_name,
+                module_interface=module_interface,
             )
         except Exception:
             # 自动发现应是 best-effort，单个策略异常不应影响其他策略
@@ -400,7 +403,10 @@ def run_module_strategy_backtest(symbol: str = "600900", source: object = "auto"
 
     validate_parameters = getattr(module, 'validate_strategy_parameters', None)
     if callable(validate_parameters):
-        validate_parameters(**strategy_params)
+        try:
+            validate_parameters(**strategy_params)
+        except ValueError as exc:
+            raise ValueError(f'策略 {strategy_key} 参数校验失败: {exc}') from exc
 
     df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
     df = df[["date", "open", "high", "low", "close", "volume"]].copy()

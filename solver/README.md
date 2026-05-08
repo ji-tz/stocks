@@ -155,6 +155,7 @@ def decide(self, open_price: float, close_price: float | None = None,
    - `key`：策略唯一标识
    - `label`：展示名
    - `runner`：`stocks.py` 中执行函数名（字符串）
+   - `module_interface`：是否复用统一模块策略回测入口
 3. 参数通过 `parameters` 数组声明，每项包含：
    - `name`、`label`、`caster`（`int|float|str`）、`default`
 4. 若 `runner` 为 `run_module_strategy_backtest`，则策略模块还应提供：
@@ -170,6 +171,7 @@ AUTO_STRATEGY_SPEC = {
     "key": "dual_ma",
     "label": "双均线交叉",
     "runner": "run_module_strategy_backtest",
+    "module_interface": True,
     "parameters": [
         {"name": "short_period", "label": "短期均线周期", "caster": "int", "default": 5},
         {"name": "long_period", "label": "长期均线周期", "caster": "int", "default": 20},

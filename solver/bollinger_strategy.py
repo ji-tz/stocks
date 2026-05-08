@@ -8,6 +8,7 @@ AUTO_STRATEGY_SPEC = {
     "key": "bollinger",
     "label": "布林带",
     "runner": "run_module_strategy_backtest",
+    "module_interface": True,
     "parameters": [
         {
             "name": "period",
@@ -79,7 +80,7 @@ def prepare_backtest_data(df: pd.DataFrame, period: int = 20, std_multiplier: fl
     prepared = df.copy()
     rolling = prepared["close"].rolling(window=period, min_periods=period)
     prepared["bollinger_mid"] = rolling.mean()
-    prepared["bollinger_std"] = rolling.std(ddof=0)  # 使用总体标准差，保持与常见布林带计算方式一致
+    prepared["bollinger_std"] = rolling.std(ddof=0)  # 使用固定的总体标准差实现，保持当前回测计算结果稳定
     prepared["bollinger_upper"] = prepared["bollinger_mid"] + std_multiplier * prepared["bollinger_std"]
     prepared["bollinger_lower"] = prepared["bollinger_mid"] - std_multiplier * prepared["bollinger_std"]
     return prepared

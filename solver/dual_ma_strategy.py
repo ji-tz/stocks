@@ -8,6 +8,7 @@ AUTO_STRATEGY_SPEC = {
     "key": "dual_ma",
     "label": "双均线交叉",
     "runner": "run_module_strategy_backtest",
+    "module_interface": True,
     "parameters": [
         {
             "name": "short_period",

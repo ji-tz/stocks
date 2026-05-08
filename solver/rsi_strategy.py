@@ -8,6 +8,7 @@ AUTO_STRATEGY_SPEC = {
     "key": "rsi",
     "label": "RSI",
     "runner": "run_module_strategy_backtest",
+    "module_interface": True,
     "parameters": [
         {
             "name": "period",
