@@ -353,6 +353,119 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
     return sim_res
 
 
+def run_dual_ma_backtest(symbol: str = "600900", source: object = "auto",
+                         start_date: Optional[str] = None, end_date: Optional[str] = None,
+                         lot_size: float = 100.0, init_cash: float = 100000.0,
+                         short_period: int = 5, long_period: int = 20,
+                         progress_callback: Optional[Callable[[int, int], None]] = None,
+                         trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
+    """使用统一模拟器运行双均线交叉回测。"""
+    if short_period <= 0 or long_period <= 0:
+        raise ValueError('均线周期必须大于 0')
+    if short_period >= long_period:
+        raise ValueError('短期均线周期必须小于长期均线周期')
+
+    from simulator.simulator import Simulator
+    from solver.dual_ma_strategy import DualMaDecision
+
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    df = df[["date", "open", "high", "low", "close", "volume"]].copy()
+    df["ma_short"] = df["close"].rolling(window=short_period, min_periods=short_period).mean()
+    df["ma_long"] = df["close"].rolling(window=long_period, min_periods=long_period).mean()
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+    strategy = DualMaDecision(short_period=short_period, long_period=long_period, df=df)
+    sim_res = sim.simulate(
+        df=df,
+        strategy=strategy,
+        symbol=symbol,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+    )
+    sim_res.setdefault('init_cash', init_cash)
+    sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
+    return sim_res
+
+
+def run_bollinger_backtest(symbol: str = "600900", source: object = "auto",
+                           start_date: Optional[str] = None, end_date: Optional[str] = None,
+                           lot_size: float = 100.0, init_cash: float = 100000.0,
+                           period: int = 20, std_multiplier: float = 2.0,
+                           progress_callback: Optional[Callable[[int, int], None]] = None,
+                           trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
+    """使用统一模拟器运行布林带回测。"""
+    if period <= 0:
+        raise ValueError('布林带周期必须大于 0')
+    if std_multiplier <= 0:
+        raise ValueError('标准差倍数必须大于 0')
+
+    from simulator.simulator import Simulator
+    from solver.bollinger_strategy import BollingerDecision
+
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    df = df[["date", "open", "high", "low", "close", "volume"]].copy()
+    rolling = df["close"].rolling(window=period, min_periods=period)
+    df["bollinger_mid"] = rolling.mean()
+    df["bollinger_std"] = rolling.std(ddof=0)
+    df["bollinger_upper"] = df["bollinger_mid"] + std_multiplier * df["bollinger_std"]
+    df["bollinger_lower"] = df["bollinger_mid"] - std_multiplier * df["bollinger_std"]
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+    strategy = BollingerDecision(period=period, std_multiplier=std_multiplier, df=df)
+    sim_res = sim.simulate(
+        df=df,
+        strategy=strategy,
+        symbol=symbol,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+    )
+    sim_res.setdefault('init_cash', init_cash)
+    sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
+    return sim_res
+
+
+def run_rsi_backtest(symbol: str = "600900", source: object = "auto",
+                     start_date: Optional[str] = None, end_date: Optional[str] = None,
+                     lot_size: float = 100.0, init_cash: float = 100000.0,
+                     period: int = 14, oversold: float = 30.0, overbought: float = 70.0,
+                     progress_callback: Optional[Callable[[int, int], None]] = None,
+                     trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
+    """使用统一模拟器运行 RSI 回测。"""
+    if period <= 0:
+        raise ValueError('RSI 周期必须大于 0')
+    if not 0 <= oversold < overbought <= 100:
+        raise ValueError('RSI 阈值必须满足 0 <= oversold < overbought <= 100')
+
+    from simulator.simulator import Simulator
+    from solver.rsi_strategy import RsiDecision
+
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    df = df[["date", "open", "high", "low", "close", "volume"]].copy()
+
+    delta = df["close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    rs = avg_gain / avg_loss.replace(0, float('nan'))
+    df["rsi"] = 100 - (100 / (1 + rs))
+    df.loc[(avg_loss == 0) & (avg_gain > 0), "rsi"] = 100.0
+    df.loc[(avg_loss == 0) & (avg_gain == 0), "rsi"] = 50.0
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+    strategy = RsiDecision(period=period, oversold=oversold, overbought=overbought, df=df)
+    sim_res = sim.simulate(
+        df=df,
+        strategy=strategy,
+        symbol=symbol,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+    )
+    sim_res.setdefault('init_cash', init_cash)
+    sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
+    return sim_res
+
+
 def run_futures_a50_prev_night(symbol: str = "600900", source: object = "auto",
                                start_date: Optional[str] = None, end_date: Optional[str] = None,
                                lot_size: float = 100.0, init_cash: float = 100000.0,

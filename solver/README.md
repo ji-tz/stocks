@@ -85,6 +85,30 @@ result = simulate_fixed_amount(
 - 简单易行：无需复杂的技术分析
 - 适合长期投资：通过时间平滑市场波动
 
+### 4. 双均线交叉策略（Dual Moving Average Strategy）
+文件：`dual_ma_strategy.py`
+
+**策略逻辑：**
+- 短期均线上穿长期均线时买入
+- 短期均线下穿长期均线时卖出
+- 适合跟随中期趋势
+
+### 5. 布林带策略（Bollinger Bands Strategy）
+文件：`bollinger_strategy.py`
+
+**策略逻辑：**
+- 收盘价跌破布林带下轨时买入
+- 收盘价突破布林带上轨时卖出
+- 适合震荡行情中的区间回归
+
+### 6. RSI 策略（RSI Strategy）
+文件：`rsi_strategy.py`
+
+**策略逻辑：**
+- RSI 低于超卖阈值时买入
+- RSI 高于超买阈值时卖出
+- 适合低频超跌反弹与回撤止盈场景
+
 ## 策略接口规范
 
 每个策略都应实现 `decide()` 方法：
@@ -173,6 +197,7 @@ class MyStrategy:
 每个策略都应有对应的测试文件：
 - `tests/test_simulator.py` - SMA 和 MeanCost 策略测试
 - `tests/test_fixed_amount_strategy.py` - 定投策略测试
+- `tests/test_low_frequency_strategies.py` - 双均线、布林带、RSI 策略测试
 
 运行测试：
 ```bash
