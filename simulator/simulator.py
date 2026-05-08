@@ -183,14 +183,42 @@ class BacktestExchangeRunner:
             due = current_idx + wait_bars
             pending_orders.append(PendingOrder(action=action, due_bar_index=due, tag=tag))
 
-        def execute_trade(action: str, date: Any, execution_price: float, action_source: str) -> None:
+        def execute_trade(
+            action: str,
+            date: Any,
+            execution_price: float,
+            action_source: str,
+            desired_shares: Optional[float] = None,
+        ) -> None:
             nonlocal min_cash
             date_key = self._date_key(date)
 
             if action == "buy":
                 buy_shares = None
-                if hasattr(strategy, "calculate_shares") and callable(getattr(strategy, "calculate_shares")):
-                    buy_shares = strategy.calculate_shares(execution_price, self.lot_size)
+                if desired_shares is not None:
+                    buy_shares = float(desired_shares)
+                elif hasattr(strategy, "calculate_shares") and callable(getattr(strategy, "calculate_shares")):
+                    calculate_shares = getattr(strategy, "calculate_shares")
+                    for calculate_kwargs in (
+                        {
+                            "price": execution_price,
+                            "lot_size": self.lot_size,
+                            "cash": engine.get_cash(),
+                            "position_shares": float(engine.get_position().shares),
+                        },
+                        {
+                            "price": execution_price,
+                            "lot_size": self.lot_size,
+                        },
+                    ):
+                        try:
+                            buy_shares = float(calculate_shares(**calculate_kwargs))
+                            break
+                        except TypeError:
+                            continue
+
+                if buy_shares is not None and buy_shares <= 0:
+                    return
 
                 result = engine.buy(date=date, price=execution_price, shares=buy_shares)
                 if result.success:
@@ -211,17 +239,44 @@ class BacktestExchangeRunner:
                 return
 
             if action == "sell":
+                sell_shares = float(self.lot_size)
+                if desired_shares is not None:
+                    sell_shares = float(desired_shares)
+                elif hasattr(strategy, "calculate_sell_shares") and callable(getattr(strategy, "calculate_sell_shares")):
+                    calculate_sell_shares = getattr(strategy, "calculate_sell_shares")
+                    for calculate_kwargs in (
+                        {
+                            "price": execution_price,
+                            "lot_size": self.lot_size,
+                            "position_shares": float(engine.get_position().shares),
+                            "cash": engine.get_cash(),
+                        },
+                        {
+                            "price": execution_price,
+                            "lot_size": self.lot_size,
+                            "position_shares": float(engine.get_position().shares),
+                        },
+                    ):
+                        try:
+                            sell_shares = float(calculate_sell_shares(**calculate_kwargs))
+                            break
+                        except TypeError:
+                            continue
+
+                if sell_shares <= 0:
+                    return
+
                 if enforce_t_plus_one:
                     sellable_shares = float(engine.get_position().shares) - today_bought_shares.get(date_key, 0.0)
-                    if sellable_shares < float(self.lot_size):
+                    if sellable_shares < sell_shares:
                         if use_verbose:
                             print(
                                 f"[{date.strftime('%Y-%m-%d')}] 卖出拦截（T+1）："
-                                f"可卖 {sellable_shares} 股，小于最小卖出手数 {self.lot_size}"
+                                f"可卖 {sellable_shares} 股，小于计划卖出股数 {sell_shares}"
                             )
                         return
 
-                result = engine.sell(date=date, price=execution_price, shares=self.lot_size)
+                result = engine.sell(date=date, price=execution_price, shares=sell_shares)
                 if result.success:
                     trades_list.append(
                         {
@@ -229,7 +284,7 @@ class BacktestExchangeRunner:
                             "action": "sell",
                             "price": round(execution_price, 4),
                             "trade_price_field": trade_price,
-                            "shares": float(self.lot_size),
+                            "shares": sell_shares,
                             "cash": round(result.cash_after, 2),
                             "shares_after": result.shares_after,
                             "realized_pl": round(engine.realized_pl, 4),
@@ -279,6 +334,7 @@ class BacktestExchangeRunner:
                     "avg_cost": avg_cost,
                     "shares": pos.shares,
                     "date": date,
+                    "cash": engine.get_cash(),
                     "trade_price": execution_price,
                     "trade_price_field": trade_price,
                     "schedule_order": schedule_order,
@@ -309,8 +365,15 @@ class BacktestExchangeRunner:
                     continue
 
             action = action_raw
+            desired_shares = None
             if isinstance(action_raw, dict):
                 action = action_raw.get("action")
+                desired_shares_raw = action_raw.get("shares")
+                if desired_shares_raw is not None:
+                    try:
+                        desired_shares = float(desired_shares_raw)
+                    except Exception:
+                        desired_shares = None
                 schedule_orders = action_raw.get("schedule_orders")
                 if schedule_orders:
                     if not enable_scheduled_orders:
@@ -324,7 +387,13 @@ class BacktestExchangeRunner:
                         )
 
             if action in ("buy", "sell"):
-                execute_trade(action, date, execution_price, action_source="strategy")
+                execute_trade(
+                    action,
+                    date,
+                    execution_price,
+                    action_source="strategy",
+                    desired_shares=desired_shares,
+                )
 
             engine.print_daily_status(date, price_open, price_close, action)
 
@@ -520,6 +589,29 @@ def simulate_fixed_amount(
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash, verbose=verbose)
     strategy = FixedAmountDecision(fixed_amount=fixed_amount)
+    return sim.simulate(
+        df=df,
+        strategy=strategy,
+        symbol=symbol,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+    )
+
+
+def simulate_signal_template(
+    symbol: str,
+    df,
+    strategy,
+    lot_size: float = 100.0,
+    init_cash: float = 100000.0,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+    trade_price: str = "open",
+) -> Dict[str, Any]:
+    """运行模板化信号策略回测。"""
+    if df is None:
+        raise RuntimeError("需要传入数据 DataFrame 才能模拟")
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     return sim.simulate(
         df=df,
         strategy=strategy,

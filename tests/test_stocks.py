@@ -85,9 +85,9 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
         self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
-    @patch('source.data_provider.get_data')
+    @patch('simulator.simulator.get_data')
     def test_run_mean_cost_returns_expected_keys(self, mock_get):
-        # simulate_mean_cost uses source.data_provider.get_data internally; patch it
+        # simulate_mean_cost 在 simulator.simulator 模块内绑定了 get_data，需在该引用处打补丁
         mock_get.return_value = make_mock_df(8)
         res = stocks.run_mean_cost(symbol='600900', start_date='20230101', end_date='20231231', lot_size=1, init_cash=10000.0, source='auto')
         # check some expected keys exist and types
@@ -107,12 +107,14 @@ class TestStocksModule(unittest.TestCase):
         self.assertIn('bollinger', specs)
         self.assertIn('rsi', specs)
         self.assertIn('a50_prev_night_1h', specs)
+        self.assertIn('signal_template', specs)
         self.assertEqual(specs['sma'].parameters[0].name, 'period')
         self.assertEqual(specs['fixed_amount'].parameters[0].name, 'fixed_amount')
         self.assertEqual(specs['dual_ma'].parameters[0].name, 'short_period')
         self.assertEqual(specs['bollinger'].parameters[1].name, 'std_multiplier')
         self.assertEqual(specs['rsi'].parameters[2].name, 'overbought')
         self.assertEqual(specs['a50_prev_night_1h'].parameters[0].name, 'futures_symbol')
+        self.assertEqual(specs['signal_template'].parameters[0].name, 'buy_trigger')
         self.assertEqual(specs['mean_cost'].supported_trade_prices, (stocks.TRADE_PRICE_OPEN,))
 
     @patch('stocks.run_fixed_amount')
@@ -205,6 +207,57 @@ class TestStocksModule(unittest.TestCase):
             trade_price='open',
             futures_symbol='FTSE_A50',
             base_position_lots=2,
+        )
+
+    @patch('stocks.run_signal_template')
+    def test_run_backtest_dispatches_signal_template_strategy(self, mock_run_signal_template):
+        mock_run_signal_template.return_value = {'symbol': '600900', 'total_value': 104000.0}
+
+        request = stocks.create_backtest_request(
+            symbol='600900',
+            strategy='signal_template',
+            source='auto',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=100,
+            init_cash=100000.0,
+            trade_price='close',
+            strategy_params={
+                'buy_trigger': 'macd_golden',
+                'buy_exec_mode': 'fixed_amount',
+                'buy_fixed_amount': '20000',
+                'sell_trigger': 'profit_target',
+                'sell_profit_pct': '8',
+                'sell_exec_mode': 'ratio',
+                'sell_ratio_pct': '50',
+            },
+        )
+        result = stocks.run_backtest(request)
+
+        self.assertEqual(result['symbol'], '600900')
+        mock_run_signal_template.assert_called_once_with(
+            symbol='600900',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=100,
+            init_cash=100000.0,
+            source='auto',
+            progress_callback=None,
+            trade_price='close',
+            buy_trigger='macd_golden',
+            buy_price_value=0.0,
+            buy_exec_mode='fixed_amount',
+            buy_fixed_amount=20000.0,
+            buy_position_pct=30.0,
+            take_profit_pct=0.0,
+            stop_loss_pct=0.0,
+            sell_trigger='profit_target',
+            sell_price_value=0.0,
+            sell_profit_pct=8.0,
+            sell_loss_pct=0.0,
+            sell_exec_mode='ratio',
+            sell_fixed_shares=100.0,
+            sell_ratio_pct=50.0,
         )
 
 

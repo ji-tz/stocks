@@ -135,6 +135,23 @@ class TestGuiAllStrategiesE2E(unittest.TestCase):
 
         self._run_strategy_flow('A50 前夜信号(1h)策略', '**/strategy/a50_prev_night_1h', filler)
 
+    def test_signal_template_strategy_gui_backtest_flow(self) -> None:
+        def filler(page):
+            page.select_option("select[name='buy_trigger']", 'macd_golden')
+            page.check("input[name='buy_exec_mode'][value='fixed_amount']")
+            page.fill("input[name='buy_fixed_amount']", '20000')
+
+            page.select_option("select[name='sell_trigger']", 'profit_target')
+            page.fill("input[name='sell_profit_pct']", '8')
+            page.check("input[name='sell_exec_mode'][value='ratio']")
+            page.fill("input[name='sell_ratio_pct']", '50')
+
+            page.select_option("select[name='source']", 'auto')
+            page.fill("input[name='lot']", '100')
+            page.fill("input[name='cash']", '100000')
+
+        self._run_strategy_flow('信号模板策略', '**/strategy/signal_template', filler)
+
 
 if __name__ == '__main__':
     unittest.main()

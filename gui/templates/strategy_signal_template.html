@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ strategy_label }} - 量化回测平台</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 980px; margin: 1.5rem auto; padding: 0 1rem; background: #f6f8fb; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+      .header h1 { margin: 0; color: #1976d2; }
+      .back-link { color: #1976d2; text-decoration: none; }
+      .breadcrumb { background: #fff; border-radius: 8px; padding: 0.8rem 1rem; margin-bottom: 1rem; border: 1px solid #e5e7eb; }
+      .selected-info-box { background: #e3f2fd; border-radius: 8px; padding: 0.9rem 1.2rem; margin-bottom: 1rem; }
+      .selected-info-row { display: flex; justify-content: space-between; margin-bottom: 0.35rem; }
+      .selected-info-row:last-child { margin-bottom: 0; }
+      .selected-info-label { color: #666; }
+      .selected-info-value { color: #1976d2; font-weight: bold; }
+      .panel { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 1rem 1.2rem; margin-bottom: 1rem; }
+      .panel h2 { margin: 0 0 0.75rem 0; color: #1f2937; font-size: 1.1rem; }
+      .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.8rem 1rem; }
+      .field label { display: block; font-weight: 600; margin-bottom: 0.3rem; color: #111827; }
+      .field input, .field select { width: 100%; box-sizing: border-box; padding: 0.5rem; border-radius: 6px; border: 1px solid #d1d5db; }
+      .hint { color: #6b7280; font-size: 0.88rem; margin-top: 0.2rem; }
+      .exec-row { display: flex; gap: 1rem; flex-wrap: wrap; margin-top: 0.3rem; }
+      .exec-item { display: flex; align-items: center; gap: 0.35rem; }
+      .inline-input { width: 140px; }
+      .actions { display: flex; justify-content: flex-end; }
+      button { padding: 0.8rem 1.8rem; background: #1976d2; color: #fff; border: none; border-radius: 6px; cursor: pointer; }
+      button:hover { background: #1565c0; }
+      .hidden { display: none; }
+      @media (max-width: 768px) {
+        .grid { grid-template-columns: 1fr; }
+        .header { flex-direction: column; align-items: flex-start; gap: 0.4rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>📈 第五步：配置参数</h1>
+      <a href="/select_time_range" class="back-link">← 返回时间段设置</a>
+    </div>
+
+    <div class="breadcrumb">
+      ✓ 选择股票 → ✓ 选择策略 → ✓ 选择运行模式 → ✓ 设置时间段 → 配置参数 → 查看结果
+    </div>
+
+    <div class="selected-info-box">
+      <div class="selected-info-row"><span class="selected-info-label">股票</span><span class="selected-info-value">{{ stock_code }} - {{ stock_name }}</span></div>
+      <div class="selected-info-row"><span class="selected-info-label">策略</span><span class="selected-info-value">{{ strategy_label }}策略</span></div>
+      <div class="selected-info-row"><span class="selected-info-label">运行模式</span><span class="selected-info-value">📊 回测仿真</span></div>
+    </div>
+
+    <form action="/run" method="post" id="signal-template-form">
+      <input type="hidden" name="strategy" value="{{ strategy_key }}" />
+
+      <div class="panel">
+        <h2>买入填写</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="buy_trigger">触发条件</label>
+            <select id="buy_trigger" name="buy_trigger">
+              <option value="price_below">价格条件：跌破XX元</option>
+              <option value="price_above">价格条件：涨破XX元</option>
+              <option value="macd_golden">指标条件：MACD金叉</option>
+              <option value="kdj_golden">指标条件：KDJ金叉</option>
+              <option value="rsi_oversold">指标条件：RSI超卖</option>
+              <option value="ma_above_5">均线条件：股价站上5日线</option>
+              <option value="ma_above_20">均线条件：股价站上20日线</option>
+              <option value="volume_rise">量价条件：放量上涨</option>
+              <option value="volume_pullback">量价条件：缩量回调</option>
+            </select>
+          </div>
+          <div class="field" id="buy-price-field">
+            <label for="buy_price_value">条件参数</label>
+            <input type="number" id="buy_price_value" name="buy_price_value" value="0" min="0" step="0.01" />
+            <div class="hint">仅价格条件生效：价格 ≤/≥ 该阈值（元）</div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top: 0.8rem;">
+          <label>交易执行</label>
+          <div class="exec-row">
+            <label class="exec-item"><input type="radio" name="buy_exec_mode" value="all_in" checked /> 全仓买入</label>
+            <label class="exec-item"><input type="radio" name="buy_exec_mode" value="fixed_amount" /> 固定金额买入</label>
+            <input class="inline-input" type="number" name="buy_fixed_amount" value="10000" min="0" step="100" id="buy_fixed_amount" />
+            <label class="exec-item"><input type="radio" name="buy_exec_mode" value="fixed_position" /> 固定仓位买入</label>
+            <input class="inline-input" type="number" name="buy_position_pct" value="30" min="0" max="100" step="1" id="buy_position_pct" />
+          </div>
+          <div class="hint">固定金额单位：元；固定仓位单位：%</div>
+        </div>
+
+        <div class="field" style="margin-top: 0.8rem;">
+          <label>风险控制（可选）</label>
+          <div class="exec-row">
+            <label class="exec-item"><input type="checkbox" id="enable_take_profit" /> 止盈：涨</label>
+            <input class="inline-input" type="number" name="take_profit_pct" id="take_profit_pct" value="0" min="0" step="0.1" disabled />
+            <span>% 卖出</span>
+            <label class="exec-item"><input type="checkbox" id="enable_stop_loss" /> 止损：跌</label>
+            <input class="inline-input" type="number" name="stop_loss_pct" id="stop_loss_pct" value="0" min="0" step="0.1" disabled />
+            <span>% 卖出</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>卖出填写</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="sell_trigger">触发条件</label>
+            <select id="sell_trigger" name="sell_trigger">
+              <option value="price_above">价格条件：涨破XX元</option>
+              <option value="price_below">价格条件：跌破XX元</option>
+              <option value="macd_dead">指标条件：MACD死叉</option>
+              <option value="kdj_dead">指标条件：KDJ死叉</option>
+              <option value="rsi_overbought">指标条件：RSI超买</option>
+              <option value="ma_below_5">均线条件：股价跌破5日线</option>
+              <option value="ma_below_20">均线条件：股价跌破20日线</option>
+              <option value="profit_target">止盈止损：盈利____%</option>
+              <option value="loss_limit">止盈止损：亏损____%</option>
+            </select>
+          </div>
+          <div class="field" id="sell-price-field">
+            <label for="sell_price_value">条件参数</label>
+            <input type="number" id="sell_price_value" name="sell_price_value" value="0" min="0" step="0.01" />
+            <div class="hint" id="sell-parameter-hint">仅价格条件生效：价格 ≥/≤ 该阈值（元）</div>
+          </div>
+        </div>
+
+        <div class="grid" id="sell-risk-fields">
+          <div class="field hidden" id="sell-profit-field">
+            <label for="sell_profit_pct">盈利阈值(%)</label>
+            <input type="number" id="sell_profit_pct" name="sell_profit_pct" value="0" min="0" step="0.1" />
+          </div>
+          <div class="field hidden" id="sell-loss-field">
+            <label for="sell_loss_pct">亏损阈值(%)</label>
+            <input type="number" id="sell_loss_pct" name="sell_loss_pct" value="0" min="0" step="0.1" />
+          </div>
+        </div>
+
+        <div class="field" style="margin-top: 0.8rem;">
+          <label>交易执行</label>
+          <div class="exec-row">
+            <label class="exec-item"><input type="radio" name="sell_exec_mode" value="all" checked /> 全部卖出</label>
+            <label class="exec-item"><input type="radio" name="sell_exec_mode" value="fixed_shares" /> 卖出固定数量</label>
+            <input class="inline-input" type="number" name="sell_fixed_shares" value="100" min="0" step="1" id="sell_fixed_shares" />
+            <span>股</span>
+            <label class="exec-item"><input type="radio" name="sell_exec_mode" value="ratio" /> 卖出比例</label>
+            <input class="inline-input" type="number" name="sell_ratio_pct" value="50" min="0" max="100" step="1" id="sell_ratio_pct" />
+            <span>%</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>基础回测参数</h2>
+        <div class="grid">
+          <div class="field">
+            <label for="source">数据源</label>
+            <select id="source" name="source">
+              <option value="auto">自动选择</option>
+              <option value="akshare">AKShare</option>
+              <option value="baostock">Baostock</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="lot">交易单位（股/份）</label>
+            <input type="number" id="lot" name="lot" value="100" min="0.01" step="0.01" required />
+          </div>
+          <div class="field">
+            <label for="cash">初始资金（元）</label>
+            <input type="number" id="cash" name="cash" value="100000" min="1000" step="1000" required />
+          </div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button type="submit">🚀 开始回测</button>
+      </div>
+    </form>
+
+    <script>
+      const buyTriggerEl = document.getElementById('buy_trigger');
+      const buyPriceFieldEl = document.getElementById('buy-price-field');
+      const sellTriggerEl = document.getElementById('sell_trigger');
+      const sellPriceFieldEl = document.getElementById('sell-price-field');
+      const sellParameterHintEl = document.getElementById('sell-parameter-hint');
+      const sellProfitFieldEl = document.getElementById('sell-profit-field');
+      const sellLossFieldEl = document.getElementById('sell-loss-field');
+
+      function updateBuyParamVisibility() {
+        const trigger = buyTriggerEl.value;
+        const isPrice = trigger === 'price_below' || trigger === 'price_above';
+        buyPriceFieldEl.classList.toggle('hidden', !isPrice);
+      }
+
+      function updateSellParamVisibility() {
+        const trigger = sellTriggerEl.value;
+        const isPrice = trigger === 'price_above' || trigger === 'price_below';
+        sellPriceFieldEl.classList.toggle('hidden', !isPrice);
+
+        sellProfitFieldEl.classList.toggle('hidden', trigger !== 'profit_target');
+        sellLossFieldEl.classList.toggle('hidden', trigger !== 'loss_limit');
+
+        if (trigger === 'profit_target') {
+          sellParameterHintEl.textContent = '请填写盈利阈值（百分比）';
+        } else if (trigger === 'loss_limit') {
+          sellParameterHintEl.textContent = '请填写亏损阈值（百分比）';
+        } else {
+          sellParameterHintEl.textContent = '仅价格条件生效：价格 ≥/≤ 该阈值（元）';
+        }
+      }
+
+      function bindRiskControlSwitch(checkboxId, inputId) {
+        const checkbox = document.getElementById(checkboxId);
+        const input = document.getElementById(inputId);
+        const sync = () => {
+          input.disabled = !checkbox.checked;
+          if (!checkbox.checked) {
+            input.value = '0';
+          }
+        };
+        checkbox.addEventListener('change', sync);
+        sync();
+      }
+
+      buyTriggerEl.addEventListener('change', updateBuyParamVisibility);
+      sellTriggerEl.addEventListener('change', updateSellParamVisibility);
+      bindRiskControlSwitch('enable_take_profit', 'take_profit_pct');
+      bindRiskControlSwitch('enable_stop_loss', 'stop_loss_pct');
+
+      updateBuyParamVisibility();
+      updateSellParamVisibility();
+    </script>
+  </body>
+</html>

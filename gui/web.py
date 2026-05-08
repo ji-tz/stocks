@@ -614,6 +614,16 @@ def strategy_dynamic(strategy_key: str):
     except Exception:
         return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
 
+    if strategy_key == 'signal_template':
+        return render_template(
+            'strategy_signal_template.html',
+            stock_code=stock_code,
+            stock_name=stock_name,
+            strategy_key=spec.key,
+            strategy_label=spec.label,
+            strategy_description=spec.description,
+        )
+
     return render_template(
         'strategy_dynamic.html',
         stock_code=stock_code,
