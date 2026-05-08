@@ -7,7 +7,7 @@ import pandas as pd
 AUTO_STRATEGY_SPEC = {
     "key": "rsi",
     "label": "RSI",
-    "runner": "run_rsi_backtest",
+    "runner": "run_module_strategy_backtest",
     "parameters": [
         {
             "name": "period",
@@ -70,3 +70,32 @@ class RsiDecision:
         if shares > 0 and rsi_value > self.overbought:
             return "sell"
         return None
+
+
+def validate_strategy_parameters(period: int = 14, oversold: float = 30.0, overbought: float = 70.0, **kwargs) -> None:
+    _ = kwargs
+    if period <= 0:
+        raise ValueError('RSI 周期必须大于 0')
+    if not 0 <= oversold < overbought <= 100:
+        raise ValueError('RSI 阈值必须满足 0 <= oversold < overbought <= 100')
+
+
+def prepare_backtest_data(df: pd.DataFrame, period: int = 14, **kwargs) -> pd.DataFrame:
+    _ = kwargs
+    prepared = df.copy()
+    delta = prepared["close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    rs = avg_gain / avg_loss.where(avg_loss != 0)
+    prepared["rsi"] = 100 - (100 / (1 + rs))
+    prepared.loc[(avg_loss == 0) & (avg_gain > 0), "rsi"] = 100.0
+    prepared.loc[(avg_loss == 0) & (avg_gain == 0), "rsi"] = 50.0
+    return prepared
+
+
+def create_strategy(df: pd.DataFrame, period: int = 14,
+                    oversold: float = 30.0, overbought: float = 70.0, **kwargs) -> RsiDecision:
+    _ = kwargs
+    return RsiDecision(period=period, oversold=oversold, overbought=overbought, df=df)

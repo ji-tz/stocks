@@ -139,8 +139,8 @@ def decide(self, open_price: float, close_price: float | None = None,
 
 1. 在本目录创建新文件，如 `my_strategy.py`
 2. 实现决策类，包含 `decide()` 方法
-3. 在 `stocks.py` 的策略注册表中声明策略名、展示名、独立参数和执行函数
-4. 复用 `simulator/simulator.py` 的统一模拟流程；仅在确有必要时新增便捷函数
+3. 在策略模块中声明自动注册信息、参数、指标准备和决策构造函数
+4. 复用 `simulator/simulator.py` 的统一模拟流程；仅在确有必要时新增专用 runner
 5. 在 `tests/` 目录添加测试文件
 6. 更新本 README 文档
 
@@ -157,18 +157,22 @@ def decide(self, open_price: float, close_price: float | None = None,
    - `runner`：`stocks.py` 中执行函数名（字符串）
 3. 参数通过 `parameters` 数组声明，每项包含：
    - `name`、`label`、`caster`（`int|float|str`）、`default`
-4. `stocks.py` 会在构建策略注册表时自动扫描并接入。
+4. 若 `runner` 为 `run_module_strategy_backtest`，则策略模块还应提供：
+   - `validate_strategy_parameters(**params)`：可选，校验参数
+   - `prepare_backtest_data(df, **params)`：可选，补充指标列
+   - `create_strategy(df, **params)`：必选，返回策略决策对象
+5. `stocks.py` 会在构建策略注册表时自动扫描并接入。
 
 示例（简化）：
 
 ```python
 AUTO_STRATEGY_SPEC = {
-    "key": "a50_prev_night_1h",
-    "label": "A50 前夜信号(1h)",
-    "runner": "run_futures_a50_prev_night",
+    "key": "dual_ma",
+    "label": "双均线交叉",
+    "runner": "run_module_strategy_backtest",
     "parameters": [
-        {"name": "futures_symbol", "label": "A50 期货代码", "caster": "str", "default": "FTSE_A50"},
-        {"name": "base_position_lots", "label": "底仓手数", "caster": "int", "default": 2},
+        {"name": "short_period", "label": "短期均线周期", "caster": "int", "default": 5},
+        {"name": "long_period", "label": "长期均线周期", "caster": "int", "default": 20},
     ],
     "supported_trade_prices": ["open"],
 }

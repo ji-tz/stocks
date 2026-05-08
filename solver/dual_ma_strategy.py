@@ -7,7 +7,7 @@ import pandas as pd
 AUTO_STRATEGY_SPEC = {
     "key": "dual_ma",
     "label": "双均线交叉",
-    "runner": "run_dual_ma_backtest",
+    "runner": "run_module_strategy_backtest",
     "parameters": [
         {
             "name": "short_period",
@@ -76,3 +76,24 @@ class DualMaDecision:
         if shares > 0 and prev_short >= prev_long and current_short < current_long:
             return "sell"
         return None
+
+
+def validate_strategy_parameters(short_period: int = 5, long_period: int = 20, **kwargs) -> None:
+    _ = kwargs
+    if short_period <= 0 or long_period <= 0:
+        raise ValueError('均线周期必须大于 0')
+    if short_period >= long_period:
+        raise ValueError('短期均线周期必须小于长期均线周期')
+
+
+def prepare_backtest_data(df: pd.DataFrame, short_period: int = 5, long_period: int = 20, **kwargs) -> pd.DataFrame:
+    _ = kwargs
+    prepared = df.copy()
+    prepared["ma_short"] = prepared["close"].rolling(window=short_period, min_periods=short_period).mean()
+    prepared["ma_long"] = prepared["close"].rolling(window=long_period, min_periods=long_period).mean()
+    return prepared
+
+
+def create_strategy(df: pd.DataFrame, short_period: int = 5, long_period: int = 20, **kwargs) -> DualMaDecision:
+    _ = kwargs
+    return DualMaDecision(short_period=short_period, long_period=long_period, df=df)

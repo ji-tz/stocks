@@ -87,6 +87,37 @@ class TestRsiDecision(unittest.TestCase):
 
 
 class TestLowFrequencyBacktests(unittest.TestCase):
+    @patch("stocks.run_module_strategy_backtest")
+    def test_run_backtest_dispatches_generic_module_runner(self, mock_runner):
+        mock_runner.return_value = {'symbol': '600900', 'total_value': 101000.0}
+        request = stocks.create_backtest_request(
+            symbol="600900",
+            strategy="dual_ma",
+            source="auto",
+            start_date="20230101",
+            end_date="20230113",
+            lot_size=100,
+            init_cash=100000.0,
+            strategy_params={"short_period": "2", "long_period": "3"},
+        )
+
+        result = stocks.run_backtest(request)
+
+        self.assertEqual(result["symbol"], "600900")
+        mock_runner.assert_called_once_with(
+            strategy_key='dual_ma',
+            symbol='600900',
+            start_date='20230101',
+            end_date='20230113',
+            lot_size=100.0,
+            init_cash=100000.0,
+            source='auto',
+            progress_callback=None,
+            trade_price='open',
+            short_period=2,
+            long_period=3,
+        )
+
     @patch("stocks._get_data")
     def test_run_backtest_supports_dual_ma(self, mock_get_data):
         mock_get_data.return_value = make_test_df([10, 9, 8, 9, 10, 11, 12, 11, 10, 9, 8, 9, 10])
@@ -137,11 +168,20 @@ class TestLowFrequencyBacktests(unittest.TestCase):
 
     def test_runner_parameter_validation(self):
         with self.assertRaises(ValueError):
-            stocks.run_dual_ma_backtest(short_period=5, long_period=5)
+            stocks.run_backtest(stocks.create_backtest_request(
+                strategy='dual_ma',
+                strategy_params={'short_period': '5', 'long_period': '5'},
+            ))
         with self.assertRaises(ValueError):
-            stocks.run_bollinger_backtest(period=20, std_multiplier=0)
+            stocks.run_backtest(stocks.create_backtest_request(
+                strategy='bollinger',
+                strategy_params={'period': '20', 'std_multiplier': '0'},
+            ))
         with self.assertRaises(ValueError):
-            stocks.run_rsi_backtest(period=14, oversold=80, overbought=70)
+            stocks.run_backtest(stocks.create_backtest_request(
+                strategy='rsi',
+                strategy_params={'period': '14', 'oversold': '80', 'overbought': '70'},
+            ))
 
 
 if __name__ == "__main__":

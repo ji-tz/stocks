@@ -7,7 +7,7 @@ import pandas as pd
 AUTO_STRATEGY_SPEC = {
     "key": "bollinger",
     "label": "布林带",
-    "runner": "run_bollinger_backtest",
+    "runner": "run_module_strategy_backtest",
     "parameters": [
         {
             "name": "period",
@@ -64,3 +64,27 @@ class BollingerDecision:
         if shares > 0 and close_price > upper:
             return "sell"
         return None
+
+
+def validate_strategy_parameters(period: int = 20, std_multiplier: float = 2.0, **kwargs) -> None:
+    _ = kwargs
+    if period <= 0:
+        raise ValueError('布林带周期必须大于 0')
+    if std_multiplier <= 0:
+        raise ValueError('标准差倍数必须大于 0')
+
+
+def prepare_backtest_data(df: pd.DataFrame, period: int = 20, std_multiplier: float = 2.0, **kwargs) -> pd.DataFrame:
+    _ = kwargs
+    prepared = df.copy()
+    rolling = prepared["close"].rolling(window=period, min_periods=period)
+    prepared["bollinger_mid"] = rolling.mean()
+    prepared["bollinger_std"] = rolling.std(ddof=0)  # 使用总体标准差，保持与常见布林带计算方式一致
+    prepared["bollinger_upper"] = prepared["bollinger_mid"] + std_multiplier * prepared["bollinger_std"]
+    prepared["bollinger_lower"] = prepared["bollinger_mid"] - std_multiplier * prepared["bollinger_std"]
+    return prepared
+
+
+def create_strategy(df: pd.DataFrame, period: int = 20, std_multiplier: float = 2.0, **kwargs) -> BollingerDecision:
+    _ = kwargs
+    return BollingerDecision(period=period, std_multiplier=std_multiplier, df=df)
