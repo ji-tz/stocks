@@ -73,7 +73,7 @@ class RsiDecision:
 
 
 def validate_strategy_parameters(period: int = 14, oversold: float = 30.0, overbought: float = 70.0, **kwargs) -> None:
-    _ = kwargs
+    """校验 RSI 策略参数。"""
     if period <= 0:
         raise ValueError('RSI 周期必须大于 0')
     if not 0 <= oversold < overbought <= 100:
@@ -81,7 +81,7 @@ def validate_strategy_parameters(period: int = 14, oversold: float = 30.0, overb
 
 
 def prepare_backtest_data(df: pd.DataFrame, period: int = 14, **kwargs) -> pd.DataFrame:
-    _ = kwargs
+    """为 RSI 策略补充 RSI 指标列。"""
     prepared = df.copy()
     delta = prepared["close"].diff()
     gain = delta.clip(lower=0)
@@ -97,5 +97,5 @@ def prepare_backtest_data(df: pd.DataFrame, period: int = 14, **kwargs) -> pd.Da
 
 def create_strategy(df: pd.DataFrame, period: int = 14,
                     oversold: float = 30.0, overbought: float = 70.0, **kwargs) -> RsiDecision:
-    _ = kwargs
+    """构造 RSI 策略决策器。"""
     return RsiDecision(period=period, oversold=oversold, overbought=overbought, df=df)

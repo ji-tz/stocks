@@ -79,7 +79,7 @@ class DualMaDecision:
 
 
 def validate_strategy_parameters(short_period: int = 5, long_period: int = 20, **kwargs) -> None:
-    _ = kwargs
+    """校验双均线策略参数。"""
     if short_period <= 0 or long_period <= 0:
         raise ValueError('均线周期必须大于 0')
     if short_period >= long_period:
@@ -87,7 +87,7 @@ def validate_strategy_parameters(short_period: int = 5, long_period: int = 20, *
 
 
 def prepare_backtest_data(df: pd.DataFrame, short_period: int = 5, long_period: int = 20, **kwargs) -> pd.DataFrame:
-    _ = kwargs
+    """为双均线策略补充均线指标列。"""
     prepared = df.copy()
     prepared["ma_short"] = prepared["close"].rolling(window=short_period, min_periods=short_period).mean()
     prepared["ma_long"] = prepared["close"].rolling(window=long_period, min_periods=long_period).mean()
@@ -95,5 +95,5 @@ def prepare_backtest_data(df: pd.DataFrame, short_period: int = 5, long_period: 
 
 
 def create_strategy(df: pd.DataFrame, short_period: int = 5, long_period: int = 20, **kwargs) -> DualMaDecision:
-    _ = kwargs
+    """构造双均线策略决策器。"""
     return DualMaDecision(short_period=short_period, long_period=long_period, df=df)

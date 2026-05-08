@@ -365,7 +365,30 @@ def run_module_strategy_backtest(symbol: str = "600900", source: object = "auto"
                                  trade_price: str = TRADE_PRICE_OPEN,
                                  strategy_key: str = '',
                                  **strategy_params: Any) -> Dict[str, Any]:
-    """执行策略模块自定义指标准备与统一模拟回测。"""
+    """执行自动注册策略模块的统一回测流程。
+
+    流程如下：
+    1. 根据 `strategy_key` 找到自动注册的策略模块；
+    2. 调用模块内可选的 `validate_strategy_parameters(**params)` 做参数校验；
+    3. 获取标准 OHLCV 数据，并调用可选的 `prepare_backtest_data(df, **params)` 预处理指标；
+    4. 调用模块必须实现的 `create_strategy(df, **params)` 构造决策器；
+    5. 统一交给 `Simulator.simulate()` 执行回测。
+
+    Args:
+        symbol: 回测标的代码。
+        source: 数据源。
+        start_date: 起始日期。
+        end_date: 结束日期。
+        lot_size: 交易手数。
+        init_cash: 初始资金。
+        progress_callback: 回测进度回调。
+        trade_price: 成交价格字段。
+        strategy_key: 自动注册策略唯一标识。
+        strategy_params: 策略模块自定义参数。
+
+    Returns:
+        统一格式的回测结果字典。
+    """
     if not strategy_key:
         raise ValueError('strategy_key 不能为空')
 

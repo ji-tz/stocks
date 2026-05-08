@@ -67,7 +67,7 @@ class BollingerDecision:
 
 
 def validate_strategy_parameters(period: int = 20, std_multiplier: float = 2.0, **kwargs) -> None:
-    _ = kwargs
+    """校验布林带策略参数。"""
     if period <= 0:
         raise ValueError('布林带周期必须大于 0')
     if std_multiplier <= 0:
@@ -75,7 +75,7 @@ def validate_strategy_parameters(period: int = 20, std_multiplier: float = 2.0, 
 
 
 def prepare_backtest_data(df: pd.DataFrame, period: int = 20, std_multiplier: float = 2.0, **kwargs) -> pd.DataFrame:
-    _ = kwargs
+    """为布林带策略补充上下轨指标列。"""
     prepared = df.copy()
     rolling = prepared["close"].rolling(window=period, min_periods=period)
     prepared["bollinger_mid"] = rolling.mean()
@@ -86,5 +86,5 @@ def prepare_backtest_data(df: pd.DataFrame, period: int = 20, std_multiplier: fl
 
 
 def create_strategy(df: pd.DataFrame, period: int = 20, std_multiplier: float = 2.0, **kwargs) -> BollingerDecision:
-    _ = kwargs
+    """构造布林带策略决策器。"""
     return BollingerDecision(period=period, std_multiplier=std_multiplier, df=df)
