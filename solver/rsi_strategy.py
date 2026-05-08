@@ -65,7 +65,6 @@ class RsiDecision:
         if pd.isna(rsi_value):
             return None
 
-        rsi_value = float(rsi_value)
         if shares <= 0 and rsi_value < self.oversold:
             return "buy"
         if shares > 0 and rsi_value > self.overbought:

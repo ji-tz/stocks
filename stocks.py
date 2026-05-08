@@ -406,7 +406,7 @@ def run_bollinger_backtest(symbol: str = "600900", source: object = "auto",
     df = df[["date", "open", "high", "low", "close", "volume"]].copy()
     rolling = df["close"].rolling(window=period, min_periods=period)
     df["bollinger_mid"] = rolling.mean()
-    df["bollinger_std"] = rolling.std(ddof=0)
+    df["bollinger_std"] = rolling.std(ddof=0)  # 使用总体标准差，保持与常见布林带口径一致
     df["bollinger_upper"] = df["bollinger_mid"] + std_multiplier * df["bollinger_std"]
     df["bollinger_lower"] = df["bollinger_mid"] - std_multiplier * df["bollinger_std"]
 

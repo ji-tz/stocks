@@ -14,6 +14,7 @@ def make_test_df(prices):
     return pd.DataFrame({
         "date": dates,
         "open": prices,
+        # 保留完整 OHLCV 结构，确保与真实回测数据格式一致。
         "high": [price + 0.5 for price in prices],
         "low": [price - 0.5 for price in prices],
         "close": prices,
