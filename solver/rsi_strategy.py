@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -43,7 +43,7 @@ class RsiDecision:
     period: int = 14
     oversold: float = 30.0
     overbought: float = 70.0
-    df: pd.DataFrame | None = None
+    df: Optional[pd.DataFrame] = None
 
     def decide(
         self,

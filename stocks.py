@@ -447,7 +447,7 @@ def run_rsi_backtest(symbol: str = "600900", source: object = "auto",
     loss = -delta.clip(upper=0)
     avg_gain = gain.rolling(window=period, min_periods=period).mean()
     avg_loss = loss.rolling(window=period, min_periods=period).mean()
-    rs = avg_gain / avg_loss.replace(0, float('nan'))
+    rs = avg_gain / avg_loss.where(avg_loss != 0)
     df["rsi"] = 100 - (100 / (1 + rs))
     df.loc[(avg_loss == 0) & (avg_gain > 0), "rsi"] = 100.0
     df.loc[(avg_loss == 0) & (avg_gain == 0), "rsi"] = 50.0

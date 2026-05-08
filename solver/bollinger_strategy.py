@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -35,7 +35,7 @@ class BollingerDecision:
 
     period: int = 20
     std_multiplier: float = 2.0
-    df: pd.DataFrame | None = None
+    df: Optional[pd.DataFrame] = None
 
     def decide(
         self,
@@ -59,8 +59,8 @@ class BollingerDecision:
         if pd.isna(upper) or pd.isna(lower):
             return None
 
-        if shares <= 0 and float(close_price) < float(lower):
+        if shares <= 0 and close_price < lower:
             return "buy"
-        if shares > 0 and float(close_price) > float(upper):
+        if shares > 0 and close_price > upper:
             return "sell"
         return None

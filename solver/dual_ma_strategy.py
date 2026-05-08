@@ -1,5 +1,5 @@
 import dataclasses
-from typing import Any
+from typing import Any, Optional
 
 import pandas as pd
 
@@ -35,7 +35,7 @@ class DualMaDecision:
 
     short_period: int = 5
     long_period: int = 20
-    df: pd.DataFrame | None = None
+    df: Optional[pd.DataFrame] = None
 
     def decide(
         self,
