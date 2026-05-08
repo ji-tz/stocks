@@ -23,7 +23,7 @@ class FixedAmountDecision:
     fixed_amount: float = 1000.0
     
     def decide(self, open_price: float, close_price: float | None = None, 
-               avg_cost: float = 0.0, shares: int = 0, date: Any = None):
+               avg_cost: float = 0.0, shares: int = 0, date: Any = None) -> str:
         """决策是否交易
         
         定投策略：每天都买入固定金额的股票
