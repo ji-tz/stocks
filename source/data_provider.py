@@ -33,14 +33,14 @@ def _save_cache(df: pd.DataFrame, cache_file: str):
         df.to_csv(tmp_file, index=False)
         try:
             os.replace(tmp_file, cache_file)
-        except Exception:
+        except OSError:
             # 在某些文件系统上 os.replace 可能失败，回退到写入直接覆盖
             try:
                 df.to_csv(cache_file, index=False)
-            except Exception:
-                pass
+            except OSError:
+                pass  # 保存缓存失败不影响主流程
     except Exception:
-        pass
+        pass  # 保存缓存失败不影响主流程
 
 
 def _parse_date_input(value: str | None):

@@ -17,8 +17,10 @@ from source.data_provider import get_data as _get_data
 
 try:
     from simulator.simulator import simulate_mean_cost, simulate_fixed_amount
-except Exception:
+except Exception as _e:
     # 兼容性：若 simulator 不可用，保留 None
+    import warnings
+    warnings.warn(f"simulator 模块不可用，相关功能将被禁用: {_e}", ImportWarning, stacklevel=2)
     simulate_mean_cost = None
     simulate_fixed_amount = None
 
@@ -197,6 +199,29 @@ def init(cache_dir: str = "data") -> None:
     os.makedirs(cache_dir, exist_ok=True)
 
 
+def _fetch_data_for_backtest(symbol: str, source: object,
+                              start_date: Optional[str], end_date: Optional[str]):
+    """按日期范围获取回测所需数据的辅助函数。
+
+    若未指定日期范围，则使用数据提供者的默认行为（返回全量数据）；
+    否则传入哨兵日期以覆盖完整区间。
+
+    Args:
+        symbol: 股票代码
+        source: 数据源
+        start_date: 起始日期（可为 None）
+        end_date: 结束日期（可为 None）
+
+    Returns:
+        包含 OHLCV 数据的 DataFrame
+    """
+    if start_date is None and end_date is None:
+        return get_data(symbol=symbol, source=source)
+    return get_data(symbol=symbol, source=source,
+                    start_date=start_date or "19700101",
+                    end_date=end_date or "20500101")
+
+
 def get_data(symbol: str = "600900",
              source: object = "auto",
              start_date: Optional[str] = None,
@@ -315,10 +340,7 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
         raise RuntimeError(f"SMA 模拟器不可用: {e}") from e
 
     # 以传入的日期范围优先；若未传则使用 get_data 的默认参数
-    if start_date is None and end_date is None:
-        df = get_data(symbol=symbol, source=source)
-    else:
-        df = get_data(symbol=symbol, source=source, start_date=start_date or "19700101", end_date=end_date or "20500101")
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
     # 只保留回测所需字段
     df = df[["date", "open", "high", "low", "close", "volume"]]
 
@@ -345,10 +367,7 @@ def run_futures_a50_prev_night(symbol: str = "600900", source: object = "auto",
     except Exception as e:
         raise RuntimeError(f"A50 策略模块不可用: {e}") from e
 
-    if start_date is None and end_date is None:
-        df = get_data(symbol=symbol, source=source)
-    else:
-        df = get_data(symbol=symbol, source=source, start_date=start_date or "19700101", end_date=end_date or "20500101")
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
 
     df = df[["date", "open", "high", "low", "close", "volume"]]
 
