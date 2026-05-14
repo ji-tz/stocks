@@ -85,9 +85,10 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
         self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
-    @patch('source.data_provider.get_data')
+    @patch('simulator.simulator.get_data')
     def test_run_mean_cost_returns_expected_keys(self, mock_get):
-        # simulate_mean_cost uses source.data_provider.get_data internally; patch it
+        # simulate_mean_cost 在 simulator.simulator 模块中直接导入了 get_data，
+        # 因此需要 patch simulator.simulator.get_data 而非 source.data_provider.get_data
         mock_get.return_value = make_mock_df(8)
         res = stocks.run_mean_cost(symbol='600900', start_date='20230101', end_date='20231231', lot_size=1, init_cash=10000.0, source='auto')
         # check some expected keys exist and types
