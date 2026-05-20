@@ -493,21 +493,17 @@ class TestGuiRoutes(unittest.TestCase):
         data = rv.get_json()
         self.assertIn('error', data)
 
-    @patch('stocks.get_data')
-    @patch('gui.web.os.remove')
-    @patch('gui.web.os.path.isfile')
-    @patch('gui.web.os.listdir')
-    @patch('gui.web.os.path.isdir')
-    def test_refresh_cache_api_success(self, mock_isdir, mock_listdir, mock_isfile, mock_remove, mock_get):
+    @patch('gui.web._download_from_all_sources')
+    @patch('gui.web._clear_all_cache_files')
+    @patch('gui.web._read_stock_cache_df')
+    def test_refresh_cache_api_success(self, _mock_read_cache, mock_clear_cache, mock_download):
         """测试清除缓存并自动重下当前股票数据"""
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
             sess['stock_name'] = '长江电力'
 
-        mock_isdir.return_value = True
-        mock_listdir.return_value = ['600900.csv', '000001.csv', 'README.md']
-        mock_isfile.return_value = True
-        mock_get.side_effect = [
+        mock_clear_cache.return_value = 2
+        mock_download.return_value = (
             pd.DataFrame({
                 'date': pd.to_datetime(['2022-12-30', '2023-01-03', '2023-01-04']),
                 'open': [23.8, 24.1, 24.3],
@@ -516,15 +512,17 @@ class TestGuiRoutes(unittest.TestCase):
                 'close': [23.9, 24.2, 24.5],
                 'volume': [900, 1000, 1100],
             }),
-            pd.DataFrame({
-                'date': pd.to_datetime(['2023-01-03', '2023-01-04']),
-                'open': [24.1, 24.3],
-                'high': [24.4, 24.7],
-                'low': [23.9, 24.0],
-                'close': [24.2, 24.5],
-                'volume': [1000, 1100],
-            }),
-        ]
+            [
+                {'source': 'akshare', 'status': 'failed', 'rows': 0, 'duration_ms': 1300, 'message': 'timeout'},
+                {'source': 'baostock', 'status': 'failed', 'rows': 0, 'duration_ms': 800, 'message': '登录失败'},
+                {'source': 'tencent', 'status': 'success', 'rows': 3, 'duration_ms': 320, 'message': '下载成功，3 条数据'},
+                {'source': 'sina', 'status': 'failed', 'rows': 0, 'duration_ms': 260, 'message': 'no data'},
+                {'source': 'sohu', 'status': 'failed', 'rows': 0, 'duration_ms': 330, 'message': 'no data'},
+                {'source': 'eastmoney', 'status': 'failed', 'rows': 0, 'duration_ms': 340, 'message': 'no data'},
+                {'source': 'cailianpress', 'status': 'failed', 'rows': 0, 'duration_ms': 410, 'message': 'no data'},
+                {'source': 'stooq', 'status': 'failed', 'rows': 0, 'duration_ms': 250, 'message': 'schema'},
+            ],
+        )
 
         rv = self.client.post(
             '/api/stock_chart/600900/refresh_cache',
@@ -534,18 +532,14 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertEqual(rv.status_code, 200)
         data = rv.get_json()
         self.assertTrue(data['refreshed'])
+        self.assertFalse(data['degraded'])
         self.assertEqual(data['removed_cache_files'], 2)
         self.assertEqual(data['labels'], ['2023-01-03', '2023-01-04'])
         self.assertEqual(data['open_prices'], [24.1, 24.3])
-        cache_dir = web_module._get_cache_dir()
-        mock_remove.assert_any_call(os.path.join(cache_dir, '600900.csv'))
-        mock_remove.assert_any_call(os.path.join(cache_dir, '000001.csv'))
-        self.assertEqual(mock_get.call_count, 2)
-        rebuild_call = mock_get.call_args_list[0].kwargs
-        self.assertEqual(rebuild_call['start_date'], '20230103')
-        self.assertEqual(rebuild_call['end_date'], '20230104')
-        self.assertTrue(rebuild_call['force_refresh'])
-        self.assertEqual(rebuild_call['buffer_days'], 5)
+        self.assertEqual(len(data['source_logs']), 8)
+        self.assertEqual(data['source_logs'][2]['source'], 'tencent')
+        self.assertEqual(data['source_logs'][2]['status'], 'success')
+        mock_download.assert_called_once_with(stock_code='600900', start='20230103', end='20230104')
 
     def test_refresh_cache_api_requires_selected_stock(self):
         """测试未选股票时无法清缓存重下"""
@@ -553,6 +547,75 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertEqual(rv.status_code, 400)
         data = rv.get_json()
         self.assertIn('error', data)
+
+    @patch('stocks.get_data')
+    @patch('gui.web._restore_stock_cache')
+    @patch('gui.web._read_stock_cache_df')
+    @patch('gui.web._download_from_all_sources')
+    @patch('gui.web._clear_all_cache_files')
+    def test_refresh_cache_api_download_failure(self,
+                                                mock_clear_cache,
+                                                mock_download,
+                                                mock_read_cache,
+                                                mock_restore_cache,
+                                                _mock_get):
+        """测试清缓存后在线下载失败时自动降级到本地缓存。"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        mock_clear_cache.return_value = 1
+        mock_read_cache.return_value = pd.DataFrame({
+            'date': pd.to_datetime(['2023-01-02', '2023-01-03', '2023-01-04']),
+            'open': [24.0, 24.1, 24.3],
+            'high': [24.2, 24.4, 24.7],
+            'low': [23.8, 23.9, 24.0],
+            'close': [24.1, 24.2, 24.5],
+            'volume': [900, 1000, 1100],
+        })
+        mock_download.side_effect = RuntimeError('所有数据源均失败: akshare: timeout; baostock: 网络异常')
+
+        rv = self.client.post(
+            '/api/stock_chart/600900/refresh_cache',
+            json={'start': '20230103', 'end': '20230104'},
+            content_type='application/json'
+        )
+
+        self.assertEqual(rv.status_code, 200)
+        data = rv.get_json()
+        self.assertFalse(data['refreshed'])
+        self.assertTrue(data['degraded'])
+        self.assertIn('warning', data)
+        self.assertIn('在线下载失败', data['warning'])
+        self.assertEqual(data['labels'], ['2023-01-03', '2023-01-04'])
+        self.assertEqual(data['open_prices'], [24.1, 24.3])
+        mock_restore_cache.assert_called_once()
+        self.assertEqual(mock_download.call_count, 1)
+
+    @patch('gui.web._download_from_all_sources')
+    @patch('gui.web._read_stock_cache_df', return_value=None)
+    @patch('gui.web._clear_all_cache_files', return_value=0)
+    def test_refresh_cache_api_download_failure_without_local_cache(self,
+                                                                    _mock_clear,
+                                                                    _mock_read_cache,
+                                                                    mock_download):
+        """测试无本地缓存时，在线下载失败仍返回500。"""
+        with self.client.session_transaction() as sess:
+            sess['stock_code'] = '600900'
+            sess['stock_name'] = '长江电力'
+
+        mock_download.side_effect = RuntimeError('所有数据源均失败')
+
+        rv = self.client.post(
+            '/api/stock_chart/600900/refresh_cache',
+            json={'start': '20230103', 'end': '20230104'},
+            content_type='application/json'
+        )
+
+        self.assertEqual(rv.status_code, 500)
+        data = rv.get_json()
+        self.assertIn('error', data)
+        self.assertIn('清除缓存并重新下载失败', data['error'])
 
     @patch('stocks.get_data')
     @patch('stocks.run_sma_backtest')

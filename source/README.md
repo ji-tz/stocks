@@ -12,6 +12,14 @@
 BaseProvider (抽象基类)
     ├── AkshareProvider (akshare数据源)
     └── BaostockProvider (baostock数据源)
+
+统一入口 `data_provider.get_data` 支持多条在线兜底路径（函数式实现，不依赖 Provider 子类）：
+- `tencent`
+- `sina`
+- `sohu`
+- `eastmoney`
+- `cailianpress`
+- `stooq`
 ```
 
 ### 主要文件
@@ -74,6 +82,8 @@ rs = bs.query_history_k_data_plus(
 )
 ```
 
+为了避免网络异常导致请求长时间卡住，`BaostockProvider` 会在请求期间临时设置 socket 默认超时（默认 8 秒），请求结束后自动恢复原值。
+
 参数说明：
 - `adjustflag="3"`: 不复权
 - `adjustflag="2"`: 前复权
@@ -107,7 +117,7 @@ df = get_data(
 # 自动尝试多个数据源
 df = get_data(
     symbol="600900",
-    source="auto",  # 自动尝试 akshare -> baostock
+    source="auto",  # 自动尝试 akshare -> baostock -> tencent -> sina -> sohu -> eastmoney -> cailianpress -> stooq
     start_date="20200101",
     end_date="20231231"
 )

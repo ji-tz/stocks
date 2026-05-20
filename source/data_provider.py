@@ -21,6 +21,59 @@ from .baostock_provider import BaostockProvider
 
 DEFAULT_FETCH_BUFFER_DAYS = 5
 
+
+def _format_symbol_for_stooq(symbol: str) -> str:
+    """将本地代码转换为 stooq 所需代码。"""
+    normalized = str(symbol).strip().lower()
+    if '.' in normalized:
+        return normalized
+    # A股在 stooq 通常使用 .cn 后缀，例如 600900.cn
+    if normalized.isdigit() and len(normalized) == 6:
+        return f"{normalized}.cn"
+    return normalized
+
+
+def _fetch_from_stooq(symbol: str, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """从 stooq 拉取日线 OHLCV 数据并标准化。"""
+    stooq_symbol = _format_symbol_for_stooq(symbol)
+    url = f"https://stooq.com/q/d/l/?s={stooq_symbol}&i=d"
+    resp = requests.get(url, timeout=12)
+    resp.raise_for_status()
+
+    raw_text = resp.text.strip()
+    if not raw_text or raw_text.lower().startswith('no data'):
+        raise RuntimeError("stooq: no data returned")
+
+    from io import StringIO
+    df = pd.read_csv(StringIO(raw_text))
+    required_columns = {"Date", "Open", "High", "Low", "Close", "Volume"}
+    if not required_columns.issubset(set(df.columns)):
+        raise RuntimeError("stooq: invalid csv schema")
+
+    out = pd.DataFrame({
+        "date": pd.to_datetime(df["Date"], errors='coerce'),
+        "open": pd.to_numeric(df["Open"], errors='coerce'),
+        "high": pd.to_numeric(df["High"], errors='coerce'),
+        "low": pd.to_numeric(df["Low"], errors='coerce'),
+        "close": pd.to_numeric(df["Close"], errors='coerce'),
+        "volume": pd.to_numeric(df["Volume"], errors='coerce').fillna(0.0),
+    }).dropna(subset=["date", "open", "high", "low", "close"])
+
+    if out.empty:
+        raise RuntimeError("stooq: no valid rows after normalization")
+
+    sd = _parse_date_input(start_date)
+    ed = _parse_date_input(end_date)
+    if sd is not None:
+        out = out[out['date'] >= sd]
+    if ed is not None:
+        out = out[out['date'] <= ed]
+
+    out = out.sort_values('date').reset_index(drop=True)
+    if out.empty:
+        raise RuntimeError("stooq: no data in requested range")
+    return out
+
 def _ensure_cache_dir(cache_dir: str):
     os.makedirs(cache_dir, exist_ok=True)
 
@@ -65,7 +118,275 @@ def _format_date_for_source(value, source_name: str) -> str | None:
     timestamp = pd.to_datetime(value)
     if source_name == 'baostock':
         return timestamp.strftime('%Y-%m-%d')
+    if source_name == 'tencent':
+        return timestamp.strftime('%Y-%m-%d')
+    if source_name in ('sina', 'cailianpress'):
+        return timestamp.strftime('%Y-%m-%d')
     return timestamp.strftime('%Y%m%d')
+
+
+def _format_symbol_for_tencent(symbol: str) -> str:
+    """将代码转为腾讯接口需要的市场前缀格式。"""
+    s = str(symbol).strip().lower()
+    if s.startswith('sh') or s.startswith('sz'):
+        return s
+    if s.isdigit() and len(s) == 6:
+        return f"sh{s}" if s.startswith('6') else f"sz{s}"
+    return s
+
+
+def _fetch_from_tencent(symbol: str, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """从腾讯接口拉取前复权日线并标准化。"""
+    symbol_t = _format_symbol_for_tencent(symbol)
+    sd = _format_date_for_source(_parse_date_input(start_date), 'tencent') if start_date else '1970-01-01'
+    ed = _format_date_for_source(_parse_date_input(end_date), 'tencent') if end_date else '2050-01-01'
+    url = (
+        "https://web.ifzq.gtimg.cn/appstock/app/fqkline/get"
+        f"?param={symbol_t},day,{sd},{ed},640,qfq"
+    )
+    resp = requests.get(url, timeout=12)
+    resp.raise_for_status()
+    payload = resp.json()
+
+    data = payload.get('data', {})
+    symbol_payload = data.get(symbol_t)
+    if not symbol_payload:
+        raise RuntimeError('tencent: empty symbol payload')
+
+    rows = symbol_payload.get('qfqday') or symbol_payload.get('day') or []
+    if not rows:
+        raise RuntimeError('tencent: no data returned')
+
+    out = pd.DataFrame({
+        'date': pd.to_datetime([r[0] for r in rows], errors='coerce'),
+        'open': pd.to_numeric([r[1] for r in rows], errors='coerce'),
+        'close': pd.to_numeric([r[2] for r in rows], errors='coerce'),
+        'high': pd.to_numeric([r[3] for r in rows], errors='coerce'),
+        'low': pd.to_numeric([r[4] for r in rows], errors='coerce'),
+        'volume': pd.Series(pd.to_numeric([r[5] for r in rows], errors='coerce')).fillna(0.0),
+    }).dropna(subset=['date', 'open', 'high', 'low', 'close'])
+
+    if out.empty:
+        raise RuntimeError('tencent: no valid rows after normalization')
+
+    return out.sort_values('date').reset_index(drop=True)
+
+
+def _parse_jsonp(text: str):
+    """解析 JSONP 文本并返回 JSON 部分。"""
+    s = (text or '').strip()
+    if not s:
+        return None
+    if s[0] in ('{', '['):
+        return requests.models.complexjson.loads(s)
+    left = s.find('(')
+    right = s.rfind(')')
+    if left >= 0 and right > left:
+        inner = s[left + 1:right]
+        return requests.models.complexjson.loads(inner)
+    return requests.models.complexjson.loads(s)
+
+
+def _filter_by_optional_range(df: pd.DataFrame, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    out = df
+    sd = _parse_date_input(start_date)
+    ed = _parse_date_input(end_date)
+    if sd is not None:
+        out = out[out['date'] >= sd]
+    if ed is not None:
+        out = out[out['date'] <= ed]
+    return out.sort_values('date').reset_index(drop=True)
+
+
+def _fetch_from_sina(symbol: str, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """使用新浪 K 线接口拉取日线数据（240分钟K线近似日线）。"""
+    symbol_t = _format_symbol_for_tencent(symbol)
+    url = (
+        "https://quotes.sina.cn/cn/api/jsonp_v2.php/var%20_sina_kline=/"
+        f"CN_MarketDataService.getKLineData?symbol={symbol_t}&scale=240&ma=no&datalen=2048"
+    )
+    resp = requests.get(url, timeout=12)
+    resp.raise_for_status()
+    rows = _parse_jsonp(resp.text) or []
+    if not isinstance(rows, list) or not rows:
+        raise RuntimeError('sina: no data returned')
+
+    out = pd.DataFrame({
+        'date': pd.to_datetime([r.get('day') for r in rows], errors='coerce'),
+        'open': pd.to_numeric([r.get('open') for r in rows], errors='coerce'),
+        'high': pd.to_numeric([r.get('high') for r in rows], errors='coerce'),
+        'low': pd.to_numeric([r.get('low') for r in rows], errors='coerce'),
+        'close': pd.to_numeric([r.get('close') for r in rows], errors='coerce'),
+        'volume': pd.Series(pd.to_numeric([r.get('volume') for r in rows], errors='coerce')).fillna(0.0),
+    }).dropna(subset=['date', 'open', 'high', 'low', 'close'])
+
+    out = _filter_by_optional_range(out, start_date, end_date)
+    if out.empty:
+        raise RuntimeError('sina: no data in requested range')
+    return out
+
+
+def _fetch_from_sohu(symbol: str, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """使用搜狐历史行情接口拉取日线数据。"""
+    code = str(symbol).strip()
+    sd = _format_date_for_source(_parse_date_input(start_date), 'akshare') if start_date else '19700101'
+    ed = _format_date_for_source(_parse_date_input(end_date), 'akshare') if end_date else '20500101'
+    url = (
+        "https://q.stock.sohu.com/hisHq"
+        f"?code=cn_{code}&start={sd}&end={ed}&stat=1&order=D&period=d&rt=jsonp"
+    )
+    resp = requests.get(url, timeout=12)
+    resp.raise_for_status()
+    payload = _parse_jsonp(resp.text)
+    if not isinstance(payload, list) or not payload:
+        raise RuntimeError('sohu: no data returned')
+
+    hq_rows = payload[0].get('hq') or []
+    if not hq_rows:
+        raise RuntimeError('sohu: empty hq rows')
+
+    normalized = []
+    for row in hq_rows:
+        if not isinstance(row, list) or len(row) < 8:
+            continue
+        # 搜狐字段：日期, 开盘, 收盘, 涨跌额, 涨跌幅, 最低, 最高, 成交量(手), ...
+        normalized.append({
+            'date': row[0],
+            'open': row[1],
+            'close': row[2],
+            'low': row[5],
+            'high': row[6],
+            'volume': row[7],
+        })
+
+    out = pd.DataFrame(normalized)
+    if out.empty:
+        raise RuntimeError('sohu: no valid row structure')
+
+    out['date'] = pd.to_datetime(out['date'], errors='coerce')
+    out['open'] = pd.to_numeric(out['open'], errors='coerce')
+    out['high'] = pd.to_numeric(out['high'], errors='coerce')
+    out['low'] = pd.to_numeric(out['low'], errors='coerce')
+    out['close'] = pd.to_numeric(out['close'], errors='coerce')
+    out['volume'] = pd.Series(pd.to_numeric(out['volume'], errors='coerce')).fillna(0.0)
+    out = out.dropna(subset=['date', 'open', 'high', 'low', 'close'])
+
+    out = _filter_by_optional_range(out, start_date, end_date)
+    if out.empty:
+        raise RuntimeError('sohu: no data in requested range')
+    return out
+
+
+def _fetch_from_eastmoney(symbol: str, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """使用东方财富官方 K 线接口拉取日线数据。"""
+    s = str(symbol).strip()
+    secid = f"1.{s}" if s.startswith('6') else f"0.{s}"
+    beg = _format_date_for_source(_parse_date_input(start_date), 'akshare') if start_date else '19700101'
+    end = _format_date_for_source(_parse_date_input(end_date), 'akshare') if end_date else '20500101'
+    url = (
+        "https://push2his.eastmoney.com/api/qt/stock/kline/get"
+        f"?secid={secid}&klt=101&fqt=1&beg={beg}&end={end}"
+        "&fields1=f1,f2,f3&fields2=f51,f52,f53,f54,f55,f56"
+    )
+    resp = requests.get(url, timeout=12)
+    resp.raise_for_status()
+    payload = resp.json()
+    data = payload.get('data') or {}
+    klines = data.get('klines') or []
+    if not klines:
+        raise RuntimeError('eastmoney: no data returned')
+
+    rows = []
+    for line in klines:
+        parts = str(line).split(',')
+        if len(parts) < 6:
+            continue
+        rows.append({
+            'date': parts[0],
+            'open': parts[1],
+            'close': parts[2],
+            'high': parts[3],
+            'low': parts[4],
+            'volume': parts[5],
+        })
+    out = pd.DataFrame(rows)
+    if out.empty:
+        raise RuntimeError('eastmoney: invalid kline payload')
+
+    out['date'] = pd.to_datetime(out['date'], errors='coerce')
+    out['open'] = pd.to_numeric(out['open'], errors='coerce')
+    out['high'] = pd.to_numeric(out['high'], errors='coerce')
+    out['low'] = pd.to_numeric(out['low'], errors='coerce')
+    out['close'] = pd.to_numeric(out['close'], errors='coerce')
+    out['volume'] = pd.Series(pd.to_numeric(out['volume'], errors='coerce')).fillna(0.0)
+    out = out.dropna(subset=['date', 'open', 'high', 'low', 'close'])
+
+    out = _filter_by_optional_range(out, start_date, end_date)
+    if out.empty:
+        raise RuntimeError('eastmoney: no data in requested range')
+    return out
+
+
+def _fetch_from_cailianpress(symbol: str, start_date: str | None, end_date: str | None) -> pd.DataFrame:
+    """使用财联社行情接口拉取日线数据（可用性受服务端策略影响）。"""
+    symbol_t = _format_symbol_for_tencent(symbol)
+    url = (
+        "https://x-quote.cls.cn/quote/stock/kline"
+        f"?secu_code={symbol_t}&type=fd1&offset=0&limit=2048"
+    )
+    resp = requests.get(url, timeout=12)
+    resp.raise_for_status()
+    payload = resp.json()
+    data = payload.get('data') or {}
+    rows = data.get('line') or data.get('klines') or []
+    if not rows:
+        raise RuntimeError('cailianpress: no data returned')
+
+    parsed = []
+    for item in rows:
+        if isinstance(item, dict):
+            dt_raw = item.get('date') or item.get('secu_time') or item.get('time')
+            parsed.append({
+                'date': dt_raw,
+                'open': item.get('open'),
+                'high': item.get('high'),
+                'low': item.get('low'),
+                'close': item.get('close'),
+                'volume': item.get('volume') or item.get('vol') or 0,
+            })
+        elif isinstance(item, (list, tuple)) and len(item) >= 6:
+            parsed.append({
+                'date': item[0],
+                'open': item[1],
+                'close': item[2],
+                'high': item[3],
+                'low': item[4],
+                'volume': item[5],
+            })
+
+    out = pd.DataFrame(parsed)
+    if out.empty:
+        raise RuntimeError('cailianpress: unsupported payload structure')
+
+    # 兼容时间戳和日期字符串
+    if pd.api.types.is_numeric_dtype(out['date']):
+        max_ts = pd.to_numeric(out['date'], errors='coerce').max()
+        unit = 'ms' if pd.notna(max_ts) and max_ts > 10_000_000_000 else 's'
+        out['date'] = pd.to_datetime(out['date'], errors='coerce', unit=unit)
+    else:
+        out['date'] = pd.to_datetime(out['date'], errors='coerce')
+
+    out['open'] = pd.to_numeric(out['open'], errors='coerce')
+    out['high'] = pd.to_numeric(out['high'], errors='coerce')
+    out['low'] = pd.to_numeric(out['low'], errors='coerce')
+    out['close'] = pd.to_numeric(out['close'], errors='coerce')
+    out['volume'] = pd.Series(pd.to_numeric(out['volume'], errors='coerce')).fillna(0.0)
+    out = out.dropna(subset=['date', 'open', 'high', 'low', 'close'])
+
+    out = _filter_by_optional_range(out, start_date, end_date)
+    if out.empty:
+        raise RuntimeError('cailianpress: no data in requested range')
+    return out
 
 
 def _expand_fetch_range(start_date: str | None,
@@ -213,7 +534,7 @@ def get_data(symbol: str = "600900",
     elif isinstance(source, str):
         s = source.lower()
         if s == "auto":
-            sources = ["akshare", "baostock"]
+            sources = ["akshare", "baostock", "tencent", "sina", "sohu", "eastmoney", "cailianpress", "stooq"]
         else:
             sources = [s]
     else:
@@ -224,6 +545,12 @@ def get_data(symbol: str = "600900",
     provider_map = {
         "akshare": lambda: AkshareProvider(max_attempts=max_attempts),
         "baostock": lambda: BaostockProvider(),
+        "tencent": lambda: None,
+        "sina": lambda: None,
+        "sohu": lambda: None,
+        "eastmoney": lambda: None,
+        "cailianpress": lambda: None,
+        "stooq": lambda: None,
     }
 
     for src in sources:
@@ -241,7 +568,20 @@ def get_data(symbol: str = "600900",
                 fetch_start = _format_date_for_source(_parse_date_input(request_start), src) if request_start else request_start
                 fetch_end = _format_date_for_source(_parse_date_input(request_end), src) if request_end else request_end
 
-            df = provider.fetch(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            if src == 'stooq':
+                df = _fetch_from_stooq(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            elif src == 'tencent':
+                df = _fetch_from_tencent(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            elif src == 'sina':
+                df = _fetch_from_sina(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            elif src == 'sohu':
+                df = _fetch_from_sohu(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            elif src == 'eastmoney':
+                df = _fetch_from_eastmoney(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            elif src == 'cailianpress':
+                df = _fetch_from_cailianpress(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
+            else:
+                df = provider.fetch(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
             if df is None or df.empty:
                 errors.append((src, "no data returned"))
                 continue

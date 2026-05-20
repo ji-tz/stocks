@@ -109,6 +109,39 @@ class TestAdjustmentParameters(unittest.TestCase):
         # 验证调用了logout
         mock_logout.assert_called()
 
+    @patch('socket.setdefaulttimeout')
+    @patch('socket.getdefaulttimeout', return_value=None)
+    @patch('baostock.logout')
+    @patch('baostock.query_history_k_data_plus')
+    @patch('baostock.login')
+    def test_baostock_sets_and_restores_socket_timeout(self,
+                                                       mock_login,
+                                                       mock_query,
+                                                       mock_logout,
+                                                       _mock_get_timeout,
+                                                       mock_set_timeout):
+        """测试BaostockProvider会设置并恢复socket默认超时，避免网络卡死。"""
+        from source.baostock_provider import BaostockProvider
+
+        mock_login_result = MagicMock()
+        mock_login_result.error_code = "0"
+        mock_login.return_value = mock_login_result
+
+        mock_result = MagicMock()
+        mock_result.error_code = "0"
+        mock_result.fields = ['date', 'open', 'high', 'low', 'close', 'volume']
+        mock_result.next.side_effect = [True, False]
+        mock_result.get_row_data.return_value = ['2023-01-01', '10.0', '10.5', '9.8', '10.2', '1000']
+        mock_query.return_value = mock_result
+
+        provider = BaostockProvider(timeout_seconds=7.5)
+        out = provider.fetch(symbol='600900', start_date='20230101', end_date='20230102')
+
+        self.assertFalse(out.empty)
+        self.assertIn(call(7.5), mock_set_timeout.mock_calls)
+        self.assertIn(call(None), mock_set_timeout.mock_calls)
+        mock_logout.assert_called()
+
     def test_adjustment_consistency(self):
         """测试两个数据源使用一致的复权方式（前复权）"""
         # 验证两个数据源的复权配置一致性

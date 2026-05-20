@@ -110,7 +110,11 @@ class AkshareProvider(BaseProvider):
             )
 
         def _fetch_open_fund_nav() -> pd.DataFrame:
-            nav_df = ak.fund_open_fund_info_em(fund=symbol, indicator="单位净值走势")
+            # akshare 在不同版本中参数名存在差异：fund / symbol。
+            try:
+                nav_df = ak.fund_open_fund_info_em(fund=symbol, indicator="单位净值走势")
+            except TypeError:
+                nav_df = ak.fund_open_fund_info_em(symbol=symbol, indicator="单位净值走势")
             if nav_df is None or nav_df.empty:
                 return pd.DataFrame()
 
@@ -137,6 +141,7 @@ class AkshareProvider(BaseProvider):
         if any(ch.isalpha() for ch in symbol):
             fetchers.append(_fetch_global_futures_hist)
         fetchers.extend((_fetch_stock_hist, _fetch_etf_hist, _fetch_open_fund_nav))
+        last_errors: list[str] = []
 
         for attempt in range(1, self.max_attempts + 1):
             sess = requests.Session()
@@ -150,11 +155,17 @@ class AkshareProvider(BaseProvider):
                         df = fetcher()
                         if df is not None and not df.empty:
                             return _filter_date_range(df, start_date=start_date, end_date=end_date)
-                    except Exception:
+                    except Exception as e:
+                        last_errors.append(f"{fetcher.__name__}: {type(e).__name__}: {e}")
                         continue
             finally:
                 requests.Session = orig_session
 
             time.sleep(1)
 
+        if last_errors:
+            raise RuntimeError(
+                "akshare: no stock/etf/open-fund data returned after retries; "
+                f"last_errors={'; '.join(last_errors[-3:])}"
+            )
         raise RuntimeError("akshare: no stock/etf/open-fund data returned after retries")

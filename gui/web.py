@@ -2,6 +2,10 @@ import os
 import sys
 import json
 import threading
+import pandas as pd
+import time
+import tempfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, session, jsonify, Response
 
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
@@ -17,6 +21,7 @@ app.secret_key = os.environ.get('SECRET_KEY', 'stocks-quantitative-backtest-secr
 # 在应用启动时加载股票列表到内存，避免重复文件IO
 _STOCK_LIST = None
 _STOCK_INDEX = None
+_DOWNLOAD_SOURCES = ('akshare', 'baostock', 'tencent', 'sina', 'sohu', 'eastmoney', 'cailianpress', 'stooq')
 
 
 def _get_cache_dir() -> str:
@@ -56,6 +61,14 @@ def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', 
     if df is None or df.empty:
         raise RuntimeError('无法获取该时间段的股票日线数据')
 
+    return _build_payload_from_df(stock_code=stock_code, df=df)
+
+
+def _build_payload_from_df(stock_code: str, df: pd.DataFrame, bounds_df: pd.DataFrame | None = None) -> dict:
+    """将行情 DataFrame 转换为前端图表 payload。"""
+    if df is None or df.empty:
+        raise RuntimeError('无法获取该时间段的股票日线数据')
+
     labels = []
     open_prices = []
     for _, row in df.iterrows():
@@ -66,8 +79,19 @@ def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', 
             labels.append(str(date_value))
         open_prices.append(float(row['open']))
 
-    available_start = labels[0]
-    available_end = labels[-1]
+    if bounds_df is None or bounds_df.empty:
+        available_start = labels[0]
+        available_end = labels[-1]
+    else:
+        bounds_labels = []
+        for _, row in bounds_df.iterrows():
+            date_value = row['date']
+            if hasattr(date_value, 'strftime'):
+                bounds_labels.append(date_value.strftime('%Y-%m-%d'))
+            else:
+                bounds_labels.append(str(date_value))
+        available_start = bounds_labels[0]
+        available_end = bounds_labels[-1]
 
     return {
         'stock_code': stock_code,
@@ -78,6 +102,159 @@ def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', 
         'points': len(labels),
         'price_field': 'open',
     }
+
+
+def _read_stock_cache_df(stock_code: str) -> pd.DataFrame | None:
+    """读取单个股票缓存并标准化列。"""
+    cache_file = os.path.join(_get_cache_dir(), f'{stock_code}.csv')
+    if not os.path.exists(cache_file):
+        return None
+
+    try:
+        df = pd.read_csv(cache_file, parse_dates=['date'])
+    except Exception:
+        return None
+
+    required = ['date', 'open', 'high', 'low', 'close', 'volume']
+    if not set(required).issubset(set(df.columns)):
+        return None
+    return df.loc[:, required].sort_values('date').reset_index(drop=True)
+
+
+def _filter_df_by_optional_range(df: pd.DataFrame, start: str = '', end: str = '') -> pd.DataFrame:
+    """按可选日期过滤缓存数据。"""
+    out = df.copy()
+    if start:
+        out = out[out['date'] >= pd.to_datetime(start, format='%Y%m%d')]
+    if end:
+        out = out[out['date'] <= pd.to_datetime(end, format='%Y%m%d')]
+    return out.sort_values('date').reset_index(drop=True)
+
+
+def _restore_stock_cache(stock_code: str, cached_df: pd.DataFrame) -> None:
+    """将指定股票缓存恢复到磁盘。"""
+    cache_file = os.path.join(_get_cache_dir(), f'{stock_code}.csv')
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+    cached_df.sort_values('date').to_csv(cache_file, index=False)
+
+
+def _fetch_source_df(stock_code: str, start: str, end: str, source_name: str, temp_root: str) -> tuple[dict, pd.DataFrame | None]:
+    """拉取单个数据源并返回日志和数据。"""
+    started = time.time()
+    source_cache_dir = os.path.join(temp_root, source_name)
+    os.makedirs(source_cache_dir, exist_ok=True)
+    try:
+        df = stocks.get_data(
+            symbol=stock_code,
+            source=source_name,
+            start_date=start or None,
+            end_date=end or None,
+            cache_dir=source_cache_dir,
+            force_refresh=True,
+            buffer_days=5,
+        )
+        if df is None or df.empty:
+            raise RuntimeError('no data returned')
+
+        duration_ms = int((time.time() - started) * 1000)
+        return (
+            {
+                'source': source_name,
+                'status': 'success',
+                'rows': int(len(df)),
+                'duration_ms': duration_ms,
+                'message': f'下载成功，{len(df)} 条数据',
+            },
+            df,
+        )
+    except Exception as exc:
+        duration_ms = int((time.time() - started) * 1000)
+        return (
+            {
+                'source': source_name,
+                'status': 'failed',
+                'rows': 0,
+                'duration_ms': duration_ms,
+                'message': str(exc),
+            },
+            None,
+        )
+
+
+def _download_from_all_sources(stock_code: str, start: str, end: str) -> tuple[pd.DataFrame | None, list[dict]]:
+    """并行拉取全部备选数据源，采用首个成功结果。"""
+    logs_by_source: dict[str, dict] = {}
+    first_success_df: pd.DataFrame | None = None
+    first_success_source: str | None = None
+    with tempfile.TemporaryDirectory() as temp_root:
+        with ThreadPoolExecutor(max_workers=len(_DOWNLOAD_SOURCES)) as executor:
+            future_map = {
+                executor.submit(_fetch_source_df, stock_code, start, end, src, temp_root): src
+                for src in _DOWNLOAD_SOURCES
+            }
+            for future in as_completed(future_map):
+                source_name = future_map[future]
+                try:
+                    log_item, df = future.result()
+                except Exception as exc:
+                    log_item = {
+                        'source': source_name,
+                        'status': 'failed',
+                        'rows': 0,
+                        'duration_ms': 0,
+                        'message': f'并行任务异常: {exc}',
+                    }
+                    df = None
+
+                logs_by_source[source_name] = log_item
+                if df is not None and not df.empty:
+                    if first_success_df is None:
+                        first_success_df = df.copy()
+                        first_success_source = source_name
+                    else:
+                        logs_by_source[source_name] = {
+                            **log_item,
+                            'status': 'discarded',
+                            'message': f"较晚到达，已丢弃（采用 {first_success_source}）",
+                        }
+
+    ordered_logs = [logs_by_source.get(src, {
+        'source': src,
+        'status': 'failed',
+        'rows': 0,
+        'duration_ms': 0,
+        'message': '未执行',
+    }) for src in _DOWNLOAD_SOURCES]
+
+    if first_success_df is None or first_success_df.empty:
+        return None, ordered_logs
+
+    first_success_df = first_success_df.copy()
+    first_success_df['date'] = pd.to_datetime(first_success_df['date'])
+    first_success_df = first_success_df.drop_duplicates(subset=['date'], keep='last').sort_values('date').reset_index(drop=True)
+
+    cache_file = os.path.join(_get_cache_dir(), f'{stock_code}.csv')
+    os.makedirs(os.path.dirname(cache_file), exist_ok=True)
+    first_success_df.to_csv(cache_file, index=False)
+    return first_success_df, ordered_logs
+
+
+def _build_fallback_payload(stock_code: str, start: str, end: str, cached_df: pd.DataFrame, error_text: str) -> dict:
+    """在线失败时使用缓存构造降级 payload。"""
+    ranged_df = _filter_df_by_optional_range(cached_df, start=start, end=end)
+    used_full_cache_range = False
+    if ranged_df.empty:
+        ranged_df = cached_df.copy()
+        used_full_cache_range = True
+
+    payload = _build_payload_from_df(stock_code=stock_code, df=ranged_df, bounds_df=cached_df)
+    payload['refreshed'] = False
+    payload['degraded'] = True
+    payload['used_full_cache_range'] = used_full_cache_range
+    payload['warning'] = '在线下载失败，已自动降级为本地缓存数据。'
+    payload['detail_error'] = str(error_text)
+    payload['source_logs'] = []
+    return payload
 
 
 def _rebuild_chart_cache(stock_code: str, start: str = '', end: str = '', source: str = 'auto') -> None:
@@ -494,21 +671,50 @@ def refresh_stock_chart_cache(stock_code):
 
     data = request.get_json(silent=True) or {}
 
+    start = ''
+    end = ''
+    removed_files = 0
+    cached_before_refresh = None
+
     try:
         start, end = _validate_optional_date_range(
             data.get('start', ''),
             data.get('end', ''),
         )
+        cached_before_refresh = _read_stock_cache_df(stock_code)
         removed_files = _clear_all_cache_files()
-        # 清缓存后按当前请求区间强制重建，并在下载时扩展前后缓冲天数，降低边界日期不稳定问题。
-        _rebuild_chart_cache(stock_code=stock_code, start=start, end=end)
-        payload = _build_stock_chart_payload(stock_code=stock_code, start=start, end=end)
+        merged_df, source_logs = _download_from_all_sources(stock_code=stock_code, start=start, end=end)
+        if merged_df is None or merged_df.empty:
+            raise RuntimeError('全部备选数据源下载失败')
+
+        ranged_df = _filter_df_by_optional_range(merged_df, start=start, end=end)
+        if ranged_df.empty:
+            ranged_df = merged_df
+
+        payload = _build_payload_from_df(stock_code=stock_code, df=ranged_df, bounds_df=merged_df)
         payload['removed_cache_files'] = removed_files
         payload['refreshed'] = True
+        payload['degraded'] = False
+        payload['source_logs'] = source_logs
         return jsonify(payload)
     except ValueError as exc:
         return jsonify({'error': str(exc)}), 400
     except Exception as exc:
+        if cached_before_refresh is not None and not cached_before_refresh.empty:
+            try:
+                _restore_stock_cache(stock_code=stock_code, cached_df=cached_before_refresh)
+                payload = _build_fallback_payload(
+                    stock_code=stock_code,
+                    start=start,
+                    end=end,
+                    cached_df=cached_before_refresh,
+                    error_text=str(exc),
+                )
+                payload['removed_cache_files'] = removed_files
+                payload['source_logs'] = payload.get('source_logs', [])
+                return jsonify(payload)
+            except Exception:
+                pass
         return jsonify({'error': f'清除缓存并重新下载失败: {str(exc)}'}), 500
 
 
