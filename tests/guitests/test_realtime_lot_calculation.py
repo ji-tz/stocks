@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 from gui.web import app
+from gui.web import _get_cache_dir
 
 
 class TestRealtimeLotCalculation(unittest.TestCase):
@@ -57,7 +58,6 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         response = self.client.get('/api/stock_price/600900')
         self.assertEqual(response.status_code, 200)
 
-        from gui.web import _get_cache_dir
         self.assertEqual(mock_get_data.call_args.kwargs.get('cache_dir'), _get_cache_dir())
 
     def test_stock_price_api_empty_data(self):
@@ -65,13 +65,14 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         # Mock get_data 返回空DataFrame
         empty_df = pd.DataFrame()
 
-        with patch('stocks.get_data', return_value=empty_df):
+        with patch('stocks.get_data', return_value=empty_df) as mock_get_data:
             response = self.client.get('/api/stock_price/600900')
             self.assertEqual(response.status_code, 404)
 
             data = response.get_json()
             self.assertIn('error', data)
             self.assertIn('无法获取股票数据', data['error'])
+            self.assertEqual(_get_cache_dir(), mock_get_data.call_args.kwargs.get('cache_dir'))
 
     def test_stock_price_api_exception(self):
         """测试获取股票价格API - 异常场景"""
