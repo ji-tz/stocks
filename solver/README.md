@@ -85,7 +85,31 @@ result = simulate_fixed_amount(
 - 简单易行：无需复杂的技术分析
 - 适合长期投资：通过时间平滑市场波动
 
-### 4. 信号模板策略（Signal Template Strategy）
+### 4. 双均线交叉策略（Dual Moving Average Strategy）
+文件：`dual_ma_strategy.py`
+
+**策略逻辑：**
+- 短期均线上穿长期均线时买入
+- 短期均线下穿长期均线时卖出
+- 适合跟随中期趋势
+
+### 5. 布林带策略（Bollinger Bands Strategy）
+文件：`bollinger_strategy.py`
+
+**策略逻辑：**
+- 收盘价跌破布林带下轨时买入
+- 收盘价突破布林带上轨时卖出
+- 适合震荡行情中的区间回归
+
+### 6. RSI 策略（RSI Strategy）
+文件：`rsi_strategy.py`
+
+**策略逻辑：**
+- RSI 低于超卖阈值时买入
+- RSI 高于超买阈值时卖出
+- 适合低频超跌反弹与回撤止盈场景
+
+### 7. 信号模板策略（Signal Template Strategy）
 文件：`signal_template_strategy.py`
 
 **策略逻辑：**
@@ -129,8 +153,8 @@ def decide(self, open_price: float, close_price: float | None = None,
 
 1. 在本目录创建新文件，如 `my_strategy.py`
 2. 实现决策类，包含 `decide()` 方法
-3. 在 `stocks.py` 的策略注册表中声明策略名、展示名、独立参数和执行函数
-4. 复用 `simulator/simulator.py` 的统一模拟流程；仅在确有必要时新增便捷函数
+3. 在策略模块中声明自动注册信息、参数、指标准备和决策构造函数
+4. 复用 `simulator/simulator.py` 的统一模拟流程；仅在确有必要时新增专用 runner
 5. 在 `tests/` 目录添加测试文件
 6. 更新本 README 文档
 
@@ -145,20 +169,26 @@ def decide(self, open_price: float, close_price: float | None = None,
    - `key`：策略唯一标识
    - `label`：展示名
    - `runner`：`stocks.py` 中执行函数名（字符串）
+   - `module_interface`：是否复用统一模块策略回测入口
 3. 参数通过 `parameters` 数组声明，每项包含：
    - `name`、`label`、`caster`（`int|float|str`）、`default`
-4. `stocks.py` 会在构建策略注册表时自动扫描并接入。
+4. 若 `runner` 为 `run_module_strategy_backtest`，则策略模块还应提供：
+   - `validate_strategy_parameters(**params)`：可选，校验参数
+   - `prepare_backtest_data(df, **params)`：可选，补充指标列
+   - `create_strategy(df, **params)`：必选，返回策略决策对象
+5. `stocks.py` 会在构建策略注册表时自动扫描并接入。
 
 示例（简化）：
 
 ```python
 AUTO_STRATEGY_SPEC = {
-    "key": "a50_prev_night_1h",
-    "label": "A50 前夜信号(1h)",
-    "runner": "run_futures_a50_prev_night",
+    "key": "dual_ma",
+    "label": "双均线交叉",
+    "runner": "run_module_strategy_backtest",
+    "module_interface": True,
     "parameters": [
-        {"name": "futures_symbol", "label": "A50 期货代码", "caster": "str", "default": "FTSE_A50"},
-        {"name": "base_position_lots", "label": "底仓手数", "caster": "int", "default": 2},
+        {"name": "short_period", "label": "短期均线周期", "caster": "int", "default": 5},
+        {"name": "long_period", "label": "长期均线周期", "caster": "int", "default": 20},
     ],
     "supported_trade_prices": ["open"],
 }
@@ -189,6 +219,7 @@ class MyStrategy:
 每个策略都应有对应的测试文件：
 - `tests/test_simulator.py` - SMA 和 MeanCost 策略测试
 - `tests/test_fixed_amount_strategy.py` - 定投策略测试
+- `tests/test_low_frequency_strategies.py` - 双均线、布林带、RSI 策略测试
 
 运行测试：
 ```bash

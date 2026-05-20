@@ -85,9 +85,9 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
         self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
-    @patch('source.data_provider.get_data')
+    @patch('simulator.simulator.get_data')
     def test_run_mean_cost_returns_expected_keys(self, mock_get):
-        # simulate_mean_cost uses source.data_provider.get_data internally; patch it
+        # simulate_mean_cost 在 simulator.simulator 模块内绑定了 get_data，需在该引用处打补丁
         mock_get.return_value = make_mock_df(8)
         res = stocks.run_mean_cost(symbol='600900', start_date='20230101', end_date='20231231', lot_size=1, init_cash=10000.0, source='auto')
         # check some expected keys exist and types
@@ -103,10 +103,16 @@ class TestStocksModule(unittest.TestCase):
         self.assertIn('sma', specs)
         self.assertIn('mean_cost', specs)
         self.assertIn('fixed_amount', specs)
+        self.assertIn('dual_ma', specs)
+        self.assertIn('bollinger', specs)
+        self.assertIn('rsi', specs)
         self.assertIn('a50_prev_night_1h', specs)
         self.assertIn('signal_template', specs)
         self.assertEqual(specs['sma'].parameters[0].name, 'period')
         self.assertEqual(specs['fixed_amount'].parameters[0].name, 'fixed_amount')
+        self.assertEqual(specs['dual_ma'].parameters[0].name, 'short_period')
+        self.assertEqual(specs['bollinger'].parameters[1].name, 'std_multiplier')
+        self.assertEqual(specs['rsi'].parameters[2].name, 'overbought')
         self.assertEqual(specs['a50_prev_night_1h'].parameters[0].name, 'futures_symbol')
         self.assertEqual(specs['signal_template'].parameters[0].name, 'buy_trigger')
         self.assertEqual(specs['mean_cost'].supported_trade_prices, (stocks.TRADE_PRICE_OPEN,))
