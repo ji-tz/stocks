@@ -41,6 +41,25 @@ class TestRealtimeLotCalculation(unittest.TestCase):
             self.assertEqual(data['stock_code'], '600900')
             self.assertIn('2024-01-10', data['date'])
 
+    @patch('stocks.get_data')
+    def test_stock_price_api_uses_project_cache_dir(self, mock_get_data):
+        """测试获取价格接口使用项目绝对缓存目录"""
+        test_data = pd.DataFrame({
+            'date': pd.to_datetime(['2024-01-10']),
+            'open': [10.0],
+            'high': [10.5],
+            'low': [9.5],
+            'close': [10.0],
+            'volume': [1000]
+        })
+        mock_get_data.return_value = test_data
+
+        response = self.client.get('/api/stock_price/600900')
+        self.assertEqual(response.status_code, 200)
+
+        from gui.web import _get_cache_dir
+        self.assertEqual(mock_get_data.call_args.kwargs.get('cache_dir'), _get_cache_dir())
+
     def test_stock_price_api_empty_data(self):
         """测试获取股票价格API - 空数据场景"""
         # Mock get_data 返回空DataFrame

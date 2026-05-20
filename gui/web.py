@@ -297,7 +297,7 @@ def get_stock_price(stock_code):
     """
     try:
         # 从缓存获取股票数据（仅获取最近一条数据以提高性能）
-        df = stocks.get_data(symbol=stock_code, source='auto', cache_dir='data')
+        df = stocks.get_data(symbol=stock_code, source='auto', cache_dir=_get_cache_dir())
 
         if df is None or df.empty:
             return jsonify({'error': '无法获取股票数据'}), 404
