@@ -186,6 +186,11 @@ def _download_from_all_sources(stock_code: str, start: str, end: str) -> tuple[p
     logs_by_source: dict[str, dict] = {}
     first_success_df: pd.DataFrame | None = None
     first_success_source: str | None = None
+    best_df: pd.DataFrame | None = None
+    best_source: str | None = None
+    best_rows: int = 0
+    best_range: tuple[str, str] | None = None
+    refreshed_by_later: dict[str, bool] = {}
     with tempfile.TemporaryDirectory() as temp_root:
         with ThreadPoolExecutor(max_workers=len(_DOWNLOAD_SOURCES)) as executor:
             future_map = {
@@ -208,15 +213,51 @@ def _download_from_all_sources(stock_code: str, start: str, end: str) -> tuple[p
 
                 logs_by_source[source_name] = log_item
                 if df is not None and not df.empty:
+                    # 计算当前df的行数和时间范围
+                    df_rows = len(df)
+                    df_dates = pd.to_datetime(df['date'])
+                    df_start = str(df_dates.min().date())
+                    df_end = str(df_dates.max().date())
+                    # 先到的直接采用
                     if first_success_df is None:
                         first_success_df = df.copy()
                         first_success_source = source_name
+                        best_df = df.copy()
+                        best_source = source_name
+                        best_rows = df_rows
+                        best_range = (df_start, df_end)
+                        # 标记首个采用
+                        logs_by_source[source_name]['status'] = 'success'
+                        logs_by_source[source_name]['message'] += '（首个采用）'
                     else:
-                        logs_by_source[source_name] = {
-                            **log_item,
-                            'status': 'discarded',
-                            'message': f"较晚到达，已丢弃（采用 {first_success_source}）",
-                        }
+                        # 判断是否“更全”：行数更多，或时间范围更广
+                        is_more_complete = False
+                        # 行数更多
+                        if df_rows > best_rows:
+                            is_more_complete = True
+                        # 时间范围更广
+                        elif best_range is not None:
+                            old_start, old_end = best_range
+                            if df_start < old_start or df_end > old_end:
+                                is_more_complete = True
+                        if is_more_complete:
+                            # 自动刷新缓存
+                            best_df = df.copy()
+                            best_source = source_name
+                            best_rows = df_rows
+                            best_range = (df_start, df_end)
+                            refreshed_by_later[source_name] = True
+                            logs_by_source[source_name] = {
+                                **log_item,
+                                'status': 'refreshed',
+                                'message': f"后到数据更全，已刷新覆盖（覆盖 {first_success_source if first_success_source else ''}）",
+                            }
+                        else:
+                            logs_by_source[source_name] = {
+                                **log_item,
+                                'status': 'discarded',
+                                'message': f"较晚到达，已丢弃（采用 {best_source}）",
+                            }
 
     ordered_logs = [logs_by_source.get(src, {
         'source': src,
@@ -226,17 +267,17 @@ def _download_from_all_sources(stock_code: str, start: str, end: str) -> tuple[p
         'message': '未执行',
     }) for src in _DOWNLOAD_SOURCES]
 
-    if first_success_df is None or first_success_df.empty:
+    if best_df is None or best_df.empty:
         return None, ordered_logs
 
-    first_success_df = first_success_df.copy()
-    first_success_df['date'] = pd.to_datetime(first_success_df['date'])
-    first_success_df = first_success_df.drop_duplicates(subset=['date'], keep='last').sort_values('date').reset_index(drop=True)
+    best_df = best_df.copy()
+    best_df['date'] = pd.to_datetime(best_df['date'])
+    best_df = best_df.drop_duplicates(subset=['date'], keep='last').sort_values('date').reset_index(drop=True)
 
     cache_file = os.path.join(_get_cache_dir(), f'{stock_code}.csv')
     os.makedirs(os.path.dirname(cache_file), exist_ok=True)
-    first_success_df.to_csv(cache_file, index=False)
-    return first_success_df, ordered_logs
+    best_df.to_csv(cache_file, index=False)
+    return best_df, ordered_logs
 
 
 def _build_fallback_payload(stock_code: str, start: str, end: str, cached_df: pd.DataFrame, error_text: str) -> dict:
