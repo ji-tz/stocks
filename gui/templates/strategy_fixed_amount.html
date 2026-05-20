@@ -217,7 +217,7 @@
           fixedAmountMultipleSpan.classList.toggle('warning-text', multiple === 0);
         }
 
-        function setTextIfChanged(element, nextText) {
+        function updateTextIfChanged(element, nextText) {
           if (element.textContent !== nextText) {
             element.textContent = nextText;
           }
@@ -226,6 +226,7 @@
         function scheduleCalculationUpdate() {
           if (calculationFrameId !== null) {
             cancelAnimationFrame(calculationFrameId);
+            calculationFrameId = null;
           }
           calculationFrameId = requestAnimationFrame(() => {
             calculationFrameId = null;
@@ -244,16 +245,16 @@
           // 计算每手金额
           const lotAmount = latestPrice * lot;
           const lotAmountText = lotAmount.toFixed(2) + ' 元';
-          setTextIfChanged(lotAmountSpan, lotAmountText);
+          updateTextIfChanged(lotAmountSpan, lotAmountText);
 
           // 计算定投金额是一手金额的多少整数倍
           const fixedAmountMultiple = lotAmount > 0 ? Math.floor(fixedAmount / lotAmount) : 0;
-          setTextIfChanged(fixedAmountMultipleSpan, String(fixedAmountMultiple));
+          updateTextIfChanged(fixedAmountMultipleSpan, String(fixedAmountMultiple));
           setMultipleHighlight(fixedAmountMultiple);
 
           // 计算资金支持手数
           const affordableLots = cash > 0 ? Math.floor(cash / lotAmount) : 0;
-          setTextIfChanged(affordableLotsSpan, affordableLots + ' 单位');
+          updateTextIfChanged(affordableLotsSpan, affordableLots + ' 单位');
 
           // 根据是否足够购买一手调整颜色
           const affordableLotsColor = affordableLots > 0 ? '#2e7d32' : '#d32f2f';
