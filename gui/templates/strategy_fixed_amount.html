@@ -182,6 +182,7 @@
 
         let latestPrice = null;
         let latestDate = null;
+        let calculationFrameId = null;
 
         // 获取股票最新价格
         function fetchStockPrice() {
@@ -203,7 +204,7 @@
               priceInfoDiv.textContent = '参考价格：' + latestPrice.toFixed(2) + ' 元（' + latestDate + '）';
               priceInfoDiv.style.color = '#999';
               realtimeInfo.style.display = 'block';
-              updateCalculations();
+              scheduleCalculationUpdate();
             })
             .catch(error => {
               realtimeInfo.style.display = 'block';
@@ -213,11 +214,23 @@
         }
 
         function setMultipleHighlight(multiple) {
-          if (multiple === 0) {
-            fixedAmountMultipleSpan.classList.add('warning-text');
-          } else {
-            fixedAmountMultipleSpan.classList.remove('warning-text');
+          fixedAmountMultipleSpan.classList.toggle('warning-text', multiple === 0);
+        }
+
+        function setTextIfChanged(element, nextText) {
+          if (element.textContent !== nextText) {
+            element.textContent = nextText;
           }
+        }
+
+        function scheduleCalculationUpdate() {
+          if (calculationFrameId !== null) {
+            cancelAnimationFrame(calculationFrameId);
+          }
+          calculationFrameId = requestAnimationFrame(() => {
+            calculationFrameId = null;
+            updateCalculations();
+          });
         }
 
         // 更新实时计算
@@ -230,29 +243,29 @@
 
           // 计算每手金额
           const lotAmount = latestPrice * lot;
-          lotAmountSpan.textContent = lotAmount.toFixed(2) + ' 元';
+          const lotAmountText = lotAmount.toFixed(2) + ' 元';
+          setTextIfChanged(lotAmountSpan, lotAmountText);
 
           // 计算定投金额是一手金额的多少整数倍
           const fixedAmountMultiple = lotAmount > 0 ? Math.floor(fixedAmount / lotAmount) : 0;
-          fixedAmountMultipleSpan.textContent = String(fixedAmountMultiple);
+          setTextIfChanged(fixedAmountMultipleSpan, String(fixedAmountMultiple));
           setMultipleHighlight(fixedAmountMultiple);
 
           // 计算资金支持手数
           const affordableLots = cash > 0 ? Math.floor(cash / lotAmount) : 0;
-          affordableLotsSpan.textContent = affordableLots + ' 单位';
+          setTextIfChanged(affordableLotsSpan, affordableLots + ' 单位');
 
           // 根据是否足够购买一手调整颜色
-          if (affordableLots > 0) {
-            affordableLotsSpan.style.color = '#2e7d32';
-          } else {
-            affordableLotsSpan.style.color = '#d32f2f';
+          const affordableLotsColor = affordableLots > 0 ? '#2e7d32' : '#d32f2f';
+          if (affordableLotsSpan.style.color !== affordableLotsColor) {
+            affordableLotsSpan.style.color = affordableLotsColor;
           }
         }
 
         // 监听输入变化
-        fixedAmountInput.addEventListener('input', updateCalculations);
-        lotInput.addEventListener('input', updateCalculations);
-        cashInput.addEventListener('input', updateCalculations);
+        fixedAmountInput.addEventListener('input', scheduleCalculationUpdate);
+        lotInput.addEventListener('input', scheduleCalculationUpdate);
+        cashInput.addEventListener('input', scheduleCalculationUpdate);
 
         // 页面加载时获取价格
         fetchStockPrice();

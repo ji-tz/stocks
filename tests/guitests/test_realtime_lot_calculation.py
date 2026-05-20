@@ -164,7 +164,10 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         self.assertIn('fetchStockPrice', html)
         self.assertIn('updateCalculations', html)
         self.assertIn('Math.floor(fixedAmount / lotAmount)', html)
-        self.assertIn("fixedAmountMultipleSpan.classList.add('warning-text')", html)
+        self.assertIn('requestAnimationFrame', html)
+        self.assertIn('cancelAnimationFrame', html)
+        self.assertIn("classList.toggle('warning-text', multiple === 0)", html)
+        self.assertIn("addEventListener('input', scheduleCalculationUpdate)", html)
 
         # 验证XSS防护
         self.assertIn('"000001"', html)
