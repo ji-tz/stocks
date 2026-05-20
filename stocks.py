@@ -10,6 +10,7 @@ import os
 import traceback
 import importlib
 import pkgutil
+from functools import partial
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable, Mapping
 
@@ -59,6 +60,8 @@ class StrategySpec:
     parameters: tuple[StrategyParameter, ...] = ()
     description: str = ''
     supported_trade_prices: tuple[str, ...] = (TRADE_PRICE_OPEN,)
+    module_name: Optional[str] = None
+    module_interface: bool = False
 
 
 @dataclass
@@ -151,12 +154,15 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
             key = str(raw.get('key', '')).strip()
             label = str(raw.get('label', '')).strip()
             runner_name = raw.get('runner')
+            module_interface = bool(raw.get('module_interface', False))
             if not key or not label or not isinstance(runner_name, str):
                 continue
 
             runner = globals().get(runner_name)
             if not callable(runner):
                 continue
+            if module_interface:
+                runner = partial(runner, strategy_key=key)
 
             parameters_raw = raw.get('parameters', []) or []
             parameters: list[StrategyParameter] = []
@@ -186,6 +192,8 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
                 parameters=tuple(parameters),
                 description=str(raw.get('description', '')).strip(),
                 supported_trade_prices=supported_trade_prices if supported_trade_prices else (TRADE_PRICE_OPEN,),
+                module_name=module_name,
+                module_interface=module_interface,
             )
         except Exception:
             # 自动发现应是 best-effort，单个策略异常不应影响其他策略
@@ -349,6 +357,81 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                            trade_price=trade_price)
     sim_res.setdefault('init_cash', init_cash)
     # 兼容旧调用方，沿用 final_cash 字段表达最终总资产。
+    sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
+    return sim_res
+
+
+def run_module_strategy_backtest(symbol: str = "600900", source: object = "auto",
+                                 start_date: Optional[str] = None, end_date: Optional[str] = None,
+                                 lot_size: float = 100.0, init_cash: float = 100000.0,
+                                 progress_callback: Optional[Callable[[int, int], None]] = None,
+                                 trade_price: str = TRADE_PRICE_OPEN,
+                                 strategy_key: str = '',
+                                 **strategy_params: Any) -> Dict[str, Any]:
+    """执行自动注册策略模块的统一回测流程。
+
+    流程如下：
+    1. 根据 `strategy_key` 找到自动注册的策略模块；
+    2. 调用模块内可选的 `validate_strategy_parameters(**params)` 做参数校验；
+    3. 获取标准 OHLCV 数据，并调用可选的 `prepare_backtest_data(df, **params)` 预处理指标；
+    4. 调用模块必须实现的 `create_strategy(df, **params)` 构造决策器；
+    5. 统一交给 `Simulator.simulate()` 执行回测。
+
+    Args:
+        symbol: 回测标的代码。
+        source: 数据源。
+        start_date: 起始日期。
+        end_date: 结束日期。
+        lot_size: 交易手数。
+        init_cash: 初始资金。
+        progress_callback: 回测进度回调。
+        trade_price: 成交价格字段。
+        strategy_key: 自动注册策略唯一标识。
+        strategy_params: 策略模块自定义参数。
+
+    Returns:
+        统一格式的回测结果字典。
+    """
+    if not strategy_key:
+        raise ValueError('strategy_key 不能为空')
+
+    spec = get_strategy_spec(strategy_key)
+    if not spec.module_name:
+        raise RuntimeError(f'策略 {strategy_key} 缺少模块信息，无法走通用回测流程')
+
+    module = importlib.import_module(spec.module_name)
+
+    validate_parameters = getattr(module, 'validate_strategy_parameters', None)
+    if callable(validate_parameters):
+        try:
+            validate_parameters(**strategy_params)
+        except ValueError as exc:
+            raise ValueError(f'策略 {strategy_key} 参数校验失败: {exc}') from exc
+
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    df = df[["date", "open", "high", "low", "close", "volume"]].copy()
+
+    prepare_backtest_data = getattr(module, 'prepare_backtest_data', None)
+    if callable(prepare_backtest_data):
+        df = prepare_backtest_data(df=df, source=source, **strategy_params)
+
+    create_strategy = getattr(module, 'create_strategy', None)
+    if not callable(create_strategy):
+        raise RuntimeError(f'策略模块 {spec.module_name} 缺少 create_strategy()')
+
+    strategy = create_strategy(df=df, source=source, **strategy_params)
+
+    from simulator.simulator import Simulator
+
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+    sim_res = sim.simulate(
+        df=df,
+        strategy=strategy,
+        symbol=symbol,
+        progress_callback=progress_callback,
+        trade_price=trade_price,
+    )
+    sim_res.setdefault('init_cash', init_cash)
     sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
     return sim_res
 
