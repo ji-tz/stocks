@@ -28,6 +28,7 @@ jobs:
         run: |
           git config --global user.name "183965983"
           git config --global user.email "jitz@foxmail.com"
+          git remote set-url origin https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/183965983/stocks.git
 
       - name: Setup OpenCode DeepSeek config
         run: |
