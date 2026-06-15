@@ -1109,13 +1109,23 @@ def download_pdf():
         pdf = FPDF()
         pdf.add_page()
 
-        pdf.set_font('Helvetica', 'B', 16)
+        # Register a Unicode font for Chinese character support
+        _CJK_FONT_PATH = '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
+        if os.path.exists(_CJK_FONT_PATH):
+            pdf.add_font('CJK', '', _CJK_FONT_PATH)
+            font_body = 'CJK'
+            font_body_bold = 'CJK'
+        else:
+            font_body = 'Helvetica'
+            font_body_bold = 'Helvetica'
+
+        pdf.set_font(font_body_bold, '', 16)
         pdf.cell(0, 12, 'Backtest Report', new_x='LMARGIN', new_y='NEXT', align='C')
         pdf.ln(4)
 
-        pdf.set_font('Helvetica', 'B', 12)
+        pdf.set_font(font_body_bold, '', 12)
         pdf.cell(0, 8, 'Summary Information', new_x='LMARGIN', new_y='NEXT')
-        pdf.set_font('Helvetica', '', 10)
+        pdf.set_font(font_body, '', 10)
         summary = pdf_data['summary']
         for k, v in [('Symbol', summary['symbol']),
                      ('Strategy', summary['strategy_name']),
@@ -1126,9 +1136,9 @@ def download_pdf():
             pdf.cell(0, 6, str(v), new_x='LMARGIN', new_y='NEXT')
         pdf.ln(4)
 
-        pdf.set_font('Helvetica', 'B', 12)
+        pdf.set_font(font_body_bold, '', 12)
         pdf.cell(0, 8, 'Key Metrics', new_x='LMARGIN', new_y='NEXT')
-        pdf.set_font('Helvetica', '', 10)
+        pdf.set_font(font_body, '', 10)
         metrics = pdf_data['metrics']
         for k, v in [('Total Return Rate', f"{metrics['total_return_rate']*100:.2f}%"),
                      ('Annualized Return', f"{metrics['annualized_return']*100:.2f}%"),
@@ -1140,19 +1150,19 @@ def download_pdf():
             pdf.cell(0, 6, str(v), new_x='LMARGIN', new_y='NEXT')
         pdf.ln(4)
 
-        pdf.set_font('Helvetica', 'B', 12)
+        pdf.set_font(font_body_bold, '', 12)
         pdf.cell(0, 8, 'Trade Records', new_x='LMARGIN', new_y='NEXT')
 
         trades = pdf_data['trades']
         col_widths = [30, 20, 25, 20, 25]
         headers = ['Date', 'Action', 'Price', 'Shares', 'P/L']
 
-        pdf.set_font('Helvetica', 'B', 8)
+        pdf.set_font(font_body_bold, '', 8)
         for i, h in enumerate(headers):
             pdf.cell(col_widths[i], 7, h, border=1, align='C')
         pdf.ln()
 
-        pdf.set_font('Helvetica', '', 8)
+        pdf.set_font(font_body, '', 8)
         max_rows = min(len(trades), 50)
         for t in trades[:max_rows]:
             pdf.cell(col_widths[0], 6, str(t.get('date', '')), border=1)
@@ -1165,7 +1175,7 @@ def download_pdf():
             pdf.ln()
 
         if len(trades) > 50:
-            pdf.set_font('Helvetica', 'I', 8)
+            pdf.set_font(font_body, 'I', 8)
             pdf.cell(0, 6, f'(Showing first 50 of {len(trades)} trades)', new_x='LMARGIN', new_y='NEXT')
 
         pdf_bytes = pdf.output()
