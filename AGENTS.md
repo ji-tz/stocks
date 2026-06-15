@@ -12,9 +12,9 @@
 | 1 | 产品经理 | PM | 普通 | 熟悉软件，发现痛点和需求，对标竞品提 Issue |
 | 2 | 架构师 | ARCH | **Pro** | 拆解需求、设计模块、定接口、开 sub-issue |
 | 3 | Web 前端 | WEB | 普通 | UI/UX 设计、Flask 模板、前端交互逻辑 |
-| 4 | 交易所/数据源 | EXCH | 普通 | 行情获取、交易执行、账户持仓管理 |
-| 5 | 平台开发 | PLAT | 普通 | 回测引擎、业务编排、基础设施 |
-| 6 | 策略开发 | STRAT | 普通 | 量化策略算法实现与维护 |
+| 4 | **交易所** | **EXCH** | 普通 | 行情数据获取 + 账户持仓管理 + 交易执行 |
+| 5 | **交易员** | **TRADER** | 普通 | 控制时间流程、驱动回测、执行买卖操作 |
+| 6 | **策略算法** | **STRAT** | 普通 | 撰写策略逻辑、输出买卖信号（不直接操作） |
 | 7 | 集成测试 | ITEST | 普通 | 接口/集成测试、边界测试、维护 test.yml |
 | 8 | GUI 测试 | GTEST | 普通 | Playwright 端到端测试、维护 testgui.yml |
 | 9 | 研发主管 | LEAD | **Pro** | Review PR、运行测试、仲裁修复责任 |
@@ -22,104 +22,172 @@
 
 ---
 
-## 二、角色详细定义
+## 二、核心概念 — 三层协作模型
 
-### EXCH — 交易所/数据源
-
-**身份背景：** 精通 A 股行情数据接口、交易所撮合机制、账户资金管理。熟悉 AKShare 等数据源及 A 股交易规则（T+1、涨跌停、手续费计算等）。
-
-**核心职责：**
-- 维护所有数据源 Provider（行情数据获取）
-- 维护交易所接口及所有实现（回测/实盘/实时仿真）
-- 维护账户模型（Position、Account、资金计算）
-- 通过 `StockExchange` 接口为 PLAT 提供交易能力
-- 创建 Feature PR
-
-**数据流位置：** `外部API → [EXCH] → stocks.get_data() → PLAT/STRAT`
-
----
-
-### PLAT — 平台/引擎开发
-
-**身份背景：** 系统工程师，精通回测系统架构。作为中间调度层，连接交易所和策略。
-
-**核心职责：**
-- 编排完整的模拟交易流程：获取行情(EXCH) → 调用策略(STRAT) → 执行交易(EXCH)
-- 维护引擎调度层（`simulator_engine.py`、`simulator.py`、`clock.py`）
-- 维护 `stocks.py` 框架（策略注册表架构、回测请求模型）
-- 创建 Feature PR
-
-**分包角色：**
 ```
-EXCH → 提供"交易能力"（怎么买、怎么查价格）
-STRAT → 提供"策略逻辑"（什么时候该买卖）
-PLAT → 中间调度（怎么组织流程、怎么跑回测）
+STRAT（策略算法）
+  │ 输出买卖信号（buy/sell/hold）
+  ▼
+TRADER（交易员）
+  │ 推进时间（一天、一小时…），问策略"现在该不该操作"，然后执行
+  ▼
+EXCH（交易所）
+  │ 提供行情数据 + 执行买卖 + 记录持仓和资金
+```
+
+**三方各司其职：**
+
+```
+EXCH  → "市场"——提供数据、执行交易、管账本
+TRADER → "操盘手"——推进时间、读策略信号、操作买卖
+STRAT → "军师"——只出主意（写策略公式），不碰钱
 ```
 
 ---
 
-## 三、文件所有权矩阵
+## 三、角色详细定义
 
-每个文件的 **Owner** 对其有修改批准权/维护主力权，**Cross** 表示该角色可能因接口依赖需要同步修改。  
-**空白的 Cross** = 不可擅自修改，必须先与 Owner 协商。
+### EXCH — 交易所
 
-### 2.1 顶层文件
+**身份背景：** 证券交易所系统工程师。精通 A 股行情数据接口、撮合机制、账户资金管理。  
+交易所是数据提供方 + 交易执行方 + 账户记账方的三位一体。
+
+**核心职责：**
+- 维护行情数据源（`source/` 所有 Provider）— 获取股票价格
+- 维护交易执行接口（`StockExchange`）— 提供 `buy()/sell()` 能力
+- 维护账户模型（Position、Account、资金计算）— 记录持仓、盈亏
+- 不关心"什么时候买卖"——那是交易员的事
+
+**接口：**
+- `get_data(symbol, start, end)` → DataFrame — 给 TRADER 和 STRAT 用
+- `StockExchange.buy(date, price, shares)` → TradeResult
+- `StockExchange.sell(date, price, shares)` → TradeResult
+- `Account.get_position()` → 当前持仓
+- `Account.get_total_value(price)` → 总资产估值
+
+**数据流位置：** `外部数据源 → [EXCH] → TRADER/STRAT`
+
+---
+
+### TRADER — 交易员
+
+**身份背景：** 资深量化交易员，熟悉回测流程、交易节奏控制。  
+交易员是**时间驱动者**——推进时间轴，在每个时间节点上问策略"该不该动"，然后操作。
+
+**核心职责：**
+- 控制模拟交易的时间进程（按天/小时 tick 推进）
+- 在每个时间 tick：
+  1. 从 **EXCH** 获取当前行情
+  2. 调用 **STRAT** 的策略信号（`prepare_backtest_data` → `simulate`）
+  3. 根据信号通过 **EXCH** 执行 `buy()/sell()`
+  4. 记录交易结果
+- 驱动完整的回测流程（`run_backtest()`）
+- 维护 `stocks.py` 中与流程编排相关的部分
+
+**工作流：**
+```
+for each day in 回测时间范围:
+    行情 = EXCH.get_data(当天)
+    信号 = STRAT.decide(行情, 当前持仓)
+    if 信号 == 'buy':
+        EXCH.buy(当天, 开盘价, 数量)
+    elif 信号 == 'sell':
+        EXCH.sell(当天, 开盘价, 数量)
+    记录当天持仓和盈亏
+```
+
+---
+
+### STRAT — 策略算法
+
+**身份背景：** 量化研究员，数学/统计背景。  
+**策略只负责写公式、算信号，不碰交易。**
+
+**核心职责：**
+- 撰写策略逻辑（技术指标计算、信号生成）
+- 输出 `buy`/`sell`/`None` 信号——由交易员去执行
+- 维护已有策略，新增策略通过 `solver/` 目录扩展
+- 为策略编写单测
+
+**策略接口：**
+```python
+class Strategy:
+    @staticmethod
+    def prepare_backtest_data(df: pd.DataFrame, **params) -> pd.DataFrame:
+        """计算技术指标，返回增强后的 DataFrame"""
+
+    @staticmethod
+    def simulate(df: pd.DataFrame, position, **params) -> dict:
+        """根据行情和持仓输出信号，返回 {'signal': 'buy'|'sell'|None, ...}"""
+
+    @staticmethod
+    def get_parameters() -> list:
+        """返回参数配置列表（用于 GUI 表单）"""
+```
+
+> **STRAT 不直接调用 `buy()/sell()`**。STRAT 只返回信号，由 TRADER 执行。  
+> STRAT 需要行情数据时，通过 EXCH 的 `get_data()` 获取。
+
+---
+
+## 四、文件所有权矩阵
+
+### 4.1 顶层文件
 
 | 文件 | Owner | Cross | 说明 |
 |------|-------|-------|------|
-| `main.py` | WEB | PLAT | Web 入口，调试模式配置 |
-| `stocks.py` | PLAT | STRAT | 业务入口 + 策略注册表。STRAT 新增策略可追加注册项，但平台架构不改 |
-| `requirements.txt` | PLAT | — | 依赖管理 |
-| `pip.conf` | PLAT | — | pip 配置 |
+| `main.py` | WEB | TRADER | Web 入口，调试模式配置 |
+| `stocks.py` | TRADER | STRAT+EXCH | 流程编排(TRADER) + 策略追加(STRAT) + 数据获取(EXCH) |
+| `requirements.txt` | TRADER | — | 依赖管理 |
+| `pip.conf` | TRADER | — | pip 配置 |
 | `.flake8` / `.pylintrc` / `mypy.ini` | LEAD | — | 代码规范配置 |
 
-### 2.2 `source/` — 数据源层（Owner: **EXCH**）
+### 4.2 `source/` — 数据源（Owner: **EXCH**）
 
 ```
 source/
 ├── base_provider.py          # EXCH — 数据源接口 ABC
 ├── data_provider.py          # EXCH — 聚合调度、缓存逻辑
 ├── provider_utils.py         # EXCH — 共享工具函数
-├── akshare_provider.py       # EXCH — AKShare 实现
-├── baostock_provider.py      # EXCH — Baostock 实现
-├── tencent_provider.py       # EXCH — 腾讯数据源
-├── sina_provider.py          # EXCH — 新浪数据源
-├── sohu_provider.py          # EXCH — 搜狐数据源
-├── eastmoney_provider.py     # EXCH — 东方财富数据源
-├── cailianpress_provider.py  # EXCH — 财联社数据源
-├── stooq_provider.py         # EXCH — Stooq 数据源
+├── akshare_provider.py       # EXCH — AKShare
+├── baostock_provider.py      # EXCH — Baostock
+├── tencent_provider.py       # EXCH — 腾讯
+├── sina_provider.py          # EXCH — 新浪
+├── sohu_provider.py          # EXCH — 搜狐
+├── eastmoney_provider.py     # EXCH — 东方财富
+├── cailianpress_provider.py  # EXCH — 财联社
+├── stooq_provider.py         # EXCH — Stooq
 └── README.md
 ```
 
-> **边界：** 任何人不得在 source/ 下新增非 Provider 文件。新增数据源必须继承 `BaseProvider`。**STOCKS 团队不得绕过 Provider 层直接调用外部 API。**
+> **不得绕过 Provider 层直接调用外部 API。** 新增数据源必须继承 `BaseProvider`。
 
-### 2.3 `simulator/` — 模拟交易引擎（EXCH + PLAT 分治）
+### 4.3 交易所执行层 — exchange/（Owner: **EXCH**）
+
+当前对应 `simulator/` 目录中与交易执行相关的文件。概念上属于交易所范畴。
 
 ```
-simulator/
-├── exchange_interface.py     # EXCH — 交易所接口抽象（StockExchange）
-├── base_engine.py            # EXCH — 账户模型（Position/Account/TradeOrder/TradeResult）
-├── simulated_exchange.py     # EXCH — 仿真交易所基础实现
-├── backtest/
-│   ├── exchange.py           # EXCH — 回测交易所
-│   └── clock.py              # PLAT — 回测时钟
-├── live/
-│   ├── exchange.py           # EXCH — 实盘交易所（预留）
-│   └── __init__.py
-├── realtime/
-│   ├── exchange.py           # EXCH — 实时仿真交易所
-│   └── __init__.py
-├── real_engine.py            # PLAT — 实盘引擎
-├── simulator_engine.py       # PLAT — 具体引擎实现
-├── simulator.py              # PLAT — 引擎入口调度
-└── README.md
+exchange_interface.py         # EXCH — StockExchange 接口（buy/sell/connect）
+base_engine.py                # EXCH — 账户模型（Position/Account/TradeOrder/TradeResult）
+simulated_exchange.py         # EXCH — 仿真交易所基础逻辑
+backtest/exchange.py          # EXCH — 回测交易所实现
+live/exchange.py              # EXCH — 实盘交易所（预留）
+realtime/exchange.py          # EXCH — 实时仿真交易所实现
 ```
 
-> **分治原则：** EXCH 负责"交易能力"（怎么连接、怎么买卖、怎么查行情）。PLAT 负责"调度编排"（什么时候买卖、怎么组织回测流程）。两者通过 `StockExchange` 接口协作。
->
-> **注意：** `real_engine.py` 归 PLAT（引擎编排），`live/exchange.py` 归 EXCH（券商接口）。区分标准：涉及交易系统连接的归 EXCH，涉及策略调度的归 PLAT。
+> **注意：** 这些文件当前位于 `simulator/` 下，后续重构会迁移到 `exchange/`。在重构完成前，概念上已属 EXCH。
 
-### 2.4 `solver/` — 策略算法（Owner: **STRAT**）
+### 4.4 交易员调度层（Owner: **TRADER**）
+
+```
+simulator/simulator.py         # TRADER — 回测流程入口（for day in days: ...）
+simulator/simulator_engine.py  # TRADER — 引擎实现
+simulator/backtest/clock.py    # TRADER — 时间推进器
+simulator/real_engine.py       # TRADER — 实盘引擎
+stocks.py（框架部分）           # TRADER — run_backtest() / create_backtest_request()
+```
+
+### 4.5 `solver/` — 策略算法（Owner: **STRAT**）
 
 ```
 solver/
@@ -134,200 +202,142 @@ solver/
 └── README.md
 ```
 
-> **STRAT 专属区域：** 只改 solver/。  
-> **接口契约：** 新增策略必须注册到 `stocks.py` 的策略注册表（追加 `AUTO_STRATEGY_SPEC`）。注册表架构本身由 PLAT 维护，STRAT 只追加条目。  
-> **命名规范：** 新增策略文件 `snake_case.py`，策略类名 `PascalCaseStrategy`。
+> **STRAT 专属区域：** 只改 solver/。策略通过 `AUTO_STRATEGY_SPEC` 自动注册，不需改 `stocks.py`。
 
-### 2.5 `gui/` — Web 界面（Owner: **WEB**）
+### 4.6 `gui/` — Web 界面（Owner: **WEB**）
 
 ```
 gui/
 ├── web.py                    # WEB — Flask 路由 + API 处理函数
-│                              #   路由范围：20+ 路由（首页、策略配置、回测执行、结果展示）
-│                              #   涉及 API 响应格式，与 PLAT 通过 stocks.py 交互
 ├── backtest_progress.py      # WEB — SSE 进度推送
-├── templates/
-│   ├── index.html            # WEB — 首页
-│   ├── select_stock.html     # WEB — 选股
-│   ├── select_strategy.html  # WEB — 选策略
-│   ├── select_mode.html      # WEB — 选模式
-│   ├── select_time_range.html# WEB — 选时间
-│   ├── strategy_sma.html     # WEB — SMA 参数页
-│   ├── strategy_mean_cost.html# WEB — 均值成本参数页
-│   ├── strategy_fixed_amount.html  # WEB — 定投参数页
-│   ├── strategy_signal_template.html  # WEB — 信号模板参数页
-│   ├── strategy_dynamic.html  # WEB — 动态策略参数页
-│   ├── result.html           # WEB — 结果页
-│   ├── result_mean.html      # WEB — 均值成本结果页
-│   ├── backtest_progress.html# WEB — 进度展示页
-│   └── strategy_dynamic.html # WEB — 通用策略参数页
-├── static/                   # WEB — CSS/JS/图片（用户可自己替换）
-├── stock_list.json           # WEB — 股票列表缓存
+├── templates/ (13个HTML文件)  # WEB
+├── static/                   # WEB
+├── stock_list.json           # WEB
 └── README.md
 ```
 
-> **WEB ↔ PLAT 接口边界：**  
-> `gui/web.py` 调用 `stocks.get_data()`、`stocks.run_backtest()` 等接口获取数据。  
-> `gui/web.py` 不应直接调用 `source/` 或 `simulator/`。  
-> 新增 API 路由，如果只是为了前端展示，WEB 自己加。如果涉及新的后端能力，需 PLAT 配合。
+> **WEB 接口边界：** `gui/web.py` 通过 `stocks.run_backtest()` 等接口调用 TRADER 能力。不应直接 import `source/` 或 exchange 层。
 >
-> **例外：** 进度推送（`backtest_progress.py`）是 WEB 和 PLAT 共用的（PLAT 的 `run_backtest` 写进度，WEB 的 SSE 读进度）。修改需双方协商。
+> **进度推送：** `backtest_progress.py` 是 WEB 和 TRADER 共用（TRADER 写进度，WEB 的 SSE 读进度）。修改需双方协商。
 
-### 2.6 业务入口 `stocks.py`（Owner: **PLAT**, Cross: **STRAT**, Cross: **EXCH**）
-
-```
-stocks.py — 按职责划分：
-┌─ PLAT 专属（引擎调度）─────────────────────┐
-│  run_backtest()            执行回测        │
-│  create_backtest_request() 创建回测请求    │
-│  _build_strategy_registry() 注册表架构    │
-│  list_strategy_specs()     列出策略        │
-│  get_strategy_spec()       获取策略        │
-│  StrategyParameter         参数定义类      │
-│  StrategySpec              策略规格类      │
-│  BacktestRequest           回测请求类      │
-└──────────────────────────────────────────┘
-┌─ PLAT 主责 + EXCH 配合（数据获取）─────────┐
-│  get_data()                数据获取        │
-│  init()                    系统初始化      │
-└──────────────────────────────────────────┘
-┌─ STRAT 可追加（策略 run 函数）─────────────┐
-│  AUTO_STRATEGY_SPEC (在 solver/*.py 中)  │
-│  run_sma_backtest()         各策略run函数  │
-│  run_mean_cost()                          │
-│  run_fixed_amount()                      │
-│  run_module_strategy_backtest()          │
-│  run_signal_template()                   │
-└──────────────────────────────────────────┘
-```
-
-> **数据流：** `EXCH` 提供 `source/data_provider.get_data()` 底层实现。`stocks.get_data()` **代理调用** EXCH 的能力。PLAT 的引擎通过 `stocks.get_data()` 获取行情数据，通过 `StockExchange` 接口执行交易。  
->
-> **STRAT 新增策略：** 在 `solver/` 下创建新策略文件 + `AUTO_STRATEGY_SPEC`，自动发现，不需改 `stocks.py`。
-
-### 2.7 `tests/` — 测试（ITEST / GTEST）
+### 4.7 `stocks.py` — 业务入口（Owner: **TRADER**, Cross: **EXCH+STRAT**）
 
 ```
-tests/
-├── guitests/                              ← Owner: GTEST
-│   ├── test_gui_app.py           GTEST — 基本 GUI 功能
-│   ├── test_gui_all_strategies_e2e.py  GTEST — 全策略端到端
-│   ├── test_gui_backtest_report_e2e.py GTEST — 回测报告
-│   ├── test_realtime_lot_calculation.py  GTEST — 实时计算
-│   └── README.py
-│
-├── test_stocks.py              ITEST — 业务入口测试
-├── test_simulator.py           ITEST — 模拟器测试
-├── test_simulator_engine.py    ITEST — 引擎测试
-├── test_integration.py         ITEST — 集成测试
-├── test_main.py                ITEST — 入口测试
-├── test_main_run.py            ITEST — 运行测试
-├── test_fixed_amount_strategy.py  ITEST — 策略测试
-├── test_low_frequency_strategies.py ITEST — 低频策略测试
-├── test_futures_open_hour_strategy.py ITEST — 期货策略测试
-├── test_run_sma.py             ITEST — SMA 回测测试
-├── test_data_provider_cache.py ITEST — 数据缓存测试
-├── test_data_provider_stooq.py ITEST — 数据源测试
-├── test_cache_utils.py         ITEST — 缓存工具测试
-├── test_akshare_provider_compat.py ITEST — 数据源兼容
-├── test_backtest_progress.py   ITEST — 进度条测试
-├── test_futures_missing_data.py ITEST — 缺失数据处理
-├── test_adjustment.py          ITEST — 复权测试
-├── test_dividend_adjustment.py ITEST — 分红复权测试
-├── test_yangtze_power.py       ITEST — 特定股票测试
-├── test_test_utils.py          ITEST — 测试工具
-├── test_utils.py               ITEST — 工具函数测试
-├── test_gui_download_policy.py ITEST — 下载策略测试
-├── test_guitest_workflow_report.py ITEST — GUI 测试报告
-├── test_comment_guitest_report_script.js  — JS 辅助脚本
-├── __init__.py
-└── README.md
+stocks.py 按职责划分：
+
+TRADER 专属（流程编排）:
+  run_backtest()            执行回测
+  create_backtest_request() 创建回测请求
+  _build_strategy_registry() 注册表架构
+  list_strategy_specs()     列出策略
+  get_strategy_spec()       获取策略
+  StrategyParameter         参数定义类
+  StrategySpec              策略规格类
+  BacktestRequest           回测请求类
+
+TRADER 主责 + EXCH 配合（数据获取）:
+  get_data()                数据获取（底层由 EXCH 实现）
+  init()                    系统初始化
+
+STRAT 可追加（策略注册条目）:
+  AUTO_STRATEGY_SPEC (在 solver/*.py 中)
+  run_sma_backtest()         各策略 run 函数
+  run_mean_cost()
+  run_fixed_amount()
+  run_module_strategy_backtest()
+  run_signal_template()
 ```
 
-> **写测试原则：**
-> - ITEST 的测试落在 `tests/test_*.py`，测试 PLAT / STRAT 的代码
-> - GTEST 的测试落在 `tests/guitests/`，测试 WEB 的界面
-> - 当测试发现 bug，ITEST/GTEST 在 PR 评论中 @对应角色（PLAT/STRAT/WEB）
-> - 新增功能必须有对应的新增测试
+> **数据流：** `EXCH` 实现 `source/data_provider.get_data()`。TRADER 通过 `stocks.get_data()` 调用。TRADER 的引擎通过 `StockExchange` 接口执行交易。
 
-### 2.8 `.github/workflows/` — CI/CD（按角色归属）
+### 4.8 `tests/` — 测试（ITEST + GTEST）
+
+| 文件范围 | Owner | 测试谁 |
+|---------|-------|--------|
+| `tests/guitests/` | GTEST | WEB 的界面 |
+| `tests/test_stocks.py` | ITEST | TRADER |
+| `tests/test_simulator*.py` | ITEST | TRADER |
+| `tests/test_integration.py` | ITEST | 全流程 |
+| `tests/test_main*.py` | ITEST | TRADER |
+| `tests/test_fixed_amount*.py` / `tests/test_low_frequency*.py` etc. | ITEST | STRAT |
+| `tests/test_data_provider*.py` | ITEST | EXCH |
+| `tests/test_backtest_progress.py` | ITEST | TRADER+WEB |
+
+> ITEST 发现 EXCH/STRAT/TRADER 的 bug → PR 评论 @ 对应角色。GTEST 发现 WEB 的 bug → PR 评论 @WEB。
+
+### 4.9 `.github/workflows/` — CI/CD
 
 | 文件 | Owner | 说明 |
 |------|-------|------|
 | `test.yml` | ITEST | 单元测试 + 集成测试 |
 | `testgui.yml` | GTEST | 端到端 GUI 测试（Playwright） |
 | `lint.yml` | LEAD | 代码风格检查（flake8 + mypy） |
-| `package.yml` | PLAT | 打包发布 |
+| `package.yml` | TRADER | 打包发布 |
 | `opencode.yml` | HERMES | （备用/仅测试用） |
 
-### 2.9 其他文件
+### 4.10 其他
 
 | 文件 | Owner | 说明 |
 |------|-------|------|
-| `AGENTS.md` | HERMES | 本文件，团队协作规范 |
-| `CLAUDE.md` | ARCH | 项目约定，ARCH 更新 |
-| `data/` | PLAT | 数据缓存目录，程序自动生成 |
-| `docs/` | 相关角色 | 文档，谁写的谁维护 |
-| `tools/` | PLAT | 辅助工具 |
-| `test_ak.py` / `probe_stocks.py` / `probe_output.txt` | — | 调试遗留文件，可清理 |
-| `.github/copilot-instructions.md` | — | Copilot 配置 |
-| `.github/agents/` / `.github/instructions/` | — | 第三方工具配置 |
-| `.github/scripts/` | GTEST | GUI 测试脚本 |
-| `.github/skills/` | — | 第三方 skill 定义 |
+| `AGENTS.md` | HERMES | 本文件 |
+| `CLAUDE.md` | ARCH | 项目约定 |
+| `data/` | EXCH | 数据缓存目录，程序自动生成 |
+| `docs/` | 相关角色 | 谁写的谁维护 |
+| `tools/` | TRADER | 辅助工具 |
+| 调试文件（`test_ak.py` 等） | — | 可清理 |
+| `.github/` 第三方工具配置 | — | 无需维护 |
 
 ---
 
-## 三、角色协作边界—谁不能碰什么
+## 五、角色协作边界
 
 | 角色 | 绝不能碰 | 跨模块必须先沟通 |
 |------|---------|----------------|
-| **WEB** | `source/` `simulator/` `solver/` `stocks.py`（框架部分） | 新增 API 路由时对接 PLAT |
-| **EXCH** | `gui/` `solver/` `simulator/`（PLAT 管辖的引擎文件） | 改 `get_data()` 签名时对接 PLAT |
-| **PLAT** | `gui/templates/` `source/`（EXCH 的数据源） `solver/` | 改回测流程时对接 EXCH / STRAT |
-| **STRAT** | `source/` `simulator/` `gui/` | 新增策略通过 `AUTO_STRATEGY_SPEC` 自动注册 |
-| **ITEST** | `solver/` 的策略逻辑、`gui/templates/` | 发现 bug 时 @ 对应角色 |
-| **GTEST** | `source/` `simulator/` `solver/` | 发现 bug 时 @ 对应角色 |
-| **ARCH** | 不写执行代码（只做设计 + Issue） | 设计评审后交给对应角色 |
-| **LEAD** | 只 Review 不写代码 | 仲裁时 @ 对应角色 |
+| **WEB** | `source/` `solver/` 交易所/交易员代码 | 新增路由对接 TRADER |
+| **EXCH** | `gui/` `solver/` `stocks.py`（TRADER 部分） | 改 `get_data()` 签名时对接 TRADER |
+| **TRADER** | `gui/templates/` `source/`（EXCH 的数据源） `solver/` | 改回测流程时对接 EXCH/STRAT |
+| **STRAT** | `source/` 交易所/交易员代码 `gui/` | 新增策略通过 `AUTO_STRATEGY_SPEC` |
+| **ITEST** | 不直接修业务代码 | 发现 bug 时 @ 对应角色 |
+| **GTEST** | 不直接修业务代码 | 发现 bug 时 @ 对应角色 |
+| **ARCH** | 不写执行代码 | 设计评审后交给对应角色 |
+| **LEAD** | 不写执行代码 | 仲裁时 @ 对应角色 |
 | **QA** | 只验收不修改 | 不通过时 label:待修复 |
 
 ---
 
-## 四、协作流程
+## 六、协作流程
 
 ```
 [PM] 发现需求 → 建 Issue + label:需求
   │
-  ▼ Hermes 检测到 label:需求
+  ▼ Hermes 检测
 [ARCH(Pro)] 读取 Issue → 分析设计 → 拆任务 → 建 sub-issue
-  │ 每个 sub-issue 标注所属角色 + label:任务
-  │ 如有必要 → 建 Design PR 描述接口设计
+  │ 标注所属角色
   ▼
-[Hermes 按 sub-issue label 触发]
+[Hermes 触发对应角色]
   ┌──────┬──────┬──────┬──────┬──────┐
   ▼      ▼      ▼      ▼      ▼      ▼
- WEB   EXCH   PLAT   STRAT  ITEST GTEST
-(UI)  (数据/ (引擎/  (策略)  (集成  (GUI
-       行情)  调度)          测试)  测试)
+ WEB   EXCH  TRADER STRAT  ITEST GTEST
+(UI)  (数据/ (流程/ (策略  (集成  (GUI
+       交易)  调度)  信号)  测试)  测试)
   │      │      │      │      │      │
   └──────┴──┬───┘      │      │      │
             │         Feature PR
-            │          │
             └─────┬────┘
                   ▼
          [LEAD(Pro)] Review PR
            ├── CI 通过 + Code OK → label:待验收
            └── 不通过 → PR 评论 @角色 + label:待修复
-                          │
-                          ▼ 修复后循环
-                   [QA] 验收测试
-                     ├── 通过 → 合并 PR
-                     └── 不通过 → label:待修复
+                  │
+                  ▼ 修复后循环
+           [QA] 验收测试
+             ├── 通过 → 合并 PR
+             └── 不通过 → label:待修复
 ```
 
 ---
 
-## 五、代码规范
+## 七、代码规范
 
 ### 命名
 - 模块名：`snake_case.py`
@@ -346,13 +356,13 @@ tests/
 ### 测试规范
 - 单测/集成测试：`tests/test_*.py`（ITEST）
 - GUI 测试：`tests/guitests/`（GTEST）
-- PR 中新增功能必须有新增测试
+- PR 中新增功能必须有对应新增测试
 
 ---
 
-## 六、策略接口规范
+## 八、策略接口规范
 
-所有策略文件（`solver/*.py`）必须遵循以下隐式接口，以支持自动发现注册：
+所有策略文件（`solver/*.py`）必须遵循以下隐式接口：
 
 ```python
 # 在策略模块中声明
@@ -365,25 +375,22 @@ AUTO_STRATEGY_SPEC = {
     ],
 }
 
-# 策略类必须提供
+# 策略类 — 只输出信号，不执行交易
 class StrategySimulator:
     def prepare_backtest_data(self, df, **params) -> pd.DataFrame:
         """计算技术指标，返回增强后的 DataFrame"""
-        ...
 
     def simulate(self, df, **params) -> dict:
-        """执行回测逻辑，返回结果 dict"""
-        ...
+        """输出信号 {'signal': 'buy'|'sell'|None, ...}，由 TRADER 执行"""
 
     def get_parameters(self) -> list:
         """返回参数配置列表"""
-        ...
 ```
 
 新增策略：
 1. 在 `solver/` 下创建 `xxx_strategy.py`
 2. 声明 `AUTO_STRATEGY_SPEC`
-3. 实现策略类
+3. 实现策略类（只返回信号）
 4. 不需要改任何其他文件
 
 ---
