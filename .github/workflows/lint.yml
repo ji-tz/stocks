@@ -38,7 +38,7 @@ jobs:
     - name: Static Code Analysis - Pylint
       run: |
         echo "=== Running Pylint ==="
-        pylint --rcfile=.pylintrc main.py gui/ trader/ exchange/ strategy/ tests/ || true
+        pylint --rcfile=.pylintrc stocks.py main.py gui/ simulator/ solver/ tests/ || true
       continue-on-error: true
     
     - name: Static Code Analysis - Flake8
@@ -50,5 +50,5 @@ jobs:
     - name: Static Code Analysis - Mypy
       run: |
         echo "=== Running Mypy Type Checking ==="
-        mypy main.py --config-file=mypy.ini || true
+        mypy stocks.py main.py --config-file=mypy.ini || true
       continue-on-error: true
