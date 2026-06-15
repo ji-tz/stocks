@@ -52,7 +52,7 @@ jobs:
       id: run_simulator_tests
       run: |
         echo "=== Testing Trading Strategy Simulators ==="
-        python -m unittest tests.test_simulator -v 2>&1 | tee -a test_output.log
+        python -m unittest tests.unit.test_simulator -v 2>&1 | tee -a test_output.log
         echo "simulator_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
       continue-on-error: true
     
@@ -68,7 +68,7 @@ jobs:
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
-        python -m tests.test_yangtze_power
+        python -m tests.integration.test_yangtze_power
     
     - name: Upload Test Results
       if: always()

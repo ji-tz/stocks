@@ -13,7 +13,7 @@ from typing import Dict, Any, Optional
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from trader.stocks import simulate_mean_cost
-from tests.test_utils import get_random_stock_code
+from tests.unit.test_utils import get_random_stock_code
 import matplotlib
 matplotlib.use('Agg')  # 使用非交互式后端
 import matplotlib.pyplot as plt

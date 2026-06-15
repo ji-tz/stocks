@@ -222,35 +222,52 @@ gui/
 
 > `backtest_progress.py` 虽然是 SSE 端点和 TRADER 的运行进度有关，但代码本身是 WEB 的文件。TRADER 如需改动 SSE 格式 → 提 PR。
 
-### 4.7 `tests/` — 严格单 Owner
+### 4.7 `tests/` — 严格单 Owner，按层分子目录
 
-| 文件 | Owner | 说明 |
+测试目录按类型分为三个子目录：
+
+```
+tests/
+├── unit/                  ← 单元测试（纯逻辑，不依赖真实API/数据）
+│   ├── test_stocks.py            ITEST （测试 TRADER 的 stocks.py）
+│   ├── test_simulator.py         ITEST （测试 TRADER 的 simulator）
+│   ├── test_simulator_engine.py  ITEST （测试 TRADER 的引擎）
+│   ├── test_main.py              ITEST （入口测试）
+│   ├── test_main_run.py          ITEST （运行测试）
+│   ├── test_fixed_amount_strategy.py ITEST （测试 STRAT）
+│   ├── test_low_frequency_strategies.py ITEST （测试 STRAT）
+│   ├── test_futures_open_hour_strategy.py ITEST （测试 STRAT）
+│   ├── test_run_sma.py           ITEST （测试 STRAT）
+│   ├── test_data_provider_cache.py ITEST （测试 EXCH）
+│   ├── test_data_provider_stooq.py ITEST （测试 EXCH）
+│   ├── test_cache_utils.py       ITEST （测试 EXCH）
+│   ├── test_akshare_provider_compat.py ITEST （测试 EXCH）
+│   ├── test_backtest_progress.py ITEST （测试进度条）
+│   ├── test_futures_missing_data.py ITEST （测试数据）
+│   ├── test_adjustment.py        ITEST （测试复权）
+│   ├── test_dividend_adjustment.py ITEST （测试分红）
+│   ├── test_gui_download_policy.py ITEST （GUI 下载测试）
+│   ├── test_guitest_workflow_report.py ITEST （测试报告）
+│   ├── test_test_utils.py        ITEST （测试工具）
+│   └── test_utils.py             ITEST （工具函数测试）
+├── integration/           ← 集成测试（依赖真实API/数据库/外部服务）
+│   ├── test_integration.py       ITEST （整体集成测试）
+│   └── test_yangtze_power.py     ITEST （真实股票数据验证）
+├── guitests/               ← GUI 端到端测试（归 GTEST）
+│   ├── test_gui_app.py           GTEST
+│   ├── test_gui_backtest_report_e2e.py GTEST
+│   ├── test_gui_all_strategies_e2e.py GTEST
+│   ├── test_realtime_lot_calculation.py GTEST
+│   └── ...
+├── __init__.py             ITEST
+└── README.md               ITEST
+```
+
+| 目录 | Owner | 说明 |
 |------|-------|------|
+| `tests/unit/` 全部 | **ITEST** | 纯逻辑单元测试，不调用真实API |
+| `tests/integration/` 全部 | **ITEST** | 集成测试，依赖真实数据源 |
 | `tests/guitests/` 全部 | **GTEST** | GUI 端到端测试 |
-| `tests/test_stocks.py` | **ITEST** | 测试 TRADER 的 stocks.py |
-| `tests/test_simulator.py` | **ITEST** | 测试 TRADER 的 simulator |
-| `tests/test_simulator_engine.py` | **ITEST** | 测试 TRADER 的引擎 |
-| `tests/test_integration.py` | **ITEST** | 集成测试 |
-| `tests/test_main.py` | **ITEST** | 入口测试 |
-| `tests/test_main_run.py` | **ITEST** | 运行测试 |
-| `tests/test_fixed_amount_strategy.py` | **ITEST** | 测试 STRAT |
-| `tests/test_low_frequency_strategies.py` | **ITEST** | 测试 STRAT |
-| `tests/test_futures_open_hour_strategy.py` | **ITEST** | 测试 STRAT |
-| `tests/test_run_sma.py` | **ITEST** | 测试 STRAT |
-| `tests/test_data_provider_cache.py` | **ITEST** | 测试 EXCH |
-| `tests/test_data_provider_stooq.py` | **ITEST** | 测试 EXCH |
-| `tests/test_cache_utils.py` | **ITEST** | 测试 EXCH |
-| `tests/test_akshare_provider_compat.py` | **ITEST** | 测试 EXCH |
-| `tests/test_backtest_progress.py` | **ITEST** | 测试进度条 |
-| `tests/test_futures_missing_data.py` | **ITEST** | 测试数据 |
-| `tests/test_adjustment.py` | **ITEST** | 测试复权 |
-| `tests/test_dividend_adjustment.py` | **ITEST** | 测试分红 |
-| `tests/test_yangtze_power.py` | **ITEST** | 特定股票测试 |
-| `tests/test_test_utils.py` | **ITEST** | 测试工具 |
-| `tests/test_utils.py` | **ITEST** | 工具函数测试 |
-| `tests/test_gui_download_policy.py` | **ITEST** | GUI 下载测试 |
-| `tests/test_guitest_workflow_report.py` | **ITEST** | 测试报告 |
-| `tests/README.md` 等 | ITEST | 测试文档 |
 
 > **说明：** 虽然测试文件测试的是 EXCH/STRAT/TRADER 的代码，但**测试文件本身的维护责任归 ITEST**。发现被测代码的 bug → ITEST 在 PR 上 @ 对应角色修复。
 

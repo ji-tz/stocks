@@ -4,7 +4,7 @@
 import unittest
 import os
 import tempfile
-from tests.test_utils import (
+from tests.unit.test_utils import (
     get_random_stock_code,
     get_stock_pool,
     get_cached_stock_codes,
