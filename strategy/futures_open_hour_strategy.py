@@ -4,7 +4,7 @@ from typing import Any, Optional
 
 import pandas as pd
 
-from source.data_provider import get_data
+from exchange.source.data_provider import get_data
 
 
 AUTO_STRATEGY_SPEC = {

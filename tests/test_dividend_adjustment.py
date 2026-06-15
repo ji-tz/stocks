@@ -7,8 +7,8 @@ from unittest.mock import patch, MagicMock
 import pandas as pd
 import datetime
 
-from simulator.simulator import Simulator
-from solver.mean_cost_strategy import MeanCostDecision
+from trader.simulator import Simulator
+from strategy.mean_cost_strategy import MeanCostDecision
 
 
 class TestDividendAdjustment(unittest.TestCase):
@@ -150,10 +150,10 @@ class TestRealStockDividendScenario(unittest.TestCase):
     # 允许5%的容差，考虑交易成本和市场波动
     MIN_VALUE_RATIO_LONG_TERM = 0.95
 
-    @patch('source.data_provider.AkshareProvider')
+    @patch('exchange.source.data_provider.AkshareProvider')
     def test_dividend_stock_with_adjusted_data(self, mock_provider_class):
         """测试使用前复权数据处理有分红的股票"""
-        from source.data_provider import get_data
+        from exchange.source.data_provider import get_data
         
         # 模拟长江电力（600900）的前复权数据
         # 这是一个经常分红的股票

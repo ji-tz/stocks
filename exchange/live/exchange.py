@@ -3,8 +3,8 @@
 from datetime import datetime
 from typing import Optional
 
-from simulator.base_engine import TradeResult
-from simulator.exchange_interface import StockExchange
+from exchange.base_engine import TradeResult
+from exchange.exchange_interface import StockExchange
 
 
 class LiveExchange(StockExchange):

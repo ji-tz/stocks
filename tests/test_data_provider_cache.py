@@ -4,7 +4,7 @@ import pandas as pd
 import unittest
 from unittest.mock import patch
 
-from source.data_provider import get_data
+from exchange.source.data_provider import get_data
 
 
 class TestDataProviderCacheFiltering(unittest.TestCase):
@@ -26,7 +26,7 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
             self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
-    @patch('source.data_provider.AkshareProvider.fetch')
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
     def test_force_refresh_fetches_even_when_cache_exists(self, mock_fetch):
         with tempfile.TemporaryDirectory() as tmp:
             cache_file = os.path.join(tmp, '600900.csv')
@@ -54,7 +54,7 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             self.assertEqual(mock_fetch.call_count, 1)
             self.assertEqual(float(out.iloc[0]['open']), 20.0)
 
-    @patch('source.data_provider.AkshareProvider.fetch')
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
     def test_fetch_uses_buffer_days_but_returns_requested_range(self, mock_fetch):
         with tempfile.TemporaryDirectory() as tmp:
             mock_fetch.return_value = pd.DataFrame({

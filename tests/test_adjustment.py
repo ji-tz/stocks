@@ -14,7 +14,7 @@ class TestAdjustmentParameters(unittest.TestCase):
     @patch('requests.Session')
     def test_akshare_uses_qfq_adjustment(self, mock_session_cls, mock_stock_zh_a_hist):
         """测试AkshareProvider使用前复权参数qfq"""
-        from source.akshare_provider import AkshareProvider
+        from exchange.source.akshare_provider import AkshareProvider
         
         # 准备mock数据
         mock_df = pd.DataFrame({
@@ -60,7 +60,7 @@ class TestAdjustmentParameters(unittest.TestCase):
     @patch('baostock.login')
     def test_baostock_uses_qfq_adjustment(self, mock_login, mock_query, mock_logout):
         """测试BaostockProvider使用前复权参数adjustflag=2"""
-        from source.baostock_provider import BaostockProvider
+        from exchange.source.baostock_provider import BaostockProvider
         
         # 准备mock数据
         mock_login_result = MagicMock()
@@ -121,7 +121,7 @@ class TestAdjustmentParameters(unittest.TestCase):
                                                        _mock_get_timeout,
                                                        mock_set_timeout):
         """测试BaostockProvider会设置并恢复socket默认超时，避免网络卡死。"""
-        from source.baostock_provider import BaostockProvider
+        from exchange.source.baostock_provider import BaostockProvider
 
         mock_login_result = MagicMock()
         mock_login_result.error_code = "0"
@@ -147,8 +147,8 @@ class TestAdjustmentParameters(unittest.TestCase):
         # 验证两个数据源的复权配置一致性
         
         # 通过源代码验证配置
-        from source.akshare_provider import AkshareProvider
-        from source.baostock_provider import BaostockProvider
+        from exchange.source.akshare_provider import AkshareProvider
+        from exchange.source.baostock_provider import BaostockProvider
         
         # 读取源代码验证复权参数配置
         import inspect

@@ -1,4 +1,3 @@
-"""向后兼容模块 — 重新导出新位置。"""
 from exchange.realtime.exchange import RealtimeSimExchange
 
 __all__ = ["RealtimeSimExchange"]

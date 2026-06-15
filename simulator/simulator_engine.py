@@ -1,7 +1,4 @@
-"""兼容模块：保留旧导入路径 `simulator.simulator_engine.SimulatorEngine`。"""
+"""向后兼容模块。"""
+from trader.simulator_engine import SimulatorEngine
 
-from simulator.backtest.exchange import BacktestExchange
-
-
-class SimulatorEngine(BacktestExchange):
-    """兼容别名：等价于 `BacktestExchange`。"""
+__all__ = ["SimulatorEngine"]

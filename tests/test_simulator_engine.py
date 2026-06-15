@@ -6,12 +6,12 @@ import inspect
 from datetime import datetime
 import pandas as pd
 
-from simulator.base_engine import Position, Account, TradeOrder, TradeResult
-from simulator.simulator_engine import SimulatorEngine
-from simulator.real_engine import RealEngine
-from simulator.backtest.exchange import BacktestExchange
-from simulator.realtime.exchange import RealtimeSimExchange
-from simulator.live.exchange import LiveExchange
+from exchange.base_engine import Position, Account, TradeOrder, TradeResult
+from trader.simulator_engine import SimulatorEngine
+from exchange.real_engine import RealEngine
+from exchange.backtest.exchange import BacktestExchange
+from exchange.realtime.exchange import RealtimeSimExchange
+from exchange.live.exchange import LiveExchange
 
 
 class TestBaseEngineStructures(unittest.TestCase):
@@ -256,7 +256,7 @@ class TestSimulatorWithVerbose(unittest.TestCase):
     def test_verbose_output(self):
         """测试verbose模式下的输出"""
         from simulator import Simulator
-        from solver.mean_cost_strategy import MeanCostDecision
+        from strategy.mean_cost_strategy import MeanCostDecision
 
         # 创建测试数据
         dates = pd.date_range(end="2023-12-31", periods=5, freq="D")

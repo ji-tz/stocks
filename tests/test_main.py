@@ -17,7 +17,7 @@ class TestGetData(unittest.TestCase):
         }
         return pd.DataFrame(data)
 
-    @patch('source.data_provider.ak.stock_zh_a_hist')
+    @patch('exchange.source.data_provider.ak.stock_zh_a_hist')
     def test_get_data_shape(self, mock_hist):
         mock_hist.return_value = self.make_mock_df(20)
         df = get_data()

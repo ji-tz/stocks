@@ -1,6 +1,6 @@
 """回测仿真交易所实现。"""
 
-from simulator.simulated_exchange import SimulatedExchangeBase
+from exchange.simulated_exchange import SimulatedExchangeBase
 
 
 class BacktestExchange(SimulatedExchangeBase):

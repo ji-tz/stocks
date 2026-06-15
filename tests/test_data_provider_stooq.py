@@ -4,18 +4,18 @@ from unittest.mock import patch
 
 import pandas as pd
 
-from source.data_provider import get_data
+from exchange.source.data_provider import get_data
 
 
 class TestDataProviderStooqFallback(unittest.TestCase):
-    @patch('source.data_provider.CailianpressProvider.fetch')
-    @patch('source.data_provider.EastmoneyProvider.fetch')
-    @patch('source.data_provider.SohuProvider.fetch')
-    @patch('source.data_provider.SinaProvider.fetch')
-    @patch('source.data_provider.TencentProvider.fetch')
-    @patch('source.data_provider.StooqProvider.fetch')
-    @patch('source.data_provider.BaostockProvider.fetch')
-    @patch('source.data_provider.AkshareProvider.fetch')
+    @patch('exchange.source.data_provider.CailianpressProvider.fetch')
+    @patch('exchange.source.data_provider.EastmoneyProvider.fetch')
+    @patch('exchange.source.data_provider.SohuProvider.fetch')
+    @patch('exchange.source.data_provider.SinaProvider.fetch')
+    @patch('exchange.source.data_provider.TencentProvider.fetch')
+    @patch('exchange.source.data_provider.StooqProvider.fetch')
+    @patch('exchange.source.data_provider.BaostockProvider.fetch')
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
     def test_auto_fallback_to_stooq_when_primary_sources_fail(
             self,
             mock_ak,
@@ -62,13 +62,13 @@ class TestDataProviderStooqFallback(unittest.TestCase):
         self.assertEqual(mock_cls.call_count, 1)
         self.assertEqual(mock_stooq.call_count, 1)
 
-    @patch('source.data_provider.CailianpressProvider.fetch')
-    @patch('source.data_provider.EastmoneyProvider.fetch')
-    @patch('source.data_provider.SohuProvider.fetch')
-    @patch('source.data_provider.SinaProvider.fetch')
-    @patch('source.data_provider.TencentProvider.fetch')
-    @patch('source.data_provider.BaostockProvider.fetch')
-    @patch('source.data_provider.AkshareProvider.fetch')
+    @patch('exchange.source.data_provider.CailianpressProvider.fetch')
+    @patch('exchange.source.data_provider.EastmoneyProvider.fetch')
+    @patch('exchange.source.data_provider.SohuProvider.fetch')
+    @patch('exchange.source.data_provider.SinaProvider.fetch')
+    @patch('exchange.source.data_provider.TencentProvider.fetch')
+    @patch('exchange.source.data_provider.BaostockProvider.fetch')
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
     def test_auto_fallback_to_tencent_when_primary_sources_fail(
             self,
             mock_ak,

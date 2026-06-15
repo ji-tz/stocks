@@ -1,23 +1,19 @@
-"""向后兼容模块 — 重新导出 trader.stocks 的全部公开 API。
+"""交易员层 — 时间推进、回测调度、交易信号执行"""
 
-本文件保留以兼容旧导入路径 `import stocks` 或 `from stocks import ...`。
-"""
 from trader.stocks import (
-    init, get_data, _get_data, get_strategy_spec, list_strategy_specs,
+    init, get_data, get_strategy_spec, list_strategy_specs,
     run_backtest, run_sma_backtest, run_mean_cost, run_fixed_amount,
     run_module_strategy_backtest, run_futures_a50_prev_night, run_signal_template,
-    create_backtest_request,
-    StrategySpec, TRADE_PRICE_OPEN,
 )
 from trader.simulator import (
+    Simulator, Simulator as BacktestExchangeRunner,
     simulate_sma, simulate_mean_cost, simulate_fixed_amount,
 )
 
 __all__ = [
-    "init", "get_data", "_get_data", "get_strategy_spec", "list_strategy_specs",
+    "init", "get_data", "get_strategy_spec", "list_strategy_specs",
     "run_backtest", "run_sma_backtest", "run_mean_cost", "run_fixed_amount",
     "run_module_strategy_backtest", "run_futures_a50_prev_night", "run_signal_template",
     "simulate_sma", "simulate_mean_cost", "simulate_fixed_amount",
-    "create_backtest_request",
-    "StrategySpec", "TRADE_PRICE_OPEN",
+    "Simulator", "BacktestExchangeRunner",
 ]

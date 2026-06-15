@@ -6,8 +6,8 @@ from unittest.mock import patch
 import pandas as pd
 import datetime
 
-from simulator.simulator import Simulator, simulate_fixed_amount
-from solver.fixed_amount_strategy import FixedAmountDecision
+from trader.simulator import Simulator, simulate_fixed_amount
+from strategy.fixed_amount_strategy import FixedAmountDecision
 
 
 def make_test_df(n=10, start_price=100.0):
@@ -184,7 +184,7 @@ class TestFixedAmountSimulation(unittest.TestCase):
         result = sim.simulate(df=df, strategy=strategy, symbol="TEST")
         self.assertIsNotNone(result)
     
-    @patch('simulator.simulator.get_data')
+    @patch('trader.simulator.get_data')
     def test_simulate_fixed_amount_function(self, mock_get_data):
         """测试 simulate_fixed_amount 便捷函数"""
         # Mock 数据获取
@@ -208,7 +208,7 @@ class TestFixedAmountSimulation(unittest.TestCase):
         self.assertEqual(result['symbol'], "600900")
         self.assertIn('trades', result)
     
-    @patch('simulator.simulator.get_data')
+    @patch('trader.simulator.get_data')
     def test_simulate_fixed_amount_no_data(self, mock_get_data):
         """测试没有数据的情况"""
         mock_get_data.return_value = None

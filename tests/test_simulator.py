@@ -5,9 +5,9 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 
-from simulator.simulator import Simulator, simulate_mean_cost, simulate_sma
-from solver.mean_cost_strategy import MeanCostDecision
-from solver.sma_strategy import SmaDecision
+from trader.simulator import Simulator, simulate_mean_cost, simulate_sma
+from strategy.mean_cost_strategy import MeanCostDecision
+from strategy.sma_strategy import SmaDecision
 
 
 def make_test_df(n=10, start_price=100.0):
@@ -312,7 +312,7 @@ class TestSimulatorWithDifferentParameters(unittest.TestCase):
 class TestIntegratedSimulation(unittest.TestCase):
     """集成测试：测试完整的模拟流程"""
     
-    @patch('source.data_provider.get_data')
+    @patch('exchange.source.data_provider.get_data')
     def test_simulate_mean_cost_end_to_end(self, mock_get_data):
         """测试 simulate_mean_cost 端到端流程"""
         mock_get_data.return_value = make_test_df(15)

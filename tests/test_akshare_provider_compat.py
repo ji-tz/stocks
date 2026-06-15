@@ -2,7 +2,7 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 
-from source.akshare_provider import AkshareProvider
+from exchange.source.akshare_provider import AkshareProvider
 
 
 class TestAkshareProviderCompatibility(unittest.TestCase):

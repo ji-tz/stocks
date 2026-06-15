@@ -31,7 +31,7 @@ class TestStocksModule(unittest.TestCase):
             stocks.init(cache_dir=cache_dir)
             self.assertTrue(os.path.isdir(cache_dir))
 
-    @patch('stocks._get_data')
+    @patch('trader.stocks._get_data')
     def test_get_data_wrapper(self, mock_get):
         df = make_mock_df(5)
         mock_get.return_value = df
@@ -45,7 +45,7 @@ class TestStocksModule(unittest.TestCase):
         with self.assertRaises(ValueError):
             stocks.get_data(symbol='600900', source='auto', start_date='202301')
 
-    @patch('stocks._get_data')
+    @patch('trader.stocks._get_data')
     def test_get_data_normalizes_hyphen_for_akshare_auto(self, mock_get):
         # when source is auto and start_date provided as YYYY-MM-DD, we expect underlying get_data to receive YYYYMMDD
         mock_get.return_value = make_mock_df(3)
@@ -55,7 +55,7 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(called_kwargs.get('start_date'), '20230101')
         self.assertEqual(called_kwargs.get('end_date'), '20230103')
 
-    @patch('stocks._get_data')
+    @patch('trader.stocks._get_data')
     def test_get_data_passes_force_refresh_and_buffer_days(self, mock_get):
         mock_get.return_value = make_mock_df(3)
         stocks.get_data(
@@ -66,7 +66,7 @@ class TestStocksModule(unittest.TestCase):
         self.assertTrue(called_kwargs.get('force_refresh'))
         self.assertEqual(called_kwargs.get('buffer_days'), 7)
 
-    @patch('stocks._get_data')
+    @patch('trader.stocks._get_data')
     def test_get_data_filters_returned_df_by_date(self, mock_get):
         # Create a dataframe spanning several dates
         dates = pd.date_range(start='2023-01-01', periods=10, freq='D')
@@ -85,7 +85,7 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
         self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
-    @patch('simulator.simulator.get_data')
+    @patch('trader.simulator.get_data')
     def test_run_mean_cost_returns_expected_keys(self, mock_get):
         # simulate_mean_cost 在 simulator.simulator 模块内绑定了 get_data，需在该引用处打补丁
         mock_get.return_value = make_mock_df(8)
@@ -117,7 +117,7 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(specs['signal_template'].parameters[0].name, 'buy_trigger')
         self.assertEqual(specs['mean_cost'].supported_trade_prices, (stocks.TRADE_PRICE_OPEN,))
 
-    @patch('stocks.run_fixed_amount')
+    @patch('trader.stocks.run_fixed_amount')
     def test_run_backtest_dispatches_strategy_registry(self, mock_run_fixed_amount):
         mock_run_fixed_amount.return_value = {'symbol': '600900', 'total_value': 101000.0}
 
@@ -150,7 +150,7 @@ class TestStocksModule(unittest.TestCase):
         with self.assertRaises(ValueError):
             stocks.create_backtest_request(strategy='sma', trade_price='close')
 
-    @patch('stocks.run_sma_backtest')
+    @patch('trader.stocks.run_sma_backtest')
     def test_run_backtest_dispatches_sma_period(self, mock_run_sma_backtest):
         mock_run_sma_backtest.return_value = {'symbol': '600900', 'total_value': 102000.0}
 
@@ -179,7 +179,7 @@ class TestStocksModule(unittest.TestCase):
             period=15,
         )
 
-    @patch('stocks.run_futures_a50_prev_night')
+    @patch('trader.stocks.run_futures_a50_prev_night')
     def test_run_backtest_dispatches_a50_strategy(self, mock_run_a50):
         mock_run_a50.return_value = {'symbol': '600900', 'total_value': 103000.0}
 
@@ -209,7 +209,7 @@ class TestStocksModule(unittest.TestCase):
             base_position_lots=2,
         )
 
-    @patch('stocks.run_signal_template')
+    @patch('trader.stocks.run_signal_template')
     def test_run_backtest_dispatches_signal_template_strategy(self, mock_run_signal_template):
         mock_run_signal_template.return_value = {'symbol': '600900', 'total_value': 104000.0}
 

@@ -126,8 +126,8 @@ class TestSimulatorProgressCallback(unittest.TestCase):
     
     def test_progress_callback_in_simulator(self):
         """测试模拟器中的进度回调"""
-        from simulator.simulator import Simulator
-        from solver.mean_cost_strategy import MeanCostDecision
+        from trader.simulator import Simulator
+        from strategy.mean_cost_strategy import MeanCostDecision
         import pandas as pd
         from datetime import datetime, timedelta
         

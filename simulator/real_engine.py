@@ -1,7 +1,4 @@
-"""兼容模块：保留旧导入路径 `simulator.real_engine.RealEngine`。"""
+"""向后兼容模块。"""
+from exchange.real_engine import RealEngine
 
-from simulator.live.exchange import LiveExchange
-
-
-class RealEngine(LiveExchange):
-    """兼容别名：等价于 `LiveExchange`。"""
+__all__ = ["RealEngine"]

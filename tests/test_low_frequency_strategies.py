@@ -5,9 +5,9 @@ from types import SimpleNamespace
 import pandas as pd
 
 import stocks
-from solver.bollinger_strategy import BollingerDecision
-from solver.dual_ma_strategy import DualMaDecision
-from solver.rsi_strategy import RsiDecision
+from strategy.bollinger_strategy import BollingerDecision
+from strategy.dual_ma_strategy import DualMaDecision
+from strategy.rsi_strategy import RsiDecision
 
 
 def make_test_df(prices):
@@ -93,14 +93,14 @@ class TestLowFrequencyBacktests(unittest.TestCase):
             stocks.run_module_strategy_backtest(strategy_key='')
 
     def test_generic_runner_requires_create_strategy(self):
-        with patch("stocks.get_strategy_spec") as mock_get_strategy_spec, \
-                patch("stocks.importlib.import_module") as mock_import_module, \
-                patch("stocks._fetch_data_for_backtest") as mock_fetch_data:
+        with patch("trader.stocks.get_strategy_spec") as mock_get_strategy_spec, \
+                patch("trader.stocks.importlib.import_module") as mock_import_module, \
+                patch("trader.stocks._fetch_data_for_backtest") as mock_fetch_data:
             mock_get_strategy_spec.return_value = stocks.StrategySpec(
                 key='dual_ma',
                 label='双均线交叉',
                 runner=stocks.run_module_strategy_backtest,
-                module_name='solver.dual_ma_strategy',
+                module_name='strategy.dual_ma_strategy',
                 module_interface=True,
             )
             mock_fetch_data.return_value = make_test_df([10, 11, 12])
@@ -108,7 +108,7 @@ class TestLowFrequencyBacktests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 stocks.run_module_strategy_backtest(strategy_key='dual_ma')
 
-    @patch("stocks.run_module_strategy_backtest")
+    @patch("trader.stocks.run_module_strategy_backtest")
     def test_run_backtest_dispatches_generic_module_runner(self, mock_runner):
         mock_runner.return_value = {'symbol': '600900', 'total_value': 101000.0}
         request = stocks.create_backtest_request(
@@ -139,7 +139,7 @@ class TestLowFrequencyBacktests(unittest.TestCase):
             long_period=3,
         )
 
-    @patch("stocks._get_data")
+    @patch("trader.stocks._get_data")
     def test_run_backtest_supports_dual_ma(self, mock_get_data):
         mock_get_data.return_value = make_test_df([10, 9, 8, 9, 10, 11, 12, 11, 10, 9, 8, 9, 10])
         result = stocks.run_backtest(stocks.create_backtest_request(
@@ -155,7 +155,7 @@ class TestLowFrequencyBacktests(unittest.TestCase):
         self.assertEqual(result["symbol"], "600900")
         self.assertIn("total_value", result)
 
-    @patch("stocks._get_data")
+    @patch("trader.stocks._get_data")
     def test_run_backtest_supports_bollinger(self, mock_get_data):
         mock_get_data.return_value = make_test_df([10, 10, 10, 10, 10, 6, 10, 10, 10, 14, 10, 10])
         result = stocks.run_backtest(stocks.create_backtest_request(
@@ -171,7 +171,7 @@ class TestLowFrequencyBacktests(unittest.TestCase):
         self.assertEqual(result["symbol"], "600900")
         self.assertGreaterEqual(result["trades"], 1)
 
-    @patch("stocks._get_data")
+    @patch("trader.stocks._get_data")
     def test_run_backtest_supports_rsi(self, mock_get_data):
         mock_get_data.return_value = make_test_df([10, 9, 8, 7, 6, 7, 8, 9, 10, 11, 10, 9])
         result = stocks.run_backtest(stocks.create_backtest_request(

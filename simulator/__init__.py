@@ -1,26 +1,21 @@
-"""Simulator 模块
+"""向后兼容模块 — 重新导出新目录结构下的全部公开 API。
 
-提供股票交易所统一接口。
-
-模块结构：
-- exchange_interface: 股票交易所统一接口（StockExchange）
-- backtest/: 回测仿真实现
-- realtime/: 实时仿真实现
-- live/: 实盘交易实现（预留）
-- simulator: 通用策略回测执行器（向后兼容）
+原 `simulator` 包已拆分为：
+- `exchange/` — 交易所层（base_engine, exchange_interface, simulated_exchange, backtest, live, realtime）
+- `trader/` — 交易员层（simulator, simulator_engine, clock, real_engine）
 """
 
-from simulator.simulator import BacktestExchangeRunner, Simulator, simulate_fixed_amount, simulate_mean_cost, simulate_sma
-from simulator.exchange_interface import StockExchange
-from simulator.backtest.exchange import BacktestExchange
-from simulator.backtest.clock import BacktestClock
-from simulator.realtime.exchange import RealtimeSimExchange
-from simulator.live.exchange import LiveExchange
-from simulator.base_engine import BaseEngine, Position, Account, TradeOrder, TradeResult
+from exchange.base_engine import BaseEngine, Position, Account, TradeOrder, TradeResult
+from exchange.exchange_interface import StockExchange
+from exchange.backtest.exchange import BacktestExchange
+from exchange.realtime.exchange import RealtimeSimExchange
+from exchange.live.exchange import LiveExchange
 
-# 兼容旧导出
-from simulator.simulator_engine import SimulatorEngine
-from simulator.real_engine import RealEngine
+from trader.simulator import BacktestExchangeRunner, Simulator, simulate_fixed_amount, simulate_mean_cost, simulate_sma
+from trader.clock import BacktestClock
+from trader.simulator_engine import SimulatorEngine
+
+from exchange.real_engine import RealEngine
 
 __all__ = [
     # 高层接口

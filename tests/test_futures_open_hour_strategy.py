@@ -2,8 +2,8 @@ import unittest
 
 import pandas as pd
 
-from simulator.simulator import Simulator
-from solver.futures_open_hour_strategy import FuturesOpenHourDecision
+from trader.simulator import Simulator
+from strategy.futures_open_hour_strategy import FuturesOpenHourDecision
 
 
 class TestFuturesOpenHourStrategy(unittest.TestCase):
