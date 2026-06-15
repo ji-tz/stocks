@@ -12,6 +12,7 @@ from flask import Flask, render_template, request, session, jsonify, Response
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 import trader.stocks as stocks
+from trader.export import export_to_excel, prepare_pdf_data, generate_filename
 from gui.backtest_progress import get_progress_manager
 
 app = Flask(__name__, template_folder='templates')
@@ -1028,12 +1029,164 @@ def view_result():
         res = json.loads(result_json)
         # 使用详细模板显示结果
         if isinstance(res, dict) and ('trades_list' in res or 'history' in res):
-            return render_template('result_mean.html', result=res)
+            strategy_name = session.get('strategy_name', '')
+            return render_template('result_mean.html', result=res, strategy_name=strategy_name)
         else:
             return render_template('result.html', error='回测结果格式不正确')
     except Exception as e:
         return render_template('result.html', error=f'解析结果失败: {e}')
 
+
+@app.route('/download/excel', methods=['POST'])
+def download_excel():
+    # 导出回测结果为 Excel 文件。
+    result_json = request.form.get('result_json')
+    if not result_json:
+        return jsonify({'error': '无法获取回测结果'}), 400
+
+    try:
+        res = json.loads(result_json)
+    except json.JSONDecodeError:
+        return jsonify({'error': '结果数据格式错误'}), 400
+
+    if not isinstance(res, dict):
+        return jsonify({'error': '结果数据格式错误'}), 400
+
+    try:
+        strategy_name = request.form.get('strategy_name', '')
+        symbol = res.get('symbol', 'UNKNOWN')
+        start_date = res.get('start_date', '')
+        end_date = res.get('end_date', '')
+
+        fname = generate_filename(symbol, strategy_name, start_date, end_date, 'xlsx')
+
+        with tempfile.NamedTemporaryFile(suffix='.xlsx', delete=False) as tmp:
+            output_path = export_to_excel(
+                backtest_result=res,
+                output_path=tmp.name,
+                strategy_name=strategy_name,
+            )
+
+        with open(output_path, 'rb') as f:
+            data = f.read()
+        os.unlink(output_path)
+
+        response = app.response_class(
+            response=data,
+            mimetype='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+        return response
+    except Exception as e:
+        return jsonify({'error': f'导出 Excel 失败: {str(e)}'}), 500
+
+
+@app.route('/download/pdf', methods=['POST'])
+def download_pdf():
+    # 导出回测结果为 PDF 文件。
+    result_json = request.form.get('result_json')
+    if not result_json:
+        return jsonify({'error': '无法获取回测结果'}), 400
+
+    try:
+        res = json.loads(result_json)
+    except json.JSONDecodeError:
+        return jsonify({'error': '结果数据格式错误'}), 400
+
+    if not isinstance(res, dict):
+        return jsonify({'error': '结果数据格式错误'}), 400
+
+    try:
+        strategy_name = request.form.get('strategy_name', '')
+        symbol = res.get('symbol', 'UNKNOWN')
+        start_date = res.get('start_date', '')
+        end_date = res.get('end_date', '')
+
+        fname = generate_filename(symbol, strategy_name, start_date, end_date, 'pdf')
+        pdf_data = prepare_pdf_data(res, strategy_name)
+
+        from fpdf import FPDF
+        pdf = FPDF()
+        pdf.add_page()
+
+        # Register a Unicode font for Chinese character support
+        _CJK_FONT_PATH = '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
+        if os.path.exists(_CJK_FONT_PATH):
+            pdf.add_font('CJK', '', _CJK_FONT_PATH)
+            font_body = 'CJK'
+            font_body_bold = 'CJK'
+        else:
+            font_body = 'Helvetica'
+            font_body_bold = 'Helvetica'
+
+        pdf.set_font(font_body_bold, '', 16)
+        pdf.cell(0, 12, 'Backtest Report', new_x='LMARGIN', new_y='NEXT', align='C')
+        pdf.ln(4)
+
+        pdf.set_font(font_body_bold, '', 12)
+        pdf.cell(0, 8, 'Summary Information', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font(font_body, '', 10)
+        summary = pdf_data['summary']
+        for k, v in [('Symbol', summary['symbol']),
+                     ('Strategy', summary['strategy_name']),
+                     ('Start Date', summary['start_date']),
+                     ('End Date', summary['end_date']),
+                     ('Initial Capital', f"${summary['init_cash']:,.2f}")]:
+            pdf.cell(50, 6, k + ':', border=0)
+            pdf.cell(0, 6, str(v), new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(4)
+
+        pdf.set_font(font_body_bold, '', 12)
+        pdf.cell(0, 8, 'Key Metrics', new_x='LMARGIN', new_y='NEXT')
+        pdf.set_font(font_body, '', 10)
+        metrics = pdf_data['metrics']
+        for k, v in [('Total Return Rate', f"{metrics['total_return_rate']*100:.2f}%"),
+                     ('Annualized Return', f"{metrics['annualized_return']*100:.2f}%"),
+                     ('Max Drawdown', f"{metrics['max_drawdown']*100:.2f}%"),
+                     ('Sharpe Ratio', f"{metrics['sharpe_ratio']:.4f}"),
+                     ('Total P/L', f"${metrics['total_pl']:,.2f}"),
+                     ('Final Value', f"${metrics['final_value']:,.2f}")]:
+            pdf.cell(50, 6, k + ':', border=0)
+            pdf.cell(0, 6, str(v), new_x='LMARGIN', new_y='NEXT')
+        pdf.ln(4)
+
+        pdf.set_font(font_body_bold, '', 12)
+        pdf.cell(0, 8, 'Trade Records', new_x='LMARGIN', new_y='NEXT')
+
+        trades = pdf_data['trades']
+        col_widths = [30, 20, 25, 20, 25]
+        headers = ['Date', 'Action', 'Price', 'Shares', 'P/L']
+
+        pdf.set_font(font_body_bold, '', 8)
+        for i, h in enumerate(headers):
+            pdf.cell(col_widths[i], 7, h, border=1, align='C')
+        pdf.ln()
+
+        pdf.set_font(font_body, '', 8)
+        max_rows = min(len(trades), 50)
+        for t in trades[:max_rows]:
+            pdf.cell(col_widths[0], 6, str(t.get('date', '')), border=1)
+            pdf.cell(col_widths[1], 6, str(t.get('action', '')), border=1, align='C')
+            pdf.cell(col_widths[2], 6, f"{t.get('price', 0):.2f}", border=1, align='R')
+            pdf.cell(col_widths[3], 6, str(t.get('shares', 0)), border=1, align='R')
+            pl = t.get('pl', '')
+            pl_str = f"{pl:.2f}" if isinstance(pl, (int, float)) else str(pl)
+            pdf.cell(col_widths[4], 6, pl_str, border=1, align='R')
+            pdf.ln()
+
+        if len(trades) > 50:
+            pdf.set_font(font_body, 'I', 8)
+            pdf.cell(0, 6, f'(Showing first 50 of {len(trades)} trades)', new_x='LMARGIN', new_y='NEXT')
+
+        pdf_bytes = pdf.output()
+        response = app.response_class(
+            response=pdf_bytes,
+            mimetype='application/pdf',
+        )
+        response.headers['Content-Disposition'] = f'attachment; filename="{fname}"'
+        return response
+    except Exception as e:
+        return jsonify({'error': f'导出 PDF 失败: {str(e)}'}), 500
 
 if __name__ == '__main__':
     # 支持通过环境变量自定义主机和端口，方便测试使用非默认端口

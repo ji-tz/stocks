@@ -7,4 +7,6 @@ Flask
 pylint
 flake8
 mypy
+openpyxl
+fpdf2
 playwright

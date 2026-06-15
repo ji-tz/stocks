@@ -678,6 +678,54 @@ def run_backtest(backtest_request: BacktestRequest | Mapping[str, Any]) -> Dict[
     )
 
 
+# ---------------------------------------------------------------------------
+# 导出接口（回测结果 → Excel / PDF 数据准备）
+# ---------------------------------------------------------------------------
+
+
+def export_backtest_excel(
+    backtest_result: Dict[str, Any],
+    output_dir: str = "trader/exports",
+    strategy_name: str = "",
+) -> str:
+    """将回测结果导出为 Excel 文件。
+
+    Args:
+        backtest_result: simulator 返回的回测结果字典。
+        output_dir: 输出目录（默认 trader/exports）。
+        strategy_name: 策略名称。
+
+    Returns:
+        生成的 Excel 文件路径。
+    """
+    from trader.export import export_to_excel, generate_filename
+
+    symbol = backtest_result.get("symbol", "UNKNOWN")
+    start_date = backtest_result.get("start_date", "")
+    end_date = backtest_result.get("end_date", "")
+    fname = generate_filename(symbol, strategy_name, start_date, end_date, ext="xlsx")
+    output_path = os.path.join(output_dir, fname)
+    return export_to_excel(backtest_result, output_path, strategy_name=strategy_name)
+
+
+def export_prepare_pdf_data(
+    backtest_result: Dict[str, Any],
+    strategy_name: str = "",
+) -> Dict[str, Any]:
+    """准备回测结果的 PDF 导出数据。
+
+    Args:
+        backtest_result: simulator 返回的回测结果字典。
+        strategy_name: 策略名称。
+
+    Returns:
+        包含 summary / metrics / trades 的结构化字典。
+    """
+    from trader.export import prepare_pdf_data
+
+    return prepare_pdf_data(backtest_result, strategy_name=strategy_name)
+
+
 if __name__ == '__main__':
     # 方便开发时直接运行并快速检查
     try:
