@@ -71,6 +71,23 @@
       <div class="card"><strong>未实现盈亏：</strong> {{ result.unrealized_pl }}</div>
     </div>
 
+    <div style="margin: 1rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <form method="post" action="/download/excel" style="display:inline;">
+        <input type="hidden" name="result_json" value='{{ result | tojson | forceescape }}'>
+        <input type="hidden" name="strategy_name" value="{{ strategy_name }}">
+        <button type="submit" style="padding:0.5rem 1rem; background:#2e7d32; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
+          📥 导出 Excel
+        </button>
+      </form>
+      <form method="post" action="/download/pdf" style="display:inline;">
+        <input type="hidden" name="result_json" value='{{ result | tojson | forceescape }}'>
+        <input type="hidden" name="strategy_name" value="{{ strategy_name }}">
+        <button type="submit" style="padding:0.5rem 1rem; background:#c62828; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
+          📄 导出 PDF
+        </button>
+      </form>
+    </div>
+
     <h2>资产曲线</h2>
     <div class="chart-container">
       <div class="chart-toolbar">
