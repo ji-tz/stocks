@@ -28,7 +28,7 @@ class TestRealtimeLotCalculation(unittest.TestCase):
             'volume': [1000, 1100, 1200, 1150, 1300]
         })
 
-        with patch('stocks.get_data', return_value=test_data):
+        with patch('trader.stocks.get_data', return_value=test_data):
             response = self.client.get('/api/stock_price/600900')
             self.assertEqual(response.status_code, 200)
 
@@ -42,7 +42,7 @@ class TestRealtimeLotCalculation(unittest.TestCase):
             self.assertEqual(data['stock_code'], '600900')
             self.assertIn('2024-01-10', data['date'])
 
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     def test_stock_price_api_uses_project_cache_dir(self, mock_get_data):
         """测试获取价格接口使用项目绝对缓存目录"""
         test_data = pd.DataFrame({
@@ -65,7 +65,7 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         # Mock get_data 返回空DataFrame
         empty_df = pd.DataFrame()
 
-        with patch('stocks.get_data', return_value=empty_df) as mock_get_data:
+        with patch('trader.stocks.get_data', return_value=empty_df) as mock_get_data:
             response = self.client.get('/api/stock_price/600900')
             self.assertEqual(response.status_code, 404)
 
@@ -77,7 +77,7 @@ class TestRealtimeLotCalculation(unittest.TestCase):
     def test_stock_price_api_exception(self):
         """测试获取股票价格API - 异常场景"""
         # Mock get_data 抛出异常
-        with patch('stocks.get_data', side_effect=Exception('网络错误')):
+        with patch('trader.stocks.get_data', side_effect=Exception('网络错误')):
             response = self.client.get('/api/stock_price/600900')
             self.assertEqual(response.status_code, 500)
 

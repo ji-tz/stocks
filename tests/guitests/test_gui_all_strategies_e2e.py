@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pandas as pd
 
-import stocks
+import trader.stocks as stocks
 from playwright.sync_api import expect, sync_playwright
 from tests.guitests import _ensure_playwright_chromium
 from tests.guitests.test_gui_backtest_report_e2e import ROOT_DIR, _start_server_with_retry
