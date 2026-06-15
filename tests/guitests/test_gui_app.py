@@ -96,8 +96,8 @@ class TestGuiRoutes(unittest.TestCase):
         with self.client.session_transaction() as sess:
             self.assertEqual(sess.get('recent_stock_codes'), ['161725'])
 
-    @patch('stocks.create_backtest_request')
-    @patch('stocks.run_backtest')
+    @patch('trader.stocks.create_backtest_request')
+    @patch('trader.stocks.run_backtest')
     def test_run_post_accepts_fractional_lot(self, mock_run_backtest, mock_create_request):
         """测试回测接口可接收小数交易单位。"""
         with self.client.session_transaction() as sess:
@@ -122,8 +122,8 @@ class TestGuiRoutes(unittest.TestCase):
         kwargs = mock_create_request.call_args.kwargs
         self.assertAlmostEqual(kwargs['lot_size'], 0.01)
 
-    @patch('stocks.get_data')
-    @patch('stocks.run_mean_cost')
+    @patch('trader.stocks.get_data')
+    @patch('trader.stocks.run_mean_cost')
     def test_run_mean_cost_post(self, mock_mean, mock_get):
         # Set stock in session
         with self.client.session_transaction() as sess:
@@ -155,8 +155,8 @@ class TestGuiRoutes(unittest.TestCase):
         task_id = self._extract_task_id(body)
         self._wait_for_task_completion(task_id)
 
-    @patch('stocks.get_data')
-    @patch('stocks.run_sma_backtest')
+    @patch('trader.stocks.get_data')
+    @patch('trader.stocks.run_sma_backtest')
     def test_run_sma_post(self, mock_sma, mock_get):
         # Set stock in session
         with self.client.session_transaction() as sess:
@@ -461,7 +461,7 @@ class TestGuiRoutes(unittest.TestCase):
             self.assertEqual(sess.get('backtest_start'), '')
             self.assertEqual(sess.get('backtest_end'), '')
 
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     def test_stock_chart_api_success(self, mock_get):
         """测试时间段页走势图数据接口"""
         with self.client.session_transaction() as sess:
@@ -548,7 +548,7 @@ class TestGuiRoutes(unittest.TestCase):
         data = rv.get_json()
         self.assertIn('error', data)
 
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     @patch('gui.web._restore_stock_cache')
     @patch('gui.web._read_stock_cache_df')
     @patch('gui.web._download_from_all_sources')
@@ -617,8 +617,8 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('error', data)
         self.assertIn('清除缓存并重新下载失败', data['error'])
 
-    @patch('stocks.get_data')
-    @patch('stocks.run_sma_backtest')
+    @patch('trader.stocks.get_data')
+    @patch('trader.stocks.run_sma_backtest')
     def test_run_with_session_time_range(self, mock_sma, mock_get):
         """测试/run路由从session读取时间段"""
         # 设置完整的session信息（包括时间段）

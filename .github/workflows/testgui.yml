@@ -47,7 +47,7 @@ jobs:
           python -m unittest \
             tests.guitests.test_gui_app \
             tests.guitests.test_realtime_lot_calculation \
-            tests.test_guitest_workflow_report -v
+            tests.unit.test_guitest_workflow_report -v
 
       - name: Verify testing outputs
         run: |

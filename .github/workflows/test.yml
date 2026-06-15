@@ -52,7 +52,7 @@ jobs:
       id: run_simulator_tests
       run: |
         echo "=== Testing Trading Strategy Simulators ==="
-        python -m unittest tests.test_simulator -v 2>&1 | tee -a test_output.log
+        python -m unittest tests.unit.test_simulator -v 2>&1 | tee -a test_output.log
         echo "simulator_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
       continue-on-error: true
     
@@ -60,15 +60,15 @@ jobs:
       id: verify_simulator
       run: |
         echo "=== Verifying Mean Cost Strategy ===" 2>&1 | tee -a test_output.log
-        python -c "from simulator.simulator import Simulator; from solver.mean_cost_strategy import MeanCostDecision; print('✓ Mean Cost Strategy loaded successfully')" 2>&1 | tee -a test_output.log || exit 1
+        python -c "from trader.simulator import Simulator; from strategy.mean_cost_strategy import MeanCostDecision; print('✓ Mean Cost Strategy loaded successfully')" 2>&1 | tee -a test_output.log || exit 1
         echo "=== Verifying SMA Strategy ===" 2>&1 | tee -a test_output.log
-        python -c "from simulator.simulator import Simulator, simulate_sma; from solver.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')" 2>&1 | tee -a test_output.log || exit 1
+        python -c "from trader.simulator import Simulator, simulate_sma; from strategy.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')" 2>&1 | tee -a test_output.log || exit 1
         echo "verify_exit_code=0" >> $GITHUB_OUTPUT
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
         echo "=== Running Stock Integration Test (Random Selection from Pool) ==="
-        python -m tests.test_yangtze_power
+        python -m tests.integration.test_yangtze_power
     
     - name: Upload Test Results
       if: always()
