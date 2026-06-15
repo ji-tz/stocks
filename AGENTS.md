@@ -273,9 +273,9 @@ gui/
 | `data/` | EXCH | 数据缓存（程序自动生成） |
 | `docs/` | 相关角色 | 谁写的谁维护 |
 | `tools/` | TRADER | 辅助工具 |
-| `simulator/` | — | **旧目录，待清理。** 交易所代码 → `exchange/`，交易员代码 → `trader/` |
-| `source/` | — | **旧目录，待清理。** 数据 Provider → `exchange/source/` |
-| `solver/` | — | **旧目录，待清理。** 策略代码 → `strategy/` |
+| `simulator/` | — | 已清理。交易所代码 → `exchange/`，交易员代码 → `trader/` |
+| `source/` | — | 已清理。数据 Provider → `exchange/source/` |
+| `solver/` | — | 已清理。策略代码 → `strategy/` |
 | `test_ak.py` / `probe_*.py` | — | 调试遗留文件，可清理 |
 | `.github/`（非 workflow） | — | 第三方工具配置，无需维护 |
 
