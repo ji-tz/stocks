@@ -1,4 +1,4 @@
-name: claude-code
+name: opencode
 
 on:
   issue_comment:
@@ -7,24 +7,26 @@ on:
     types: [created]
 
 jobs:
-  claude:
+  opencode:
     if: |
-      contains(github.event.comment.body, ' /cc') ||
-      startsWith(github.event.comment.body, '/cc') ||
-      contains(github.event.comment.body, ' /claude') ||
-      startsWith(github.event.comment.body, '/claude')
+      contains(github.event.comment.body, '/oc') ||
+      contains(github.event.comment.body, '/opencode')
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: write
       pull-requests: write
       issues: write
-      id-token: write
-    env:
-      ANTHROPIC_BASE_URL: https://api.deepseek.com/anthropic
     steps:
-      - uses: actions/checkout@v6
-
-      - uses: anthropics/claude-code-action@v1
+      - name: Checkout repository
+        uses: actions/checkout@v6
         with:
-          anthropic_api_key: ${{ secrets.DEEPSEEK_API_KEY }}
-          trigger_phrase: "/cc"
+          fetch-depth: 1
+          persist-credentials: false
+
+      - name: Run OpenCode
+        uses: anomalyco/opencode/github@latest
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+        with:
+          model: deepseek/deepseek-v4-pro
