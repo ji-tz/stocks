@@ -40,7 +40,7 @@ jobs:
                 "npm": "@ai-sdk/openai-compatible",
                 "name": "DeepSeek",
                 "options": {
-                  "baseURL": "https://api.deepseek.com/v1",
+                  "baseURL": "https://api.deepseek.com",
                   "apiKey": "{env:DEEPSEEK_API_KEY}"
                 },
                 "models": {
@@ -54,6 +54,14 @@ jobs:
             "model": "deepseek/deepseek-v4-pro"
           }
           EOF
+
+      - name: Test DeepSeek API key
+        run: |
+          echo "Testing DeepSeek API..."
+          curl -s -X POST "https://api.deepseek.com/v1/chat/completions" \
+            -H "Authorization: Bearer ${{ secrets.DEEPSEEK_API_KEY }}" \
+            -H "Content-Type: application/json" \
+            -d '{"model":"deepseek-chat","messages":[{"role":"user","content":"say OK"}],"max_tokens":5}' | head -200
 
       - name: Run OpenCode
         uses: anomalyco/opencode/github@latest
