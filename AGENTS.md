@@ -12,16 +12,53 @@
 | 1 | 产品经理 | PM | 普通 | 熟悉软件，发现痛点和需求，对标竞品提 Issue |
 | 2 | 架构师 | ARCH | **Pro** | 拆解需求、设计模块、定接口、开 sub-issue |
 | 3 | Web 前端 | WEB | 普通 | UI/UX 设计、Flask 模板、前端交互逻辑 |
-| 4a | 平台开发 | PLAT | 普通 | 回测引擎、数据源层、Web API、基础设施 |
-| 4b | 策略开发 | STRAT | 普通 | 量化策略算法实现与维护 |
-| 5 | 集成测试 | ITEST | 普通 | 接口/集成测试、边界测试、维护 test.yml |
-| 6 | GUI 测试 | GTEST | 普通 | Playwright 端到端测试、维护 testgui.yml |
-| 7 | 研发主管 | LEAD | **Pro** | Review PR、运行测试、仲裁修复责任 |
-| 8 | 验收测试 | QA | — | 自动化端到端验收，通过后合并 PR |
+| 4 | 交易所/数据源 | EXCH | 普通 | 行情获取、交易执行、账户持仓管理 |
+| 5 | 平台开发 | PLAT | 普通 | 回测引擎、业务编排、基础设施 |
+| 6 | 策略开发 | STRAT | 普通 | 量化策略算法实现与维护 |
+| 7 | 集成测试 | ITEST | 普通 | 接口/集成测试、边界测试、维护 test.yml |
+| 8 | GUI 测试 | GTEST | 普通 | Playwright 端到端测试、维护 testgui.yml |
+| 9 | 研发主管 | LEAD | **Pro** | Review PR、运行测试、仲裁修复责任 |
+| 10 | 验收测试 | QA | — | 自动化端到端验收，通过后合并 PR |
 
 ---
 
-## 二、文件所有权矩阵
+## 二、角色详细定义
+
+### EXCH — 交易所/数据源
+
+**身份背景：** 精通 A 股行情数据接口、交易所撮合机制、账户资金管理。熟悉 AKShare 等数据源及 A 股交易规则（T+1、涨跌停、手续费计算等）。
+
+**核心职责：**
+- 维护所有数据源 Provider（行情数据获取）
+- 维护交易所接口及所有实现（回测/实盘/实时仿真）
+- 维护账户模型（Position、Account、资金计算）
+- 通过 `StockExchange` 接口为 PLAT 提供交易能力
+- 创建 Feature PR
+
+**数据流位置：** `外部API → [EXCH] → stocks.get_data() → PLAT/STRAT`
+
+---
+
+### PLAT — 平台/引擎开发
+
+**身份背景：** 系统工程师，精通回测系统架构。作为中间调度层，连接交易所和策略。
+
+**核心职责：**
+- 编排完整的模拟交易流程：获取行情(EXCH) → 调用策略(STRAT) → 执行交易(EXCH)
+- 维护引擎调度层（`simulator_engine.py`、`simulator.py`、`clock.py`）
+- 维护 `stocks.py` 框架（策略注册表架构、回测请求模型）
+- 创建 Feature PR
+
+**分包角色：**
+```
+EXCH → 提供"交易能力"（怎么买、怎么查价格）
+STRAT → 提供"策略逻辑"（什么时候该买卖）
+PLAT → 中间调度（怎么组织流程、怎么跑回测）
+```
+
+---
+
+## 三、文件所有权矩阵
 
 每个文件的 **Owner** 对其有修改批准权/维护主力权，**Cross** 表示该角色可能因接口依赖需要同步修改。  
 **空白的 Cross** = 不可擅自修改，必须先与 Owner 协商。
@@ -36,50 +73,51 @@
 | `pip.conf` | PLAT | — | pip 配置 |
 | `.flake8` / `.pylintrc` / `mypy.ini` | LEAD | — | 代码规范配置 |
 
-### 2.2 `source/` — 数据源层（Owner: **PLAT**）
+### 2.2 `source/` — 数据源层（Owner: **EXCH**）
 
 ```
 source/
-├── base_provider.py          # PLAT — 数据源接口 ABC
-├── data_provider.py          # PLAT — 聚合调度、缓存逻辑
-├── provider_utils.py         # PLAT — 共享工具函数
-├── akshare_provider.py       # PLAT — AKShare 实现
-├── baostock_provider.py      # PLAT — Baostock 实现
-├── tencent_provider.py       # PLAT — 腾讯数据源
-├── sina_provider.py          # PLAT — 新浪数据源
-├── sohu_provider.py          # PLAT — 搜狐数据源
-├── eastmoney_provider.py     # PLAT — 东方财富数据源
-├── cailianpress_provider.py  # PLAT — 财联社数据源
-├── stooq_provider.py         # PLAT — Stooq 数据源
+├── base_provider.py          # EXCH — 数据源接口 ABC
+├── data_provider.py          # EXCH — 聚合调度、缓存逻辑
+├── provider_utils.py         # EXCH — 共享工具函数
+├── akshare_provider.py       # EXCH — AKShare 实现
+├── baostock_provider.py      # EXCH — Baostock 实现
+├── tencent_provider.py       # EXCH — 腾讯数据源
+├── sina_provider.py          # EXCH — 新浪数据源
+├── sohu_provider.py          # EXCH — 搜狐数据源
+├── eastmoney_provider.py     # EXCH — 东方财富数据源
+├── cailianpress_provider.py  # EXCH — 财联社数据源
+├── stooq_provider.py         # EXCH — Stooq 数据源
 └── README.md
 ```
 
-> **边界：** 任何人不得在 source/ 下新增非 Provider 文件。新增数据源必须继承 `BaseProvider`。
+> **边界：** 任何人不得在 source/ 下新增非 Provider 文件。新增数据源必须继承 `BaseProvider`。**STOCKS 团队不得绕过 Provider 层直接调用外部 API。**
 
-### 2.3 `simulator/` — 模拟交易引擎（Owner: **PLAT**）
+### 2.3 `simulator/` — 模拟交易引擎（EXCH + PLAT 分治）
 
 ```
 simulator/
-├── exchange_interface.py     # PLAT — 交易所接口抽象
-├── base_engine.py            # PLAT — 引擎基类
-├── simulator_engine.py       # PLAT — 具体引擎实现
-├── simulated_exchange.py     # PLAT — 模拟交易所
-├── real_engine.py            # PLAT — 实盘引擎
-├── simulator.py              # PLAT — 引擎入口调度
+├── exchange_interface.py     # EXCH — 交易所接口抽象（StockExchange）
+├── base_engine.py            # EXCH — 账户模型（Position/Account/TradeOrder/TradeResult）
+├── simulated_exchange.py     # EXCH — 仿真交易所基础实现
 ├── backtest/
-│   ├── clock.py              # PLAT — 回测时钟
-│   ├── exchange.py           # PLAT — 回测交易所
-│   └── __init__.py
+│   ├── exchange.py           # EXCH — 回测交易所
+│   └── clock.py              # PLAT — 回测时钟
 ├── live/
-│   ├── exchange.py           # PLAT — 实盘交易所
+│   ├── exchange.py           # EXCH — 实盘交易所（预留）
 │   └── __init__.py
 ├── realtime/
-│   ├── exchange.py           # PLAT — 实时行情引擎
+│   ├── exchange.py           # EXCH — 实时仿真交易所
 │   └── __init__.py
+├── real_engine.py            # PLAT — 实盘引擎
+├── simulator_engine.py       # PLAT — 具体引擎实现
+├── simulator.py              # PLAT — 引擎入口调度
 └── README.md
 ```
 
-> **边界：** `simulator/` 是平台核心，**任何人修改必须经过 LEAD 评审**。新增交易模式（如回测/实盘/实时）在对应子目录下扩展。
+> **分治原则：** EXCH 负责"交易能力"（怎么连接、怎么买卖、怎么查行情）。PLAT 负责"调度编排"（什么时候买卖、怎么组织回测流程）。两者通过 `StockExchange` 接口协作。
+>
+> **注意：** `real_engine.py` 归 PLAT（引擎编排），`live/exchange.py` 归 EXCH（券商接口）。区分标准：涉及交易系统连接的归 EXCH，涉及策略调度的归 PLAT。
 
 ### 2.4 `solver/` — 策略算法（Owner: **STRAT**）
 
@@ -135,24 +173,25 @@ gui/
 >
 > **例外：** 进度推送（`backtest_progress.py`）是 WEB 和 PLAT 共用的（PLAT 的 `run_backtest` 写进度，WEB 的 SSE 读进度）。修改需双方协商。
 
-### 2.6 业务入口 `stocks.py`（Owner: **PLAT**, Cross: **STRAT**）
+### 2.6 业务入口 `stocks.py`（Owner: **PLAT**, Cross: **STRAT**, Cross: **EXCH**）
 
 ```
 stocks.py — 按职责划分：
-┌─ PLAT 专属 ──────────────────────────────┐
-│  init()                    系统初始化      │
-│  get_data()                数据获取        │
-│  create_backtest_request() 创建回测请求    │
+┌─ PLAT 专属（引擎调度）─────────────────────┐
 │  run_backtest()            执行回测        │
-│  run_futures_a50_prev_night() 期货策略    │
-│  StrategyParameter         参数定义类      │
-│  StrategySpec              策略规格类      │
-│  BacktestRequest           回测请求类      │
+│  create_backtest_request() 创建回测请求    │
 │  _build_strategy_registry() 注册表架构    │
 │  list_strategy_specs()     列出策略        │
 │  get_strategy_spec()       获取策略        │
+│  StrategyParameter         参数定义类      │
+│  StrategySpec              策略规格类      │
+│  BacktestRequest           回测请求类      │
 └──────────────────────────────────────────┘
-┌─ STRAT 可追加 ───────────────────────────┐
+┌─ PLAT 主责 + EXCH 配合（数据获取）─────────┐
+│  get_data()                数据获取        │
+│  init()                    系统初始化      │
+└──────────────────────────────────────────┘
+┌─ STRAT 可追加（策略 run 函数）─────────────┐
 │  AUTO_STRATEGY_SPEC (在 solver/*.py 中)  │
 │  run_sma_backtest()         各策略run函数  │
 │  run_mean_cost()                          │
@@ -162,11 +201,9 @@ stocks.py — 按职责划分：
 └──────────────────────────────────────────┘
 ```
 
-> **STRAT 新增策略时的操作流程：**
-> 1. 在 `solver/` 下创建新策略文件，包含 `AUTO_STRATEGY_SPEC`
-> 2. 自动发现机制会在 `_build_strategy_registry()` 中扫描到
-> 3. 不需要手动修改 `stocks.py`
-> 4. 如果策略需要特殊参数处理 → 在 solver 的模块中自行实现，不要改 stocks.py
+> **数据流：** `EXCH` 提供 `source/data_provider.get_data()` 底层实现。`stocks.get_data()` **代理调用** EXCH 的能力。PLAT 的引擎通过 `stocks.get_data()` 获取行情数据，通过 `StockExchange` 接口执行交易。  
+>
+> **STRAT 新增策略：** 在 `solver/` 下创建新策略文件 + `AUTO_STRATEGY_SPEC`，自动发现，不需改 `stocks.py`。
 
 ### 2.7 `tests/` — 测试（ITEST / GTEST）
 
@@ -245,13 +282,14 @@ tests/
 | 角色 | 绝不能碰 | 跨模块必须先沟通 |
 |------|---------|----------------|
 | **WEB** | `source/` `simulator/` `solver/` `stocks.py`（框架部分） | 新增 API 路由时对接 PLAT |
-| **PLAT** | `gui/templates/` 的 HTML 结构、`solver/` 的策略逻辑 | 改 Web API 格式时对接 WEB |
-| **STRAT** | `source/` `simulator/` `gui/` `stocks.py`（框架部分） | 新增策略注册时追加 `AUTO_STRATEGY_SPEC` 即可 |
-| **ITEST** | `solver/` 的策略逻辑、`gui/templates/` | 发现 bug 时评论 @ 对应角色 |
-| **GTEST** | `source/` `simulator/` `solver/` | 发现 bug 时评论 @ 对应角色 |
-| **ARCH** | 执行代码（只做设计 + 提 Issue + Review） | 设计评审后交给对应角色执行 |
-| **LEAD** | 只 Review 不写代码 | 仲裁时评论 @ 对应角色 |
-| **QA** | 只验收不修改 | 不通过时退回带 label:待修复 |
+| **EXCH** | `gui/` `solver/` `simulator/`（PLAT 管辖的引擎文件） | 改 `get_data()` 签名时对接 PLAT |
+| **PLAT** | `gui/templates/` `source/`（EXCH 的数据源） `solver/` | 改回测流程时对接 EXCH / STRAT |
+| **STRAT** | `source/` `simulator/` `gui/` | 新增策略通过 `AUTO_STRATEGY_SPEC` 自动注册 |
+| **ITEST** | `solver/` 的策略逻辑、`gui/templates/` | 发现 bug 时 @ 对应角色 |
+| **GTEST** | `source/` `simulator/` `solver/` | 发现 bug 时 @ 对应角色 |
+| **ARCH** | 不写执行代码（只做设计 + Issue） | 设计评审后交给对应角色 |
+| **LEAD** | 只 Review 不写代码 | 仲裁时 @ 对应角色 |
+| **QA** | 只验收不修改 | 不通过时 label:待修复 |
 
 ---
 
@@ -266,25 +304,25 @@ tests/
   │ 如有必要 → 建 Design PR 描述接口设计
   ▼
 [Hermes 按 sub-issue label 触发]
-  ┌──────────┬──────────┬──────────┐
-  ▼          ▼          ▼          ▼
- WEB       PLAT      STRAT      ITEST/GTEST
- (前端)    (平台)    (策略)    (测试先行)
-  │          │          │          │
-  └─────┬────┘          │          │
-        ▼               │          │
-    Feature PR ─────────┘          │
-        │                          │
-        └────────────┬─────────────┘
-                     ▼
-            [LEAD(Pro)] Review PR
-              ├── CI 通过 + Code OK → label:待验收
-              └── 不通过 → PR 评论 @角色 + label:待修复
-                            │
-                            ▼ 修复后循环
-                     [QA] 验收测试
-                        ├── 通过 → 合并 PR
-                        └── 不通过 → label:待修复
+  ┌──────┬──────┬──────┬──────┬──────┐
+  ▼      ▼      ▼      ▼      ▼      ▼
+ WEB   EXCH   PLAT   STRAT  ITEST GTEST
+(UI)  (数据/ (引擎/  (策略)  (集成  (GUI
+       行情)  调度)          测试)  测试)
+  │      │      │      │      │      │
+  └──────┴──┬───┘      │      │      │
+            │         Feature PR
+            │          │
+            └─────┬────┘
+                  ▼
+         [LEAD(Pro)] Review PR
+           ├── CI 通过 + Code OK → label:待验收
+           └── 不通过 → PR 评论 @角色 + label:待修复
+                          │
+                          ▼ 修复后循环
+                   [QA] 验收测试
+                     ├── 通过 → 合并 PR
+                     └── 不通过 → label:待修复
 ```
 
 ---
