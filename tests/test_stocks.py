@@ -5,7 +5,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-import stocks
+import trader.stocks as stocks
 
 
 def make_mock_df(n=10):

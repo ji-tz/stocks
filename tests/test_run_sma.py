@@ -3,7 +3,7 @@ from unittest.mock import patch
 
 import pandas as pd
 
-import stocks
+import trader.stocks as stocks
 
 
 def make_mock_df(n=10):
@@ -18,7 +18,7 @@ def make_mock_df(n=10):
     }
     return pd.DataFrame(data)
 class TestRunSMA(unittest.TestCase):
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     def test_run_sma_backtest_returns_unified_simulator_result(self, mock_get):
         df = make_mock_df(15)
         mock_get.return_value = df
@@ -34,7 +34,7 @@ class TestRunSMA(unittest.TestCase):
         self.assertAlmostEqual(res['init_cash'], 100000.0)
         self.assertEqual(res['final_cash'], res['total_value'])
 
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     def test_run_sma_backtest_period_changes_result(self, mock_get):
         df = make_mock_df(30)
         closes = [

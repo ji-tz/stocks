@@ -7,8 +7,8 @@ import main
 
 class TestMainRun(unittest.TestCase):
     @patch('main.web')
-    @patch('stocks.get_data')
-    @patch('stocks.init')
+    @patch('trader.stocks.get_data')
+    @patch('trader.stocks.init')
     def test_main_calls_run(self, mock_init, mock_get, mock_web):
         # patch web.app.run so it doesn't block
         mock_web.app.run = lambda *a, **k: None

@@ -255,7 +255,7 @@ class TestSimulatorWithVerbose(unittest.TestCase):
 
     def test_verbose_output(self):
         """测试verbose模式下的输出"""
-        from simulator import Simulator
+        from trader.simulator import Simulator
         from strategy.mean_cost_strategy import MeanCostDecision
 
         # 创建测试数据

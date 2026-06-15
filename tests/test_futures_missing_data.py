@@ -2,11 +2,11 @@ import unittest
 from unittest.mock import patch
 import pandas as pd
 
-import stocks
+import trader.stocks as stocks
 
 
 class TestFuturesMissingData(unittest.TestCase):
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     def test_missing_futures_data_raises(self, mock_get):
         # 模拟股票数据可用但期货数据不可用的情况
         def _fake_get_data(symbol, source='auto', **kwargs):

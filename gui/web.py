@@ -11,7 +11,7 @@ from flask import Flask, render_template, request, session, jsonify, Response
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-import stocks
+import trader.stocks as stocks
 from gui.backtest_progress import get_progress_manager
 
 app = Flask(__name__, template_folder='templates')

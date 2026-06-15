@@ -1,7 +1,7 @@
 import unittest
 import pandas as pd
 from unittest.mock import patch
-import stocks
+import trader.stocks as stocks
 
 
 class TestIntegration(unittest.TestCase):
@@ -17,7 +17,7 @@ class TestIntegration(unittest.TestCase):
         }
         return pd.DataFrame(data)
 
-    @patch('stocks.get_data')
+    @patch('trader.stocks.get_data')
     def test_run_sma_backtest_integration(self, mock_get_data):
         mock_get_data.return_value = pd.DataFrame({
             'date': pd.date_range(end='2023-12-31', periods=60, freq='D'),

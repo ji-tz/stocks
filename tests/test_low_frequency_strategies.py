@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 import pandas as pd
 
-import stocks
+import trader.stocks as stocks
 from strategy.bollinger_strategy import BollingerDecision
 from strategy.dual_ma_strategy import DualMaDecision
 from strategy.rsi_strategy import RsiDecision

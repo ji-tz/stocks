@@ -1,4 +1,0 @@
-"""向后兼容模块 — 重新导出新位置。"""
-from exchange.live.exchange import LiveExchange
-
-__all__ = ["LiveExchange"]

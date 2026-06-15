@@ -3,7 +3,7 @@ import tempfile
 import pandas as pd
 import unittest
 
-from source import data_provider as dp
+from exchange.source import data_provider as dp
 
 
 class TestCacheUtils(unittest.TestCase):

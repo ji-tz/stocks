@@ -4,7 +4,7 @@ import sys
 # 确保工程根目录在 sys.path，便于导入 sibling 模块
 sys.path.insert(0, os.path.dirname(__file__))
 
-import stocks
+import trader.stocks as stocks
 from gui import web
 
 

@@ -1,5 +1,5 @@
 import time
-import stocks
+import trader.stocks as stocks
 import traceback
 
 def test_get_data(symbol):
