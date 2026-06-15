@@ -53,9 +53,10 @@ STRAT → "军师"——只出主意（写策略公式），不碰钱
 交易所是数据提供方 + 交易执行方 + 账户记账方的三位一体。
 
 **核心职责：**
-- 维护行情数据源（`source/` 所有 Provider）— 获取股票价格
+- 维护行情数据源（`exchange/source/` 所有 Provider）— 获取股票价格
 - 维护交易执行接口（`StockExchange`）— 提供 `buy()/sell()` 能力
 - 维护账户模型（Position、Account、资金计算）— 记录持仓、盈亏
+- 维护 `exchange/` 目录下所有交易所实现（基类、回测、实盘、实时仿真）
 - 不关心"什么时候买卖"——那是交易员的事
 
 **接口：**
@@ -80,7 +81,7 @@ STRAT → "军师"——只出主意（写策略公式），不碰钱
   3. 根据信号通过 **EXCH** 执行 `buy()/sell()`
   4. 记录交易结果
 - 驱动完整的回测流程（`run_backtest()`）
-- 维护 `stocks.py`（业务入口，三层协作的调度中心）
+- 维护 `trader/` 目录下所有交易逻辑（模拟器、引擎、时钟）
 
 **工作流：**
 ```
@@ -104,7 +105,7 @@ for each day in 回测时间范围:
 **核心职责：**
 - 撰写策略逻辑（技术指标计算、信号生成）
 - 输出 `buy`/`sell`/`None` 信号——由交易员去执行
-- 维护已有策略，新增策略通过 `solver/` 目录扩展
+- 维护已有策略，新增策略通过 `strategy/` 目录扩展
 - 为策略编写单测（可以自行向 tests/ 提交，但文件归 ITEST 维护）
 
 **策略接口：**
@@ -137,65 +138,74 @@ class Strategy:
 | 文件 | Owner | 说明 |
 |------|-------|------|
 | `main.py` | WEB | Web 入口 |
-| `stocks.py` | **TRADER** | 业务入口。STRAT/EXCH 如需修改 → 提 PR TRADER Review |
 | `requirements.txt` | TRADER | 依赖管理 |
 | `pip.conf` | TRADER | pip 配置 |
 | `.flake8` / `.pylintrc` / `mypy.ini` | LEAD | 代码规范配置 |
 
-### 4.2 `source/` — 全部归 **EXCH**
+### 4.2 `exchange/` — 全部归 **EXCH**
+
+交易所目录，包含行情数据源 + 交易执行 + 账户管理。
 
 ```
-source/
-├── base_provider.py          EXCH
-├── data_provider.py          EXCH
-├── provider_utils.py         EXCH
-├── akshare_provider.py       EXCH
-├── baostock_provider.py      EXCH
-├── tencent_provider.py       EXCH
-├── sina_provider.py          EXCH
-├── sohu_provider.py          EXCH
-├── eastmoney_provider.py     EXCH
-├── cailianpress_provider.py  EXCH
-├── stooq_provider.py         EXCH
-└── README.md                 EXCH
+exchange/
+├── __init__.py                    EXCH
+├── README.md                      EXCH
+├── base_engine.py                 EXCH
+├── exchange_interface.py          EXCH
+├── simulated_exchange.py          EXCH
+├── real_engine.py                 EXCH
+├── source/                        EXCH（所有数据 Provider）
+│   ├── base_provider.py           EXCH
+│   ├── data_provider.py           EXCH
+│   ├── provider_utils.py          EXCH
+│   ├── akshare_provider.py        EXCH
+│   ├── baostock_provider.py       EXCH
+│   ├── tencent_provider.py        EXCH
+│   ├── sina_provider.py           EXCH
+│   ├── sohu_provider.py           EXCH
+│   ├── eastmoney_provider.py      EXCH
+│   ├── cailianpress_provider.py   EXCH
+│   ├── stooq_provider.py          EXCH
+│   └── README.md                  EXCH
+├── backtest/
+│   ├── __init__.py                EXCH
+│   └── exchange.py                EXCH
+├── live/
+│   ├── __init__.py                EXCH
+│   └── exchange.py                EXCH
+└── realtime/
+    ├── __init__.py                EXCH
+    └── exchange.py                EXCH
 ```
 
-### 4.3 交易所执行层 — 全部归 **EXCH**
+### 4.3 `trader/` — 全部归 **TRADER**
 
-当前位于 `simulator/` 下，概念上属于交易所范畴。
-
-```
-simulator/exchange_interface.py     EXCH
-simulator/base_engine.py            EXCH
-simulator/simulated_exchange.py     EXCH
-simulator/backtest/exchange.py      EXCH
-simulator/live/exchange.py          EXCH
-simulator/realtime/exchange.py      EXCH
-```
-
-### 4.4 交易员调度层 — 全部归 **TRADER**
+交易员目录，包含时间推进、回测调度、交易信号执行。
 
 ```
-simulator/simulator.py              TRADER
-simulator/simulator_engine.py       TRADER
-simulator/backtest/clock.py         TRADER
-simulator/real_engine.py            TRADER
-stocks.py                           TRADER（详见 4.1）
+trader/
+├── simulator.py                   TRADER
+├── simulator_engine.py            TRADER
+├── clock.py                       TRADER
+├── stocks.py                      TRADER（业务入口，三层协作调度中心）
+└── __init__.py                    TRADER
 ```
 
-### 4.5 `solver/` — 全部归 **STRAT**
+> `stocks.py` 是三层协作的调度入口。STRAT/EXCH 如需修改 → 提 PR @TRADER Review。
+
+### 4.4 `strategy/` — 全部归 **STRAT**
 
 ```
-solver/
-├── sma_strategy.py             STRAT
-├── dual_ma_strategy.py         STRAT
-├── bollinger_strategy.py       STRAT
-├── rsi_strategy.py             STRAT
-├── mean_cost_strategy.py       STRAT
-├── fixed_amount_strategy.py    STRAT
+strategy/
+├── sma_strategy.py                STRAT
+├── dual_ma_strategy.py            STRAT
+├── bollinger_strategy.py          STRAT
+├── rsi_strategy.py                STRAT
+├── mean_cost_strategy.py          STRAT
+├── fixed_amount_strategy.py       STRAT
 ├── futures_open_hour_strategy.py  STRAT
 ├── signal_template_strategy.py    STRAT
-└── README.md                   STRAT
+└── README.md                      STRAT
 ```
 
 ### 4.6 `gui/` — 全部归 **WEB**
@@ -263,6 +273,9 @@ gui/
 | `data/` | EXCH | 数据缓存（程序自动生成） |
 | `docs/` | 相关角色 | 谁写的谁维护 |
 | `tools/` | TRADER | 辅助工具 |
+| `simulator/` | — | **旧目录，待清理。** 交易所代码 → `exchange/`，交易员代码 → `trader/` |
+| `source/` | — | **旧目录，待清理。** 数据 Provider → `exchange/source/` |
+| `solver/` | — | **旧目录，待清理。** 策略代码 → `strategy/` |
 | `test_ak.py` / `probe_*.py` | — | 调试遗留文件，可清理 |
 | `.github/`（非 workflow） | — | 第三方工具配置，无需维护 |
 
@@ -278,10 +291,10 @@ gui/
 
 | 角色 | 绝不能碰的目录 |
 |------|---------------|
-| **WEB** | `source/` `solver/` `simulator/`（交易所和交易员代码） |
-| **EXCH** | `gui/` `solver/` |
-| **TRADER** | `gui/templates/` `source/` `solver/` |
-| **STRAT** | `source/` `simulator/` `gui/` |
+| **WEB** | `exchange/` `strategy/` `trader/` |
+| **EXCH** | `gui/` `strategy/` `trader/` |
+| **TRADER** | `gui/` `exchange/source/` `strategy/` |
+| **STRAT** | `exchange/` `trader/` `gui/` |
 | **ITEST** | 不直接修改业务代码（发现 bug 时 @ 对应角色） |
 | **GTEST** | 不直接修改业务代码（发现 bug 时 @ 对应角色） |
 | **ARCH** | 不写执行代码（只做设计 + Issue） |
@@ -337,7 +350,7 @@ gui/
 
 ## 八、策略接口规范
 
-所有策略文件（`solver/*.py`）必须遵循以下隐式接口：
+所有策略文件（`strategy/*.py`）必须遵循以下隐式接口：
 
 ```python
 # 在策略模块中声明
@@ -363,7 +376,7 @@ class StrategySimulator:
 ```
 
 新增策略：
-1. 在 `solver/` 下创建 `xxx_strategy.py`
+1. 在 `strategy/` 下创建 `xxx_strategy.py`
 2. 声明 `AUTO_STRATEGY_SPEC`
 3. 实现策略类（只返回信号）
 4. 不需要改任何其他文件
@@ -371,4 +384,4 @@ class StrategySimulator:
 ---
 
 本文件由 Hermes Agent 维护，随团队协作流程迭代更新。
-最后更新：2026-06-15
+最后更新：2026-06-15（v2 — 目录结构映射：`solver/`→`strategy/`, `simulator/` 拆分→`exchange/`+`trader/`）
