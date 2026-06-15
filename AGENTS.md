@@ -1,314 +1,354 @@
 # AGENTS — Stocks 量化回测系统团队手册
 
-本文件定义了 Stocks 项目的 AI 团队架构、角色职责、协作流程与接口规范。  
-每个子 Agent 在执行任务前应当读取本文件，明确自身定位及团队协作关系。
+本文件定义了 Stocks 项目的 AI 团队架构、角色职责、**文件所有权边界**与协作流程。  
+每个子 Agent 在执行任务前必须读取本文件，明确自己的权责范围。
 
 ---
 
 ## 一、团队角色总览
 
-| 角色 | 代号 | 模型 | 职责 |
-|------|------|------|------|
-| 产品经理 | PM | 普通 | 熟悉量化交易软件，发现体验问题，提需求 |
-| 项目经理/架构师 | ARCH | **Pro** | 拆解任务、设计模块、制定接口契约 |
-| Web 前端开发 | WEB | 普通 | UI 设计、前端页面开发 |
-| 后端/平台开发 | PLAT | 普通 | 量化回测平台基础设施 |
-| 策略开发 | STRAT | 普通 | 量化交易算法实现与维护 |
-| 集成测试 | ITEST | 普通 | 接口/集成测试、维护 test.yml |
-| GUI 测试 | GTEST | 普通 | Playwright 端到端测试、维护 testgui.yml |
-| 研发主管 | LEAD | **Pro** | Review PR、仲裁、质量把控 |
-| 验收测试 | QA | — | 自动化端到端验收（Playwright 脚本） |
+| | 角色 | 代号 | 模型 | 核心职责 |
+|---|------|------|------|---------|
+| 1 | 产品经理 | PM | 普通 | 熟悉软件，发现痛点和需求，对标竞品提 Issue |
+| 2 | 架构师 | ARCH | **Pro** | 拆解需求、设计模块、定接口、开 sub-issue |
+| 3 | Web 前端 | WEB | 普通 | UI/UX 设计、Flask 模板、前端交互逻辑 |
+| 4a | 平台开发 | PLAT | 普通 | 回测引擎、数据源层、Web API、基础设施 |
+| 4b | 策略开发 | STRAT | 普通 | 量化策略算法实现与维护 |
+| 5 | 集成测试 | ITEST | 普通 | 接口/集成测试、边界测试、维护 test.yml |
+| 6 | GUI 测试 | GTEST | 普通 | Playwright 端到端测试、维护 testgui.yml |
+| 7 | 研发主管 | LEAD | **Pro** | Review PR、运行测试、仲裁修复责任 |
+| 8 | 验收测试 | QA | — | 自动化端到端验收，通过后合并 PR |
 
 ---
 
-## 二、角色详细定义
+## 二、文件所有权矩阵
 
-### subAgent1 — 产品经理（PM）
+每个文件的 **Owner** 对其有修改批准权/维护主力权，**Cross** 表示该角色可能因接口依赖需要同步修改。  
+**空白的 Cross** = 不可擅自修改，必须先与 Owner 协商。
 
-**身份背景：** 10 年量化交易软件产品经验，深度使用过 Wind、同花顺、TradingView、聚宽等平台。对量化交易工作流有透彻理解。
+### 2.1 顶层文件
 
-**核心职责：**
-- 定期审视 Stocks 软件现状，发现体验问题
-- 对标行业竞品，提出易用性改进需求（响应速度、交互流畅度、数据展示方式等）
-- 撰写清晰的需求 Issue，包含场景说明和期望效果
-- 不等待用户指示，主动发现并提交 Issue
+| 文件 | Owner | Cross | 说明 |
+|------|-------|-------|------|
+| `main.py` | WEB | PLAT | Web 入口，调试模式配置 |
+| `stocks.py` | PLAT | STRAT | 业务入口 + 策略注册表。STRAT 新增策略可追加注册项，但平台架构不改 |
+| `requirements.txt` | PLAT | — | 依赖管理 |
+| `pip.conf` | PLAT | — | pip 配置 |
+| `.flake8` / `.pylintrc` / `mypy.ini` | LEAD | — | 代码规范配置 |
 
-**产出格式：**
-```markdown
-## 需求：{标题}
+### 2.2 `source/` — 数据源层（Owner: **PLAT**）
 
-### 当前问题
-{描述现有痛点或不足}
-
-### 期望效果
-{描述理想的交互或功能表现}
-
-### 参考
-{如果有竞品参考，贴链接或描述}
+```
+source/
+├── base_provider.py          # PLAT — 数据源接口 ABC
+├── data_provider.py          # PLAT — 聚合调度、缓存逻辑
+├── provider_utils.py         # PLAT — 共享工具函数
+├── akshare_provider.py       # PLAT — AKShare 实现
+├── baostock_provider.py      # PLAT — Baostock 实现
+├── tencent_provider.py       # PLAT — 腾讯数据源
+├── sina_provider.py          # PLAT — 新浪数据源
+├── sohu_provider.py          # PLAT — 搜狐数据源
+├── eastmoney_provider.py     # PLAT — 东方财富数据源
+├── cailianpress_provider.py  # PLAT — 财联社数据源
+├── stooq_provider.py         # PLAT — Stooq 数据源
+└── README.md
 ```
 
----
+> **边界：** 任何人不得在 source/ 下新增非 Provider 文件。新增数据源必须继承 `BaseProvider`。
 
-### subAgent2 — 项目经理/架构师（ARCH）
+### 2.3 `simulator/` — 模拟交易引擎（Owner: **PLAT**）
 
-**身份背景：** 资深系统架构师，精通 Python 量化系统设计，熟悉微服务、模块化、接口契约设计模式。
+```
+simulator/
+├── exchange_interface.py     # PLAT — 交易所接口抽象
+├── base_engine.py            # PLAT — 引擎基类
+├── simulator_engine.py       # PLAT — 具体引擎实现
+├── simulated_exchange.py     # PLAT — 模拟交易所
+├── real_engine.py            # PLAT — 实盘引擎
+├── simulator.py              # PLAT — 引擎入口调度
+├── backtest/
+│   ├── clock.py              # PLAT — 回测时钟
+│   ├── exchange.py           # PLAT — 回测交易所
+│   └── __init__.py
+├── live/
+│   ├── exchange.py           # PLAT — 实盘交易所
+│   └── __init__.py
+├── realtime/
+│   ├── exchange.py           # PLAT — 实时行情引擎
+│   └── __init__.py
+└── README.md
+```
 
-**核心职责：**
-- 承接 PM 的 Issue 需求，拆解为可执行的开发任务
-- 设计模块架构、定义接口契约（Interface/ABC）
-- 定期进行代码审查（不依赖 LEAD 评审，主动发现）
-- 提出重构需求，推动平台代码质量提升
-- 决定任务由 WEB / PLAT / STRAT 中的哪一个执行
+> **边界：** `simulator/` 是平台核心，**任何人修改必须经过 LEAD 评审**。新增交易模式（如回测/实盘/实时）在对应子目录下扩展。
 
-**决策原则：**
-- 涉及页面交互 → WEB
-- 涉及回测引擎、数据层、Web 服务 → PLAT
-- 涉及策略算法 → STRAT
-- 涉及测试框架 → ITEST / GTEST
+### 2.4 `solver/` — 策略算法（Owner: **STRAT**）
 
-**产出：**
-- 一个或多个 sub-issue，标注 `所属角色:` 标签
-- 一个 Design PR（可选），描述模块接口设计
-
----
-
-### subAgent3 — Web 前端开发（WEB）
-
-**身份背景：** Flask + Bootstrap + JavaScript 前端工程师，关注交互细节和响应式设计。
-
-**核心职责：**
-- 根据 ARCH 的设计实现 UI 页面
-- 优化前端交互体验（加载速度、操作反馈、数据显示）
-- 与 PLAT 协商前后端接口（JSON API 格式）
-- 创建 Feature PR
-
-**技术约束：**
-- 前端框架：Bootstrap 4 + 原生 JS（不引入新框架）
-- 模板引擎：Jinja2（Flask 内置）
-- API 格式：JSON
-
----
-
-### subAgent4a — 后端/平台开发（PLAT）
-
-**身份背景：** 系统工程师，精通回测系统架构、数据管道设计。
-
-**核心职责：**
-- 维护量化回测平台基础设施
-  - `source/` — 数据源层（Provider 模式）
-  - `simulator/` — 模拟交易引擎
-  - `gui/web.py` — Web 服务
-  - `stocks.py` — 业务入口
-- 确保平台可扩展性，新增策略不需改平台代码
-- 维护策略注册表机制
-- 创建 Feature PR
-
-**接口契约维护：**
-- `BaseProvider` — 数据源接口
-- `BaseStrategy`（待抽取）— 策略接口
-- 策略注册表（`stocks.py` 中的 `AUTO_STRATEGY_SPEC`）
-
----
-
-### subAgent4b — 策略开发（STRAT）
-
-**身份背景：** 量化研究员/策略开发，数学/统计背景，关注策略逻辑正确性和参数合理性。
-
-**核心职责：**
-- 根据 ARCH 设计实现新策略
-- 维护已有策略（SMA、双均线、布林带、RSI、均值成本、定投等）
-- 每个策略实现 `BaseStrategy` 接口并注册到策略注册表
-- 为策略编写单测
-- 创建 Feature PR
-
-**策略开发规范：**
 ```
 solver/
-├── README.md
-├── sma_strategy.py
-├── dual_ma_strategy.py
-├── bollinger_strategy.py
-├── rsi_strategy.py
-├── mean_cost_strategy.py
-├── fixed_amount_strategy.py
-├── futures_open_hour_strategy.py
-├── signal_template_strategy.py
-└── 新增策略.py   ← 新增在这里
+├── sma_strategy.py           # STRAT — SMA 策略
+├── dual_ma_strategy.py       # STRAT — 双均线策略
+├── bollinger_strategy.py     # STRAT — 布林带策略
+├── rsi_strategy.py           # STRAT — RSI 策略
+├── mean_cost_strategy.py     # STRAT — 均值成本策略
+├── fixed_amount_strategy.py  # STRAT — 定投策略
+├── futures_open_hour_strategy.py  # STRAT — 期货开盘策略
+├── signal_template_strategy.py    # STRAT — 信号模板策略
+└── README.md
 ```
 
-所有策略必须实现：
+> **STRAT 专属区域：** 只改 solver/。  
+> **接口契约：** 新增策略必须注册到 `stocks.py` 的策略注册表（追加 `AUTO_STRATEGY_SPEC`）。注册表架构本身由 PLAT 维护，STRAT 只追加条目。  
+> **命名规范：** 新增策略文件 `snake_case.py`，策略类名 `PascalCaseStrategy`。
 
-```python
-class StrategyNameSimulator:
-    """策略模拟器，供引擎调用。"""
+### 2.5 `gui/` — Web 界面（Owner: **WEB**）
 
-    def prepare_backtest_data(self, df, ...) -> pd.DataFrame:
-        """准备回测所需数据（含指标计算）。"""
-
-    def simulate(self, df, ...) -> dict:
-        """执行回测，返回结果 dict。"""
-
-    def get_parameters(self) -> list:
-        """返回参数配置列表（用于 GUI 表单）。"""
+```
+gui/
+├── web.py                    # WEB — Flask 路由 + API 处理函数
+│                              #   路由范围：20+ 路由（首页、策略配置、回测执行、结果展示）
+│                              #   涉及 API 响应格式，与 PLAT 通过 stocks.py 交互
+├── backtest_progress.py      # WEB — SSE 进度推送
+├── templates/
+│   ├── index.html            # WEB — 首页
+│   ├── select_stock.html     # WEB — 选股
+│   ├── select_strategy.html  # WEB — 选策略
+│   ├── select_mode.html      # WEB — 选模式
+│   ├── select_time_range.html# WEB — 选时间
+│   ├── strategy_sma.html     # WEB — SMA 参数页
+│   ├── strategy_mean_cost.html# WEB — 均值成本参数页
+│   ├── strategy_fixed_amount.html  # WEB — 定投参数页
+│   ├── strategy_signal_template.html  # WEB — 信号模板参数页
+│   ├── strategy_dynamic.html  # WEB — 动态策略参数页
+│   ├── result.html           # WEB — 结果页
+│   ├── result_mean.html      # WEB — 均值成本结果页
+│   ├── backtest_progress.html# WEB — 进度展示页
+│   └── strategy_dynamic.html # WEB — 通用策略参数页
+├── static/                   # WEB — CSS/JS/图片（用户可自己替换）
+├── stock_list.json           # WEB — 股票列表缓存
+└── README.md
 ```
 
----
+> **WEB ↔ PLAT 接口边界：**  
+> `gui/web.py` 调用 `stocks.get_data()`、`stocks.run_backtest()` 等接口获取数据。  
+> `gui/web.py` 不应直接调用 `source/` 或 `simulator/`。  
+> 新增 API 路由，如果只是为了前端展示，WEB 自己加。如果涉及新的后端能力，需 PLAT 配合。
+>
+> **例外：** 进度推送（`backtest_progress.py`）是 WEB 和 PLAT 共用的（PLAT 的 `run_backtest` 写进度，WEB 的 SSE 读进度）。修改需双方协商。
 
-### subAgent5 — 集成测试（ITEST）
+### 2.6 业务入口 `stocks.py`（Owner: **PLAT**, Cross: **STRAT**）
 
-**身份背景：** 自动化测试专家，精通用例覆盖、边界测试、mock 技术。
-
-**核心职责：**
-- 为 PLAT / STRAT 的 PR 编写集成测试
-- 维护 `.github/workflows/test.yml`
-- 确保测试覆盖核心流程（数据获取 → 策略计算 → 回测执行）
-- 测试结果评论到 PR 上
-
----
-
-### subAgent6 — GUI 测试（GTEST）
-
-**身份背景：** 前端自动化测试工程师，精通 Playwright。
-
-**核心职责：**
-- 为 WEB 的 PR 编写 GUI 端到端测试（Playwright）
-- 维护 `.github/workflows/testgui.yml`
-- 确保 GUI 测试在 PR 中自动运行
-- 测试结果评论到 PR 上
-
----
-
-### subAgent7 — 研发主管（LEAD）
-
-**身份背景：** 10 年+全栈开发经验，技术负责人，严苛的代码审查者。使用 **Pro 模型**。
-
-**核心职责：**
-- Review 所有 Feature PR
-- 通过 GitHub API 获取 PR 的 CI 运行状态
-- 检查：代码风格、架构合理性、测试覆盖、接口是否断裂
-- 当测试不通过时，仲裁问题归属 → 在 PR 上评论 `@subAgentX 需修复: ...`
-- 批准通过后添加 label `待验收`
-
-**评审 checklist：**
 ```
-[ ] 符合项目代码规范（flake8 + mypy）
-[ ] 测试覆盖率为 >= 80%
-[ ] 新增代码有对应测试
-[ ] 接口向后兼容
-[ ] 没有引入新的外部依赖
-[ ] 符合现有架构模式
+stocks.py — 按职责划分：
+┌─ PLAT 专属 ──────────────────────────────┐
+│  init()                    系统初始化      │
+│  get_data()                数据获取        │
+│  create_backtest_request() 创建回测请求    │
+│  run_backtest()            执行回测        │
+│  run_futures_a50_prev_night() 期货策略    │
+│  StrategyParameter         参数定义类      │
+│  StrategySpec              策略规格类      │
+│  BacktestRequest           回测请求类      │
+│  _build_strategy_registry() 注册表架构    │
+│  list_strategy_specs()     列出策略        │
+│  get_strategy_spec()       获取策略        │
+└──────────────────────────────────────────┘
+┌─ STRAT 可追加 ───────────────────────────┐
+│  AUTO_STRATEGY_SPEC (在 solver/*.py 中)  │
+│  run_sma_backtest()         各策略run函数  │
+│  run_mean_cost()                          │
+│  run_fixed_amount()                      │
+│  run_module_strategy_backtest()          │
+│  run_signal_template()                   │
+└──────────────────────────────────────────┘
 ```
 
+> **STRAT 新增策略时的操作流程：**
+> 1. 在 `solver/` 下创建新策略文件，包含 `AUTO_STRATEGY_SPEC`
+> 2. 自动发现机制会在 `_build_strategy_registry()` 中扫描到
+> 3. 不需要手动修改 `stocks.py`
+> 4. 如果策略需要特殊参数处理 → 在 solver 的模块中自行实现，不要改 stocks.py
+
+### 2.7 `tests/` — 测试（ITEST / GTEST）
+
+```
+tests/
+├── guitests/                              ← Owner: GTEST
+│   ├── test_gui_app.py           GTEST — 基本 GUI 功能
+│   ├── test_gui_all_strategies_e2e.py  GTEST — 全策略端到端
+│   ├── test_gui_backtest_report_e2e.py GTEST — 回测报告
+│   ├── test_realtime_lot_calculation.py  GTEST — 实时计算
+│   └── README.py
+│
+├── test_stocks.py              ITEST — 业务入口测试
+├── test_simulator.py           ITEST — 模拟器测试
+├── test_simulator_engine.py    ITEST — 引擎测试
+├── test_integration.py         ITEST — 集成测试
+├── test_main.py                ITEST — 入口测试
+├── test_main_run.py            ITEST — 运行测试
+├── test_fixed_amount_strategy.py  ITEST — 策略测试
+├── test_low_frequency_strategies.py ITEST — 低频策略测试
+├── test_futures_open_hour_strategy.py ITEST — 期货策略测试
+├── test_run_sma.py             ITEST — SMA 回测测试
+├── test_data_provider_cache.py ITEST — 数据缓存测试
+├── test_data_provider_stooq.py ITEST — 数据源测试
+├── test_cache_utils.py         ITEST — 缓存工具测试
+├── test_akshare_provider_compat.py ITEST — 数据源兼容
+├── test_backtest_progress.py   ITEST — 进度条测试
+├── test_futures_missing_data.py ITEST — 缺失数据处理
+├── test_adjustment.py          ITEST — 复权测试
+├── test_dividend_adjustment.py ITEST — 分红复权测试
+├── test_yangtze_power.py       ITEST — 特定股票测试
+├── test_test_utils.py          ITEST — 测试工具
+├── test_utils.py               ITEST — 工具函数测试
+├── test_gui_download_policy.py ITEST — 下载策略测试
+├── test_guitest_workflow_report.py ITEST — GUI 测试报告
+├── test_comment_guitest_report_script.js  — JS 辅助脚本
+├── __init__.py
+└── README.md
+```
+
+> **写测试原则：**
+> - ITEST 的测试落在 `tests/test_*.py`，测试 PLAT / STRAT 的代码
+> - GTEST 的测试落在 `tests/guitests/`，测试 WEB 的界面
+> - 当测试发现 bug，ITEST/GTEST 在 PR 评论中 @对应角色（PLAT/STRAT/WEB）
+> - 新增功能必须有对应的新增测试
+
+### 2.8 `.github/workflows/` — CI/CD（按角色归属）
+
+| 文件 | Owner | 说明 |
+|------|-------|------|
+| `test.yml` | ITEST | 单元测试 + 集成测试 |
+| `testgui.yml` | GTEST | 端到端 GUI 测试（Playwright） |
+| `lint.yml` | LEAD | 代码风格检查（flake8 + mypy） |
+| `package.yml` | PLAT | 打包发布 |
+| `opencode.yml` | HERMES | （备用/仅测试用） |
+
+### 2.9 其他文件
+
+| 文件 | Owner | 说明 |
+|------|-------|------|
+| `AGENTS.md` | HERMES | 本文件，团队协作规范 |
+| `CLAUDE.md` | ARCH | 项目约定，ARCH 更新 |
+| `data/` | PLAT | 数据缓存目录，程序自动生成 |
+| `docs/` | 相关角色 | 文档，谁写的谁维护 |
+| `tools/` | PLAT | 辅助工具 |
+| `test_ak.py` / `probe_stocks.py` / `probe_output.txt` | — | 调试遗留文件，可清理 |
+| `.github/copilot-instructions.md` | — | Copilot 配置 |
+| `.github/agents/` / `.github/instructions/` | — | 第三方工具配置 |
+| `.github/scripts/` | GTEST | GUI 测试脚本 |
+| `.github/skills/` | — | 第三方 skill 定义 |
+
 ---
 
-### subAgent8 — 验收测试（QA）
+## 三、角色协作边界—谁不能碰什么
 
-**身份背景：** 通过 Playwright 自动化脚本执行端到端验收。
-
-**核心职责：**
-- 当 PR 带 label `待验收` 时触发
-- 运行 Playwright 验收脚本，验证功能完整性
-- 通过后合并 PR 并评论 `验收通过 ✅`
-- 不通过则评论具体失败原因，退回 `待修复`
+| 角色 | 绝不能碰 | 跨模块必须先沟通 |
+|------|---------|----------------|
+| **WEB** | `source/` `simulator/` `solver/` `stocks.py`（框架部分） | 新增 API 路由时对接 PLAT |
+| **PLAT** | `gui/templates/` 的 HTML 结构、`solver/` 的策略逻辑 | 改 Web API 格式时对接 WEB |
+| **STRAT** | `source/` `simulator/` `gui/` `stocks.py`（框架部分） | 新增策略注册时追加 `AUTO_STRATEGY_SPEC` 即可 |
+| **ITEST** | `solver/` 的策略逻辑、`gui/templates/` | 发现 bug 时评论 @ 对应角色 |
+| **GTEST** | `source/` `simulator/` `solver/` | 发现 bug 时评论 @ 对应角色 |
+| **ARCH** | 执行代码（只做设计 + 提 Issue + Review） | 设计评审后交给对应角色执行 |
+| **LEAD** | 只 Review 不写代码 | 仲裁时评论 @ 对应角色 |
+| **QA** | 只验收不修改 | 不通过时退回带 label:待修复 |
 
 ---
 
-## 三、协作流程
+## 四、协作流程
 
 ```
 [PM] 发现需求 → 建 Issue + label:需求
   │
-  ▼ Hermes 检测
-[ARCH] 读取 Issue → 拆任务 → 建 sub-issue
-  │ label:subtask-前端 / subtask-后端 / subtask-策略
+  ▼ Hermes 检测到 label:需求
+[ARCH(Pro)] 读取 Issue → 分析设计 → 拆任务 → 建 sub-issue
+  │ 每个 sub-issue 标注所属角色 + label:任务
+  │ 如有必要 → 建 Design PR 描述接口设计
   ▼
-[WEB/PLAT/STRAT] 各自认领
-  │ 开 Feature PR
-  ├── [ITEST] → 添加集成测试
-  ├── [GTEST] → 添加 GUI 测试
-  ▼
-[LEAD] Review PR
-  ├── 通过 → label:待验收
-  └── 不通过 → PR 评论 @谁 + label:待修复
-              │
-              ▼ 修复后循环
-[QA] 验收 → 合并 PR
+[Hermes 按 sub-issue label 触发]
+  ┌──────────┬──────────┬──────────┐
+  ▼          ▼          ▼          ▼
+ WEB       PLAT      STRAT      ITEST/GTEST
+ (前端)    (平台)    (策略)    (测试先行)
+  │          │          │          │
+  └─────┬────┘          │          │
+        ▼               │          │
+    Feature PR ─────────┘          │
+        │                          │
+        └────────────┬─────────────┘
+                     ▼
+            [LEAD(Pro)] Review PR
+              ├── CI 通过 + Code OK → label:待验收
+              └── 不通过 → PR 评论 @角色 + label:待修复
+                            │
+                            ▼ 修复后循环
+                     [QA] 验收测试
+                        ├── 通过 → 合并 PR
+                        └── 不通过 → label:待修复
 ```
 
 ---
 
-## 四、代码规范
+## 五、代码规范
 
-### 命名规范
+### 命名
 - 模块名：`snake_case.py`
 - 类名：`PascalCase`
 - 函数/变量：`snake_case`
-- 私有方法：`_leading_underscore`
+- 私有方法/属性：`_leading_underscore`
 
 ### 类型注解
 所有函数参数和返回值必须有类型注解（mypy 严格模式）。
 
 ### 异常处理
-- 不吞异常（不写 `except: pass`）
+- 不吞异常（不写裸 `except: pass`）
 - 自定义异常继承 `Exception`
 - 外部调用失败要有 fallback 或明确报错
 
 ### 测试规范
-- 单测：`tests/test_*.py`
-- 集成测试：`tests/test_integration.py`
-- GUI 测试：`tests/guitests/`
+- 单测/集成测试：`tests/test_*.py`（ITEST）
+- GUI 测试：`tests/guitests/`（GTEST）
+- PR 中新增功能必须有新增测试
 
 ---
 
-## 五、现有项目目录
+## 六、策略接口规范
 
+所有策略文件（`solver/*.py`）必须遵循以下隐式接口，以支持自动发现注册：
+
+```python
+# 在策略模块中声明
+AUTO_STRATEGY_SPEC = {
+    "key": "策略唯一标识",
+    "name": "策略展示名称",
+    "category": "策略分类",
+    "parameters": [
+        {"name": "param1", "label": "参数1", "type": "float", "default": 20},
+    ],
+}
+
+# 策略类必须提供
+class StrategySimulator:
+    def prepare_backtest_data(self, df, **params) -> pd.DataFrame:
+        """计算技术指标，返回增强后的 DataFrame"""
+        ...
+
+    def simulate(self, df, **params) -> dict:
+        """执行回测逻辑，返回结果 dict"""
+        ...
+
+    def get_parameters(self) -> list:
+        """返回参数配置列表"""
+        ...
 ```
-stocks/
-├── main.py              # 入口
-├── stocks.py            # 业务逻辑入口，策略注册表
-├── source/
-│   ├── base_provider.py       # 数据源 ABC
-│   ├── data_provider.py       # 数据聚合层
-│   ├── akshare_provider.py    # AKShare 数据源
-│   ├── baostock_provider.py   # Baostock 数据源
-│   └── README.md
-├── solver/              # 策略算法
-│   ├── sma_strategy.py
-│   ├── dual_ma_strategy.py
-│   ├── bollinger_strategy.py
-│   ├── rsi_strategy.py
-│   ├── mean_cost_strategy.py
-│   ├── fixed_amount_strategy.py
-│   ├── futures_open_hour_strategy.py
-│   ├── signal_template_strategy.py
-│   └── README.md
-├── simulator/           # 模拟交易引擎
-│   ├── base_engine.py
-│   ├── exchange_interface.py
-│   ├── simulated_exchange.py
-│   ├── simulator_engine.py
-│   ├── simulator.py
-│   ├── backtest/
-│   ├── live/
-│   └── realtime/
-├── gui/                 # Web 界面
-│   ├── web.py
-│   ├── backtest_progress.py
-│   └── templates/
-├── tests/               # 测试
-│   ├── guitests/
-│   ├── test_*.py
-│   └── README.md
-├── data/                # 数据缓存
-├── docs/
-├── tools/
-├── .github/workflows/
-│   ├── test.yml         # 单元/集成测试
-│   ├── testgui.yml      # GUI 端到端测试
-│   ├── lint.yml         # 代码风格检查
-│   ├── package.yml      # 打包
-│   └── opencode.yml     # （备用）
-└── AGENTS.md            # ← 本文件
-```
+
+新增策略：
+1. 在 `solver/` 下创建 `xxx_strategy.py`
+2. 声明 `AUTO_STRATEGY_SPEC`
+3. 实现策略类
+4. 不需要改任何其他文件
+
+---
 
 本文件由 Hermes Agent 维护，随团队协作流程迭代更新。
+最后更新：2026-06-15
