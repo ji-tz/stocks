@@ -14,16 +14,9 @@ from functools import partial
 from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable, Mapping
 
-from source.data_provider import get_data as _get_data
+import pandas as pd
 
-try:
-    from simulator.simulator import simulate_mean_cost, simulate_fixed_amount
-except Exception as _e:
-    # 兼容性：若 simulator 不可用，保留 None
-    import warnings
-    warnings.warn(f"simulator 模块不可用，相关功能将被禁用: {_e}", ImportWarning, stacklevel=2)
-    simulate_mean_cost = None
-    simulate_fixed_amount = None
+from source.data_provider import get_data as _get_data
 
 
 TRADE_PRICE_OPEN = 'open'
@@ -208,7 +201,7 @@ def init(cache_dir: str = "data") -> None:
 
 
 def _fetch_data_for_backtest(symbol: str, source: object,
-                              start_date: Optional[str], end_date: Optional[str]):
+                              start_date: Optional[str], end_date: Optional[str]) -> pd.DataFrame:
     """按日期范围获取回测所需数据的辅助函数。
 
     若未指定日期范围，则使用数据提供者的默认行为（返回全量数据）；
@@ -277,15 +270,17 @@ def get_data(symbol: str = "600900",
 
 
 def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
-                  lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto", 
+                  lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto",
                   progress_callback: Optional[Callable[[int, int], None]] = None,
                   trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
-    """调用均值成本模拟（封装自 solver.mean_cost_strategy.simulate_mean_cost）。"""
-    if simulate_mean_cost is None:
-        raise RuntimeError("mean_cost 模块不可用")
-    return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, 
-                            lot_size=lot_size, init_cash=init_cash, source=source,
-                            progress_callback=progress_callback, trade_price=trade_price)
+    """均值成本策略回测（委托通用流程）。"""
+    return run_module_strategy_backtest(
+        symbol=symbol, source=source,
+        start_date=start_date, end_date=end_date,
+        lot_size=lot_size, init_cash=init_cash,
+        progress_callback=progress_callback, trade_price=trade_price,
+        strategy_key='mean_cost',
+    )
 
 
 def run_fixed_amount(symbol: str = "600900",
@@ -297,32 +292,14 @@ def run_fixed_amount(symbol: str = "600900",
                     source: object = "auto",
                     progress_callback: Optional[Callable[[int, int], None]] = None,
                     trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
-    """调用定投策略模拟（封装自 simulator.simulator.simulate_fixed_amount）。
-    
-    Args:
-        symbol: 股票代码
-        start_date: 开始日期
-        end_date: 结束日期
-        fixed_amount: 每次定投金额（默认 1000 元）
-        lot_size: 交易手数
-        init_cash: 初始资金
-        source: 数据源
-        progress_callback: 进度回调函数
-        
-    Returns:
-        包含回测结果的字典
-    """
-    if simulate_fixed_amount is None:
-        raise RuntimeError("fixed_amount 模块不可用")
-    return simulate_fixed_amount(symbol=symbol,
-                                start_date=start_date,
-                                end_date=end_date,
-                                fixed_amount=fixed_amount,
-                                lot_size=lot_size,
-                                init_cash=init_cash,
-                                source=source,
-                                progress_callback=progress_callback,
-                                trade_price=trade_price)
+    """定投策略回测（委托通用流程）。"""
+    return run_module_strategy_backtest(
+        symbol=symbol, source=source,
+        start_date=start_date, end_date=end_date,
+        lot_size=lot_size, init_cash=init_cash,
+        progress_callback=progress_callback, trade_price=trade_price,
+        strategy_key='fixed_amount', fixed_amount=fixed_amount,
+    )
 
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
@@ -330,35 +307,14 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      lot_size: float = 100.0, init_cash: float = 100000.0, period: int = 20,
                      progress_callback: Optional[Callable[[int, int], None]] = None,
                      trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
-    """使用统一模拟器运行 SMA 回测并返回统一的展示结果。
-    
-    Args:
-        symbol: 股票代码
-        source: 数据源
-        start_date: 开始日期
-        end_date: 结束日期
-        lot_size: 交易手数
-        init_cash: 初始资金
-        period: SMA 周期（默认 20）
-        progress_callback: 进度回调函数
-    """
-    try:
-        from simulator.simulator import simulate_sma
-    except Exception as e:
-        raise RuntimeError(f"SMA 模拟器不可用: {e}") from e
-
-    # 以传入的日期范围优先；若未传则使用 get_data 的默认参数
-    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
-    # 只保留回测所需字段
-    df = df[["date", "open", "high", "low", "close", "volume"]]
-
-    sim_res = simulate_sma(symbol=symbol, df=df, period=period, lot_size=lot_size,
-                           init_cash=init_cash, progress_callback=progress_callback,
-                           trade_price=trade_price)
-    sim_res.setdefault('init_cash', init_cash)
-    # 兼容旧调用方，沿用 final_cash 字段表达最终总资产。
-    sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
-    return sim_res
+    """SMA 策略回测（委托通用流程）。"""
+    return run_module_strategy_backtest(
+        symbol=symbol, source=source,
+        start_date=start_date, end_date=end_date,
+        lot_size=lot_size, init_cash=init_cash,
+        progress_callback=progress_callback, trade_price=trade_price,
+        strategy_key='sma', period=period,
+    )
 
 
 def run_module_strategy_backtest(symbol: str = "600900", source: object = "auto",
@@ -512,7 +468,7 @@ def run_signal_template(
 ) -> Dict[str, Any]:
     """模板化买卖信号策略：按前端配置执行。"""
     try:
-        from simulator.simulator import simulate_signal_template
+        from simulator.simulator import Simulator
         from solver.signal_template_strategy import SignalTemplateDecision
     except Exception as e:
         raise RuntimeError(f"信号模板策略模块不可用: {e}") from e
@@ -544,12 +500,11 @@ def run_signal_template(
         sell_ratio_pct=float(sell_ratio_pct),
     )
 
-    sim_res = simulate_signal_template(
-        symbol=symbol,
+    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+    sim_res = sim.simulate(
         df=feature_df,
         strategy=strategy,
-        lot_size=lot_size,
-        init_cash=init_cash,
+        symbol=symbol,
         progress_callback=progress_callback,
         trade_price=trade_price,
     )
@@ -560,44 +515,7 @@ def run_signal_template(
 
 def _build_strategy_registry() -> Dict[str, StrategySpec]:
     """构建策略注册表。"""
-    registry = {
-        'sma': StrategySpec(
-            key='sma',
-            label='SMA',
-            runner=run_sma_backtest,
-            parameters=(
-                StrategyParameter(
-                    name='period',
-                    label='SMA 周期',
-                    caster=int,
-                    default=20,
-                    description='移动平均线周期',
-                ),
-            ),
-            description='基于移动平均线的趋势策略',
-        ),
-        'mean_cost': StrategySpec(
-            key='mean_cost',
-            label='均值成本',
-            runner=run_mean_cost,
-            description='围绕持仓均价进行开盘交易',
-        ),
-        'fixed_amount': StrategySpec(
-            key='fixed_amount',
-            label='定投',
-            runner=run_fixed_amount,
-            parameters=(
-                StrategyParameter(
-                    name='fixed_amount',
-                    label='每次定投金额',
-                    caster=float,
-                    default=1000.0,
-                    description='每次开盘投入的金额',
-                ),
-            ),
-            description='固定金额定投策略',
-        ),
-    }
+    registry: Dict[str, StrategySpec] = {}
 
     # 自动接入：扫描 solver 下声明了 AUTO_STRATEGY_SPEC 的策略
     registry.update(_discover_auto_strategy_specs())

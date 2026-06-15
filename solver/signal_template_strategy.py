@@ -279,7 +279,7 @@ class SignalTemplateDecision:
             return self._round_to_lot(position_shares * pct)
         return 0.0
 
-    def decide(
+    def simulate(
         self,
         open_price: float,
         close_price: float,
@@ -310,3 +310,19 @@ class SignalTemplateDecision:
                 return {"action": "buy", "shares": buy_shares}
 
         return None
+
+    def decide(
+        self,
+        open_price: float,
+        close_price: float,
+        avg_cost: float = 0.0,
+        shares: float = 0.0,
+        date: Any = None,
+        cash: float = 0.0,
+        trade_price: float | None = None,
+        **kwargs,
+    ):
+        """已弃用，请使用 simulate()。"""
+        return self.simulate(
+            open_price=open_price, close_price=close_price, avg_cost=avg_cost, shares=shares,
+            date=date, cash=cash, trade_price=trade_price, **kwargs)

@@ -357,12 +357,18 @@ class BacktestExchangeRunner:
             ]
 
             action_raw = None
-            for decision_kwargs in decision_kwargs_chain:
-                try:
-                    action_raw = strategy.decide(**decision_kwargs)
-                    break
-                except TypeError:
-                    continue
+            # Try simulate() first (new interface per AGENTS.md), fallback to decide()
+            strategy_method = getattr(strategy, 'simulate', None)
+            if not callable(strategy_method):
+                strategy_method = getattr(strategy, 'decide', None)
+
+            if callable(strategy_method):
+                for decision_kwargs in decision_kwargs_chain:
+                    try:
+                        action_raw = strategy_method(**decision_kwargs)
+                        break
+                    except TypeError:
+                        continue
 
             action = action_raw
             desired_shares = None
@@ -589,29 +595,6 @@ def simulate_fixed_amount(
 
     sim = Simulator(lot_size=lot_size, init_cash=init_cash, verbose=verbose)
     strategy = FixedAmountDecision(fixed_amount=fixed_amount)
-    return sim.simulate(
-        df=df,
-        strategy=strategy,
-        symbol=symbol,
-        progress_callback=progress_callback,
-        trade_price=trade_price,
-    )
-
-
-def simulate_signal_template(
-    symbol: str,
-    df,
-    strategy,
-    lot_size: float = 100.0,
-    init_cash: float = 100000.0,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
-    trade_price: str = "open",
-) -> Dict[str, Any]:
-    """运行模板化信号策略回测。"""
-    if df is None:
-        raise RuntimeError("需要传入数据 DataFrame 才能模拟")
-
-    sim = Simulator(lot_size=lot_size, init_cash=init_cash)
     return sim.simulate(
         df=df,
         strategy=strategy,

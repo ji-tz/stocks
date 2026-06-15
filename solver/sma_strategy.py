@@ -1,5 +1,44 @@
 from typing import Any
 
+import pandas as pd
+
+
+AUTO_STRATEGY_SPEC = {
+    "key": "sma",
+    "label": "SMA",
+    "runner": "run_module_strategy_backtest",
+    "module_interface": True,
+    "parameters": [
+        {
+            "name": "period",
+            "label": "SMA 周期",
+            "caster": "int",
+            "default": 20,
+            "description": "移动平均线周期",
+        },
+    ],
+    "description": "基于移动平均线的趋势策略",
+    "supported_trade_prices": ["open"],
+}
+
+
+def validate_strategy_parameters(period: int = 20, **kwargs) -> None:
+    """校验 SMA 策略参数。"""
+    if period <= 0:
+        raise ValueError('SMA 周期必须大于 0')
+
+
+def prepare_backtest_data(df: pd.DataFrame, period: int = 20, **kwargs) -> pd.DataFrame:
+    """为 SMA 策略补充均线指标列。"""
+    prepared = df.copy()
+    prepared["sma"] = prepared["close"].rolling(window=period, min_periods=1).mean()
+    return prepared
+
+
+def create_strategy(df: pd.DataFrame, period: int = 20, **kwargs) -> 'SmaDecision':
+    """构造 SMA 策略决策器。"""
+    return SmaDecision(period=period, df=df)
+
 
 class SmaDecision:
     """决策器：用于 pandas 模拟的 SMA 决策逻辑。
@@ -13,8 +52,8 @@ class SmaDecision:
         self.period = period
         self.df = df
 
-    def decide(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: float = 0.0,
-               date: Any = None, trade_price: float | None = None, trade_price_field: str = 'open') -> str | None:
+    def simulate(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: float = 0.0,
+                 date: Any = None, trade_price: float | None = None, trade_price_field: str = 'open') -> str | None:
         """根据 SMA 信号决定买卖操作。
 
         Args:
@@ -29,10 +68,7 @@ class SmaDecision:
         Returns:
             'buy' 表示买入，'sell' 表示卖出，None 表示不操作
         """
-        # close_price 对比 sma 决策由 simulator 预先计算 sma 并放入 df；此处使用 close_price 与 df 中对应 sma 值比较具有上下文耦合。
-        # 为了保持简单，假设调用方在构造时给定了 df，并且当前 date 可用于查询 sma。
         if self.df is None or date is None:
-            # 退化到仅用 close_price 与 None 比较 -> 无动作
             return None
         try:
             row = self.df[self.df['date'] == date]
@@ -48,3 +84,9 @@ class SmaDecision:
             return 'sell'
         return None
 
+    def decide(self, open_price: float, close_price: float, avg_cost: float = 0.0, shares: float = 0.0,
+               date: Any = None, trade_price: float | None = None, trade_price_field: str = 'open') -> str | None:
+        """根据 SMA 信号决定买卖操作（已弃用，请使用 simulate()）。"""
+        return self.simulate(
+            open_price=open_price, close_price=close_price, avg_cost=avg_cost, shares=shares,
+            date=date, trade_price=trade_price, trade_price_field=trade_price_field)

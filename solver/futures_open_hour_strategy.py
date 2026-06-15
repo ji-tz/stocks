@@ -78,7 +78,7 @@ class FuturesOpenHourDecision:
         prev_close = float(hist.iloc[-2]["close"])
         return last_close > prev_close
 
-    def decide(
+    def simulate(
         self,
         open_price: float,
         close_price: float | None = None,
@@ -93,7 +93,6 @@ class FuturesOpenHourDecision:
             return None
 
         if self._base_shares is None:
-            # 首次决策时记下底仓基线：允许在“仅持有底仓”时继续做日内 T+0。
             self._base_shares = max(float(shares), 0.0)
 
         is_up = self._is_prev_night_up(date)
@@ -110,3 +109,18 @@ class FuturesOpenHourDecision:
             return "buy"
 
         return None
+
+    def decide(
+        self,
+        open_price: float,
+        close_price: float | None = None,
+        avg_cost: float = 0.0,
+        shares: float = 0.0,
+        date: Any = None,
+        schedule_order=None,
+        **kwargs,
+    ):
+        """已弃用，请使用 simulate()。"""
+        return self.simulate(
+            open_price=open_price, close_price=close_price, avg_cost=avg_cost, shares=shares,
+            date=date, schedule_order=schedule_order, **kwargs)

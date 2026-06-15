@@ -46,7 +46,7 @@ class RsiDecision:
     overbought: float = 70.0
     df: Optional[pd.DataFrame] = None
 
-    def decide(
+    def simulate(
         self,
         open_price: float,
         close_price: float | None = None,
@@ -71,6 +71,17 @@ class RsiDecision:
         if shares > 0 and rsi_value > self.overbought:
             return "sell"
         return None
+
+    def decide(
+        self,
+        open_price: float,
+        close_price: float | None = None,
+        avg_cost: float = 0.0,
+        shares: float = 0.0,
+        date: Any = None,
+    ) -> str | None:
+        """已弃用，请使用 simulate()。"""
+        return self.simulate(open_price=open_price, close_price=close_price, avg_cost=avg_cost, shares=shares, date=date)
 
 
 def validate_strategy_parameters(period: int = 14, oversold: float = 30.0, overbought: float = 70.0, **kwargs) -> None:

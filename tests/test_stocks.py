@@ -117,9 +117,9 @@ class TestStocksModule(unittest.TestCase):
         self.assertEqual(specs['signal_template'].parameters[0].name, 'buy_trigger')
         self.assertEqual(specs['mean_cost'].supported_trade_prices, (stocks.TRADE_PRICE_OPEN,))
 
-    @patch('stocks.run_fixed_amount')
-    def test_run_backtest_dispatches_strategy_registry(self, mock_run_fixed_amount):
-        mock_run_fixed_amount.return_value = {'symbol': '600900', 'total_value': 101000.0}
+    @patch('stocks.run_module_strategy_backtest')
+    def test_run_backtest_dispatches_strategy_registry(self, mock_run_module):
+        mock_run_module.return_value = {'symbol': '600900', 'total_value': 101000.0}
 
         request = stocks.create_backtest_request(
             symbol='600900',
@@ -134,7 +134,8 @@ class TestStocksModule(unittest.TestCase):
         result = stocks.run_backtest(request)
 
         self.assertEqual(result['symbol'], '600900')
-        mock_run_fixed_amount.assert_called_once_with(
+        mock_run_module.assert_called_once_with(
+            strategy_key='fixed_amount',
             symbol='600900',
             start_date='20230101',
             end_date='20231231',
@@ -150,9 +151,9 @@ class TestStocksModule(unittest.TestCase):
         with self.assertRaises(ValueError):
             stocks.create_backtest_request(strategy='sma', trade_price='close')
 
-    @patch('stocks.run_sma_backtest')
-    def test_run_backtest_dispatches_sma_period(self, mock_run_sma_backtest):
-        mock_run_sma_backtest.return_value = {'symbol': '600900', 'total_value': 102000.0}
+    @patch('stocks.run_module_strategy_backtest')
+    def test_run_backtest_dispatches_sma_period(self, mock_run_module):
+        mock_run_module.return_value = {'symbol': '600900', 'total_value': 102000.0}
 
         request = stocks.create_backtest_request(
             symbol='600900',
@@ -167,7 +168,8 @@ class TestStocksModule(unittest.TestCase):
         result = stocks.run_backtest(request)
 
         self.assertEqual(result['symbol'], '600900')
-        mock_run_sma_backtest.assert_called_once_with(
+        mock_run_module.assert_called_once_with(
+            strategy_key='sma',
             symbol='600900',
             start_date='20230101',
             end_date='20231231',

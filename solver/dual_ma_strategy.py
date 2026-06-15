@@ -38,7 +38,7 @@ class DualMaDecision:
     long_period: int = 20
     df: Optional[pd.DataFrame] = None
 
-    def decide(
+    def simulate(
         self,
         open_price: float,
         close_price: float | None = None,
@@ -77,6 +77,17 @@ class DualMaDecision:
         if shares > 0 and prev_short >= prev_long and current_short < current_long:
             return "sell"
         return None
+
+    def decide(
+        self,
+        open_price: float,
+        close_price: float | None = None,
+        avg_cost: float = 0.0,
+        shares: float = 0.0,
+        date: Any = None,
+    ) -> str | None:
+        """已弃用，请使用 simulate()。"""
+        return self.simulate(open_price=open_price, close_price=close_price, avg_cost=avg_cost, shares=shares, date=date)
 
 
 def validate_strategy_parameters(short_period: int = 5, long_period: int = 20, **kwargs) -> None:
