@@ -135,7 +135,8 @@ class AkshareProvider(BaseProvider):
             norm_df["high"] = norm_df["close"]
             norm_df["low"] = norm_df["close"]
             norm_df["volume"] = 0.0
-            return norm_df[["date", "open", "high", "low", "close", "volume"]].sort_values("date").reset_index(drop=True)
+            return norm_df[["date", "open", "high", "low", "close", "volume"]
+                           ].sort_values("date").reset_index(drop=True)
 
         fetchers = []
         if any(ch.isalpha() for ch in symbol):

@@ -219,7 +219,9 @@ def get_data(symbol: str = "600900",
             fetch_end = end_date
             if start_date or end_date:
                 request_start, request_end = _expand_fetch_range(start_date, end_date, buffer_days)
-                fetch_start = format_date_for_source(parse_date_input(request_start), src) if request_start else request_start
+                fetch_start = format_date_for_source(
+                    parse_date_input(request_start),
+                    src) if request_start else request_start
                 fetch_end = format_date_for_source(parse_date_input(request_end), src) if request_end else request_end
 
             provider = _create_provider(src, max_attempts=max_attempts)
@@ -241,7 +243,8 @@ def get_data(symbol: str = "600900",
 
     if os.path.exists(cache_file):
         try:
-            return pd.read_csv(cache_file, parse_dates=["date"]).loc[:, ["date", "open", "high", "low", "close", "volume"]]
+            return pd.read_csv(cache_file, parse_dates=["date"]).loc[:, [
+                "date", "open", "high", "low", "close", "volume"]]
         except Exception:
             pass
 

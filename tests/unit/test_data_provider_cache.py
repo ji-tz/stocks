@@ -14,11 +14,11 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             dates = pd.date_range(start='2023-01-01', periods=10, freq='D')
             df = pd.DataFrame({
                 'date': dates,
-                'open': [100+i for i in range(10)],
-                'high': [101+i for i in range(10)],
-                'low': [99+i for i in range(10)],
-                'close': [100+i for i in range(10)],
-                'volume': [1000+i*10 for i in range(10)],
+                'open': [100 + i for i in range(10)],
+                'high': [101 + i for i in range(10)],
+                'low': [99 + i for i in range(10)],
+                'close': [100 + i for i in range(10)],
+                'volume': [1000 + i * 10 for i in range(10)],
             })
             df.to_csv(cache_file, index=False)
 

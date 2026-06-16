@@ -47,4 +47,3 @@ class SmaDecision:
         if shares > 0 and close_price < sma:
             return 'sell'
         return None
-

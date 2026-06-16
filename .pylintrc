@@ -1,16 +1,23 @@
 [MASTER]
-ignore=.git,__pycache__,build,dist,.venv,venv,screenshots
+ignore=.git,__pycache__,build,dist,.venv,venv,screenshots,tests/guitests
 extension-pkg-allow-list=
 
 [MESSAGES CONTROL]
-# Disable: missing-docstring, missing-class-docstring, missing-function-docstring,
-# too-few-public-methods, unused-argument, broad-except, too-many-arguments,
-# similar-lines, too-many-instance-attributes, too-many-locals
-disable=C0114,C0115,C0116,R0903,W0612,W0613,W0703,R0913,R0801,R0902,R0914
+# 禁用：missing-docstring, TODO注释警告, too-few-public-methods,
+# unused-argument, broad-except, too-many-arguments, similar-lines,
+# too-many-instance-attributes, too-many-locals, too-many-branches,
+# too-many-statements, too-many-return-statements, invalid-name
+disable=C0114,C0115,C0116,R0903,W0612,W0613,W0703,R0913,R0801,
+       R0902,R0914,R0912,R0915,R0911,C0103,W0511
 
 [FORMAT]
 max-line-length=120
+expected-line-ending-format=LF
 
 [REPORTS]
 output-format=colorized
 score=no
+
+[TYPECHECK]
+ignored-modules=numpy,pandas,matplotlib,playwright,flask,akshare,
+                baostock,bs4,lxml,openpyxl,fpdf2

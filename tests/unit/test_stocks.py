@@ -72,11 +72,11 @@ class TestStocksModule(unittest.TestCase):
         dates = pd.date_range(start='2023-01-01', periods=10, freq='D')
         df = pd.DataFrame({
             'date': dates,
-            'open': [100+i for i in range(10)],
-            'high': [101+i for i in range(10)],
-            'low': [99+i for i in range(10)],
-            'close': [100+i for i in range(10)],
-            'volume': [1000+i*10 for i in range(10)],
+            'open': [100 + i for i in range(10)],
+            'high': [101 + i for i in range(10)],
+            'low': [99 + i for i in range(10)],
+            'close': [100 + i for i in range(10)],
+            'volume': [1000 + i * 10 for i in range(10)],
         })
         mock_get.return_value = df
 
@@ -89,7 +89,13 @@ class TestStocksModule(unittest.TestCase):
     def test_run_mean_cost_returns_expected_keys(self, mock_get):
         # simulate_mean_cost 在 simulator.simulator 模块内绑定了 get_data，需在该引用处打补丁
         mock_get.return_value = make_mock_df(8)
-        res = stocks.run_mean_cost(symbol='600900', start_date='20230101', end_date='20231231', lot_size=1, init_cash=10000.0, source='auto')
+        res = stocks.run_mean_cost(
+            symbol='600900',
+            start_date='20230101',
+            end_date='20231231',
+            lot_size=1,
+            init_cash=10000.0,
+            source='auto')
         # check some expected keys exist and types
         self.assertIn('symbol', res)
         self.assertIn('init_cash', res)

@@ -301,7 +301,8 @@ class SignalTemplateDecision:
         price = float(trade_price) if trade_price is not None else float(close_price)
         position_shares = float(shares)
 
-        if position_shares > 0 and self._is_sell_signal(row=row, prev_row=prev_row, price=price, avg_cost=float(avg_cost)):
+        if position_shares > 0 and self._is_sell_signal(
+                row=row, prev_row=prev_row, price=price, avg_cost=float(avg_cost)):
             sell_shares = self._compute_sell_shares(position_shares=position_shares)
             if sell_shares > 0:
                 return {"action": "sell", "shares": sell_shares}

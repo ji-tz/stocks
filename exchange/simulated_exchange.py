@@ -132,7 +132,8 @@ class SimulatedExchangeBase(StockExchange):
             realized_pl=realized_pl_this,
         )
 
-    def print_daily_status(self, date: datetime, price_open: float, price_close: float, action: Optional[str] = None) -> None:
+    def print_daily_status(self, date: datetime, price_open: float, price_close: float,
+                           action: Optional[str] = None) -> None:
         if not self.verbose:
             return
 
@@ -162,6 +163,7 @@ class SimulatedExchangeBase(StockExchange):
     def cancel_order(self, order_id: str) -> bool:
         _ = order_id
         return False
+
 
 # 向后兼容
 SimulatedExchange = SimulatedExchangeBase

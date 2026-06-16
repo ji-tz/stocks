@@ -17,6 +17,8 @@ def make_mock_df(n=10):
         "volume": [1000 + i * 10 for i in range(n)],
     }
     return pd.DataFrame(data)
+
+
 class TestRunSMA(unittest.TestCase):
     @patch('trader.stocks.get_data')
     def test_run_sma_backtest_returns_unified_simulator_result(self, mock_get):

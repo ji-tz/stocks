@@ -2,6 +2,7 @@ import time
 import trader.stocks as stocks
 import traceback
 
+
 def test_get_data(symbol):
     print(f"Testing symbol: {symbol}")
     start_time = time.time()
@@ -28,6 +29,7 @@ def test_get_data(symbol):
         print(f"Exception: {e}")
         traceback.print_exc()
     print("-" * 20)
+
 
 if __name__ == "__main__":
     test_get_data('161725')
