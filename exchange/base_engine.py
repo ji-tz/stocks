@@ -66,16 +66,25 @@ class BaseEngine(ABC):
     - RealEngine: 实盘交易引擎（实际交易，预留）
     """
 
-    def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0):
+    def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0,
+                 commission_pct: float = 0.00025, stamp_duty_pct: float = 0.001,
+                 slippage_pct: float = 0.0):
         """初始化交易引擎
 
         Args:
             init_cash: 初始资金
             lot_size: 交易手数（每次买卖的股数）
+            commission_pct: 佣金比例（如 0.00025 表示万分之二点五）
+            stamp_duty_pct: 印花税比例（卖出时收取，如 0.001 表示千分之一）
+            slippage_pct: 滑点比例（如 0.001 表示千分之一）
         """
         self.lot_size = float(lot_size)
         self.account = Account(cash=init_cash)
         self.realized_pl = 0.0  # 累计已实现盈亏
+        self.total_fees = 0.0  # 累计交易费用（佣金 + 印花税）
+        self.commission_pct = commission_pct
+        self.stamp_duty_pct = stamp_duty_pct
+        self.slippage_pct = slippage_pct
 
     @abstractmethod
     def buy(self, date: datetime, price: float) -> TradeResult:
@@ -141,4 +150,5 @@ class BaseEngine(ABC):
             'total_value': round(total_value, 2),
             'realized_pl': round(self.realized_pl, 4),
             'unrealized_pl': round(unrealized_pl, 4),
+            'total_fees': round(self.total_fees, 4),
         }

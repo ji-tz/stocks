@@ -171,8 +171,8 @@ class TestFixedAmountSimulation(unittest.TestCase):
         # 5天，每天都能买入 100 股
         self.assertEqual(result['trades'], 5)
         self.assertEqual(result['shares'], 500)  # 5 * 100
-        # 花费：5 * 1000 = 5000
-        self.assertEqual(result['cash'], 100000.0 - 5000.0)
+        # 花费：5 * 1000 + 5 * 佣金0.25 = 5001.25
+        self.assertEqual(result['cash'], 100000.0 - 5001.25)
 
     def test_verbose_output(self):
         """测试详细输出模式"""
