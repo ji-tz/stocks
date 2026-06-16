@@ -14,6 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 import trader.stocks as stocks
 from trader.export import export_to_excel, prepare_pdf_data, generate_filename
 from gui.backtest_progress import get_progress_manager
+from trader import persistence
 
 app = Flask(__name__, template_folder='templates')
 # 使用环境变量配置secret_key，开发环境使用默认值
@@ -1285,6 +1286,161 @@ def download_pdf():
         return response
     except Exception as e:
         return jsonify({'error': f'导出 PDF 失败: {str(e)}'}), 500
+
+# ── 参数预设 API ─────────────────────────────────────────
+
+@app.route('/save_preset', methods=['POST'])
+def save_preset_route():
+    """保存参数预设。"""
+    data = request.get_json()
+    if not data or not data.get('name') or not data.get('strategy_key'):
+        return jsonify({'error': '缺少必填字段: name, strategy_key'}), 400
+    try:
+        persistence.save_preset(
+            name=data['name'],
+            strategy_key=data['strategy_key'],
+            params=data.get('params'),
+            source=data.get('source'),
+            lot_size=data.get('lot'),
+            init_cash=data.get('cash'),
+            stock_code=data.get('stock'),
+            start_date=data.get('start_date'),
+            end_date=data.get('end_date'),
+            trade_price=data.get('trade_price'),
+        )
+        saved_name = data['name']
+        return jsonify({'success': True, 'message': f'预设「{saved_name}」保存成功'})
+    except Exception as e:
+        return jsonify({'error': f'保存预设失败: {str(e)}'}), 500
+
+
+@app.route('/load_preset/<name>', methods=['GET'])
+def load_preset_route(name: str):
+    """加载指定名称的预设。"""
+    preset = persistence.load_preset_by_name(name)
+    if preset is None:
+        return jsonify({'error': f'预设「{name}」不存在'}), 404
+    return jsonify(preset)
+
+
+@app.route('/list_presets', methods=['GET'])
+def list_presets_route():
+    """列出所有预设。"""
+    strategy_key = request.args.get('strategy_key')
+    presets = persistence.list_presets(strategy_key=strategy_key)
+    return jsonify(presets)
+
+
+@app.route('/delete_preset/<name>', methods=['DELETE'])
+def delete_preset_route(name: str):
+    """删除指定预设。"""
+    try:
+        persistence.delete_preset(name)
+        return jsonify({'success': True, 'message': f'预设「{name}」已删除'})
+    except Exception as e:
+        return jsonify({'error': f'删除预设失败: {str(e)}'}), 500
+
+
+@app.route('/api/presets_for_strategy/<strategy_key>', methods=['GET'])
+def presets_for_strategy_route(strategy_key: str):
+    """返回指定策略的预设列表。"""
+    presets = persistence.list_presets(strategy_key=strategy_key)
+    return jsonify(presets)
+
+
+# ── 回测结果历史 API ────────────────────────────────────
+
+@app.route('/save_result_history', methods=['POST'])
+def save_result_history_route():
+    """保存回测结果到历史记录。"""
+    data = request.get_json()
+    if not data:
+        return jsonify({'error': '请求体不能为空'}), 400
+
+    result = data.get('result', {})
+    req = data.get('request_params', {})
+
+    strategy_key = req.get('strategy', result.get('strategy', ''))
+    stock_code = req.get('symbol', result.get('symbol', ''))
+    stock_name = data.get('stock_name', '')
+    start_date = req.get('start_date', result.get('start_date', ''))
+    end_date = req.get('end_date', result.get('end_date', ''))
+
+    params = req.get('strategy_params', {})
+    metrics = result.get('metrics', {})
+    trades_count = result.get('trades', 0) or len(result.get('trades_list', []))
+    total_returns = metrics.get('total_return_rate', 0.0)
+    sharp_ratio = metrics.get('sharpe_ratio', 0.0)
+    max_drawdown = metrics.get('max_drawdown', 0.0)
+    preset_name = data.get('preset_name')
+
+    try:
+        result_id = persistence.save_result(
+            strategy_key=strategy_key,
+            stock_code=stock_code,
+            stock_name=stock_name,
+            start_date=start_date,
+            end_date=end_date,
+            params=params,
+            metrics=metrics,
+            trades_count=trades_count,
+            total_returns=total_returns,
+            sharp_ratio=sharp_ratio,
+            max_drawdown=max_drawdown,
+            preset_name=preset_name,
+        )
+        return jsonify({'success': True, 'result_id': result_id})
+    except Exception as e:
+        return jsonify({'error': f'保存历史记录失败: {str(e)}'}), 500
+
+
+@app.route('/history', methods=['GET'])
+def history_route():
+    """历史回测结果列表页。"""
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 20, type=int)
+    results, total = persistence.list_results(page=page, page_size=page_size)
+    total_pages = max(1, (total + page_size - 1) // page_size)
+    return render_template(
+        'history.html',
+        results=results,
+        page=page,
+        page_size=page_size,
+        total=total,
+        total_pages=total_pages,
+    )
+
+
+@app.route('/result/<int:result_id>', methods=['GET'])
+def result_detail_route(result_id: int):
+    """查看历史回测结果详情。"""
+    row = persistence.get_result(result_id)
+    if row is None:
+        return render_template('result_generic.html', error=f'结果记录 #{result_id} 不存在')
+
+    # 将数据库行重建为 result_generic.html 所需的完整 result dict
+    result = {
+        'symbol': row.get('stock_code', ''),
+        'stock_code': row.get('stock_code', ''),
+        'stock_name': row.get('stock_name', ''),
+        'start_date': row.get('start_date', ''),
+        'end_date': row.get('end_date', ''),
+        'metrics': row.get('metrics', {}),
+        'trades': row.get('trades_count', 0),
+        'trades_list': [],
+        'history': [],
+        'init_cash': None,
+        'total_value': None,
+        'cash': None,
+        'shares': None,
+        'last_price': None,
+        'market_value': None,
+        'realized_pl': None,
+        'unrealized_pl': None,
+    }
+    strategy_name = row.get('strategy_key', '')
+    return render_template('result_generic.html', result=result, strategy_name=strategy_name)
+
 
 if __name__ == '__main__':
     # 支持通过环境变量自定义主机和端口，方便测试使用非默认端口

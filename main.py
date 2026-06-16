@@ -5,10 +5,14 @@ import sys
 sys.path.insert(0, os.path.dirname(__file__))
 
 import trader.stocks as stocks
+from trader import persistence
 from gui import web
 
 
 def main():
+    # 初始化持久化层（参数预设 + 回测结果历史）
+    persistence.init_db()
+
     # 初始化后端（创建缓存目录等）并尝试预热默认数据缓存
     stocks.init()
     try:
