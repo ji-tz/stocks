@@ -132,14 +132,14 @@
     {% endif %}
 
     <div style="margin: 1rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
-      <form method="post" action="/download/excel" style="display:inline;">
+      <form method="post" action="/download/excel" style="display:inline;" onsubmit="return checkPayloadSize(this);">
         <input type="hidden" name="result_json" value='{{ result | tojson | forceescape }}'>
         <input type="hidden" name="strategy_name" value="{{ strategy_name }}">
         <button type="submit" style="padding:0.5rem 1rem; background:#2e7d32; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
           📥 导出 Excel
         </button>
       </form>
-      <form method="post" action="/download/pdf" style="display:inline;">
+      <form method="post" action="/download/pdf" style="display:inline;" onsubmit="return checkPayloadSize(this);">
         <input type="hidden" name="result_json" value='{{ result | tojson | forceescape }}'>
         <input type="hidden" name="strategy_name" value="{{ strategy_name }}">
         <button type="submit" style="padding:0.5rem 1rem; background:#c62828; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
@@ -151,6 +151,17 @@
       </button>
       <a href="/history" class="history-link">📋 查看历史记录</a>
     </div>
+
+    <script>
+    function checkPayloadSize(form) {
+      var size = new Blob([form.result_json.value]).size;
+      if (size > 15360) {
+        alert('⚠️ 结果数据过大（' + (size / 1024).toFixed(1) + ' KB），隐藏表单无法传输。\n请先点击"保存到历史记录"，再从历史记录页面导出。');
+        return false;
+      }
+      return true;
+    }
+    </script>
 
     <!-- Toast container -->
     <div class="toast-container" id="toast-container"></div>
