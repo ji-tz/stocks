@@ -122,17 +122,17 @@
       </div>
       
       <!-- 实时仿真 -->
-      <div class="mode-card realtime disabled" title="功能开发中，敬请期待">
+      <div class="mode-card realtime" onclick="selectMode('realtime')">
         <div class="mode-card-icon">⚡</div>
         <div class="mode-card-title">实时仿真</div>
         <div class="mode-card-desc">使用实时数据模拟交易</div>
         <ul class="mode-card-features">
-          <li>○ 实时行情数据</li>
-          <li>○ 模拟交易环境</li>
-          <li>○ 无资金风险</li>
-          <li>○ 验证策略稳定性</li>
+          <li>✓ 实时行情数据</li>
+          <li>✓ 模拟交易环境</li>
+          <li>✓ 无资金风险</li>
+          <li>✓ 验证策略稳定性</li>
         </ul>
-        <div class="mode-card-badge todo">开发中</div>
+        <div class="mode-card-badge" style="background:#4caf50;">已就绪</div>
       </div>
       
       <!-- 实盘交易 -->
@@ -152,6 +152,12 @@
     
     <script>
       function selectMode(mode) {
+        if (mode === 'realtime') {
+          // 实时仿真模式 — 跳转到模拟盘配置
+          window.location.href = '/papertrade/setup';
+          return;
+        }
+        
         if (mode !== 'backtest') {
           alert('该功能正在开发中，敬请期待！');
           return;
