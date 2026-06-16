@@ -233,7 +233,7 @@ class TestGuiRoutes(unittest.TestCase):
         body = rv.data.decode('utf-8')
         self.assertIn('第五步：配置参数', body)  # 更新为第五步
         self.assertIn('策略说明', body)
-        self.assertIn('低买高卖', body)
+        self.assertIn('围绕持仓均价', body)
         self.assertIn('股票', body)
         self.assertIn('600900', body)
         self.assertIn('长江电力', body)
