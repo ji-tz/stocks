@@ -435,6 +435,64 @@ class BacktestExchangeRunner:
             print(f"收益率: {(total_pl / self.init_cash * 100):.2f}%")
             print(f"{'=' * 100}\n")
 
+        # ---- 计算标准化 metrics ----
+        total_pl = final_summary["realized_pl"] + final_summary["unrealized_pl"]
+        total_return_rate = total_pl / self.init_cash if self.init_cash else 0
+
+        # 年化收益率
+        annualized_return = 0.0
+        try:
+            from datetime import datetime
+            s = datetime.strptime(df["date"].iloc[0].strftime("%Y-%m-%d"), "%Y-%m-%d")
+            e = datetime.strptime(df["date"].iloc[-1].strftime("%Y-%m-%d"), "%Y-%m-%d")
+            days = (e - s).days
+            if days > 0:
+                annualized_return = (
+                    (final_summary["total_value"] / self.init_cash) ** (365.0 / days) - 1
+                )
+        except (ValueError, ZeroDivisionError):
+            annualized_return = 0.0
+
+        # 最大回撤
+        max_drawdown = 0.0
+        if history:
+            peak = max(history[0].get("total_value", self.init_cash), self.init_cash)
+            for h in history:
+                tv = h.get("total_value", self.init_cash)
+                if tv > peak:
+                    peak = tv
+                drawdown = (peak - tv) / peak if peak > 0 else 0
+                if drawdown > max_drawdown:
+                    max_drawdown = drawdown
+
+        # 夏普比率（近似）
+        sharpe_ratio = 0.0
+        if len(history) >= 2:
+            try:
+                import statistics
+                daily_returns = []
+                for i in range(1, len(history)):
+                    prev_tv = history[i - 1].get("total_value", self.init_cash)
+                    curr_tv = history[i].get("total_value", self.init_cash)
+                    if prev_tv > 0:
+                        daily_returns.append((curr_tv - prev_tv) / prev_tv)
+                if daily_returns:
+                    avg = statistics.mean(daily_returns)
+                    std = statistics.stdev(daily_returns) if len(daily_returns) > 1 else 0
+                    if std > 0:
+                        sharpe_ratio = (avg * 252 - 0.02) / (std * (252 ** 0.5))
+            except (ValueError, ZeroDivisionError, IndexError):
+                sharpe_ratio = 0.0
+
+        metrics = {
+            "total_return_rate": round(total_return_rate, 4),
+            "annualized_return": round(annualized_return, 4),
+            "max_drawdown": round(max_drawdown, 4),
+            "sharpe_ratio": round(sharpe_ratio, 4),
+            "total_pl": round(total_pl, 2),
+            "final_value": round(final_summary["total_value"], 2),
+        }
+
         return {
             "symbol": symbol,
             "start_date": df["date"].iloc[0].strftime("%Y-%m-%d"),
@@ -453,6 +511,7 @@ class BacktestExchangeRunner:
             "min_cash": round(min_cash, 2),
             "history": history,
             "trades_list": trades_list,
+            "metrics": metrics,
             "pending_orders_left": len(pending_orders),
             "granularity": granularity,
             "enforce_t_plus_one": enforce_t_plus_one,
