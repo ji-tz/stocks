@@ -233,6 +233,7 @@
         const taskId = '{{ task_id }}';
         const strategy = {{ strategy|tojson }};
         const backUrl = {{ back_url|tojson }};
+        const resultUrl = {{ result_url|default('/view_result')|tojson }};
         const replayDurationMs = 10000;
         let resultData = null;
         let replayFinished = false;
@@ -266,6 +267,17 @@
         }
 
         function buildTradeEntries(result) {
+            // Multi-strategy comparison: show strategy-level summary
+            if (result.strategies) {
+                return [{
+                    kind: 'meta',
+                    title: '多策略对比完成',
+                    time: result.end_date || '',
+                    body: `共 ${result.strategies.length} 个策略参与对比：${
+                        result.strategies.map(s => s.strategy_label || s.strategy_key).join('、')
+                    }`
+                }];
+            }
             const trades = Array.isArray(result.trades_list) ? result.trades_list : [];
             if (!trades.length) {
                 return [{
@@ -387,7 +399,7 @@
             }
             const form = document.createElement('form');
             form.method = 'POST';
-            form.action = '/view_result';
+            form.action = resultUrl;
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = 'result_json';

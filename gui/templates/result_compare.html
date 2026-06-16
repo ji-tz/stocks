@@ -1,0 +1,287 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>多策略对比结果 - 量化回测平台</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; background: #f5f5f5; }
+      h1 { color: #1976d2; text-align: center; }
+      .summary-bar {
+        display: flex; gap: 1rem; flex-wrap: wrap; justify-content: center;
+        background: white; border-radius: 8px; padding: 1rem 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem;
+      }
+      .summary-item { text-align: center; }
+      .summary-item .label { font-size: 0.8rem; color: #666; }
+      .summary-item .value { font-size: 1rem; font-weight: bold; color: #1976d2; }
+
+      .chart-container {
+        background: white; border-radius: 8px; padding: 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem;
+      }
+      .chart-toolbar { display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+      .chart-btn {
+        padding: 0.5rem 1rem; background: #1976d2; color: white;
+        border: none; border-radius: 4px; cursor: pointer; font-size: 0.85rem;
+      }
+      .chart-btn:hover { background: #1565c0; }
+      .chart-help { color: #666; font-size: 0.85rem; padding: 0.5rem; background: #f9f9f9; border-radius: 4px; border-left: 3px solid #1976d2; }
+
+      h2 { color: #333; margin-top: 1.5rem; }
+      table { border-collapse: collapse; width: 100%; background: white; box-shadow: 0 2px 4px rgba(0,0,0,0.1); border-radius: 8px; overflow: hidden; }
+      th { background: #1976d2; color: white; padding: 10px 12px; text-align: center; font-size: 0.9rem; }
+      td { padding: 8px 12px; border-bottom: 1px solid #eee; text-align: center; }
+      tr:last-child td { border-bottom: none; }
+      tr:hover td { background: #f5f8ff; }
+      .metric-best { font-weight: bold; color: #2e7d32; }
+      .metric-worst { color: #c62828; }
+      .strategy-header { text-align: left; font-weight: bold; color: #333; }
+
+      .error-msg {
+        background: #fee2e2; color: #b91c1c; padding: 1rem; border-radius: 8px;
+        text-align: center; margin: 2rem 0;
+      }
+
+      .back-link { display: block; text-align: center; margin-top: 2rem; padding: 1rem; }
+      .back-link a { color: #1976d2; text-decoration: none; font-size: 1rem; }
+      .back-link a:hover { text-decoration: underline; }
+
+      @media (max-width: 768px) {
+        table { font-size: 0.85rem; }
+        td, th { padding: 6px 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <h1>📊 多策略对比回测结果</h1>
+
+    {% if error %}
+    <div class="error-msg">⚠️ {{ error }}</div>
+    <div class="back-link"><a href="/select_strategies_multi">← 返回重新选择策略</a></div>
+    {% else %}
+
+    <div class="summary-bar">
+      <div class="summary-item">
+        <div class="label">股票代码</div>
+        <div class="value">{{ symbol }}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">回测区间</div>
+        <div class="value">{{ start_date }} → {{ end_date }}</div>
+      </div>
+      <div class="summary-item">
+        <div class="label">参与策略数</div>
+        <div class="value">{{ results|length }}</div>
+      </div>
+    </div>
+
+    <div class="chart-container">
+      <div class="chart-toolbar">
+        <button class="chart-btn" onclick="resetZoom()">🔄 重置缩放</button>
+        <button class="chart-btn" onclick="downloadChart()">💾 导出图片</button>
+        <div class="chart-help">💡 鼠标滚轮缩放，拖拽平移，点击图例切换显示</div>
+      </div>
+      <canvas id="compareChart" width="1000" height="400"></canvas>
+    </div>
+
+    <h2>📋 指标对比</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>策略</th>
+          <th>总收益率</th>
+          <th>年化收益率</th>
+          <th>最大回撤</th>
+          <th>夏普比率</th>
+          <th>总盈亏</th>
+          <th>最终资产</th>
+          <th>交易次数</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in results %}
+        {% set metrics = r.get('metrics', {}) %}
+        <tr>
+          <td class="strategy-header">{{ r.get('strategy_label', r.get('strategy_key', '未知')) }}</td>
+          <td class="{{ 'metric-best' if (metrics.get('total_return_rate', 0) | float) == best_return else '' }}">
+            {{ '%.2f'|format((metrics.get('total_return_rate', 0) | float) * 100) if metrics.get('total_return_rate') is defined else '-' }}%
+          </td>
+          <td>{{ '%.2f'|format((metrics.get('annualized_return', 0) | float) * 100) if metrics.get('annualized_return') is defined else '-' }}%</td>
+          <td class="{{ 'metric-best' if (metrics.get('max_drawdown', 0) | float) == best_drawdown else '' }}">
+            {{ '%.2f'|format((metrics.get('max_drawdown', 0) | float) * 100) if metrics.get('max_drawdown') is defined else '-' }}%
+          </td>
+          <td class="{{ 'metric-best' if (metrics.get('sharpe_ratio', 0) | float) == best_sharpe else '' }}">
+            {{ '%.2f'|format(metrics.get('sharpe_ratio', 0) | float) if metrics.get('sharpe_ratio') is defined else '-' }}
+          </td>
+          <td>{{ '%.2f'|format(metrics.get('total_pl', 0) | float) if metrics.get('total_pl') is defined else '-' }}</td>
+          <td>{{ '%.2f'|format(r.get('total_value', r.get('final_cash', 0)) | float) }}</td>
+          <td>{{ r.get('trades', 0) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <div class="back-link">
+      <a href="/select_strategies_multi">← 返回重新选择策略</a>
+      &nbsp;|&nbsp;
+      <a href="/">🏠 返回首页</a>
+    </div>
+
+    <script>
+      {% set ns = namespace(best_return=-999, best_sharpe=-999, best_drawdown=999) %}
+      {% for r in results %}
+        {% set m = r.get('metrics', {}) %}
+        {% if m.get('total_return_rate') is defined and (m.get('total_return_rate') | float) > ns.best_return %}
+          {% set ns.best_return = (m.get('total_return_rate') | float) %}
+        {% endif %}
+        {% if m.get('sharpe_ratio') is defined and (m.get('sharpe_ratio') | float) > ns.best_sharpe %}
+          {% set ns.best_sharpe = (m.get('sharpe_ratio') | float) %}
+        {% endif %}
+        {% if m.get('max_drawdown') is defined and (m.get('max_drawdown') | float) < ns.best_drawdown %}
+          {% set ns.best_drawdown = (m.get('max_drawdown') | float) %}
+        {% endif %}
+      {% endfor %}
+      // Pass best values to frontend for highlighting
+      const bestReturn = {{ ns.best_return }};
+      const bestSharpe = {{ ns.best_sharpe }};
+      const bestDrawdown = {{ ns.best_drawdown }};
+
+      const colorPalette = [
+        'rgb(25, 118, 210)',
+        'rgb(198, 40, 40)',
+        'rgb(46, 125, 50)',
+        'rgb(255, 160, 0)',
+        'rgb(156, 39, 176)',
+        'rgb(0, 188, 212)',
+        'rgb(233, 30, 99)',
+        'rgb(121, 85, 72)',
+        'rgb(96, 125, 139)',
+        'rgb(255, 87, 34)',
+      ];
+
+      {% if results %}
+      // Build chart datasets from strategy histories
+      const datasets = [];
+      const allLabels = [];
+
+      {% for r in results %}
+      {% if r.get('history') and r['history']|length > 0 %}
+      (function() {
+        const strategyLabel = {{ r.get('strategy_label', r.get('strategy_key', '策略'))|tojson }};
+        const history = {{ r['history']|tojson }};
+        const color = colorPalette[{{ loop.index0 }} % colorPalette.length];
+
+        // Collect labels from this strategy
+        const labels = history.map(h => h.date || '');
+
+        // Normalize to base=100
+        const baseValue = history[0] ? (history[0].total_value || 0) : 1;
+        const values = history.map(h => {
+          const v = h.total_value || 0;
+          return baseValue > 0 ? (v / baseValue) * 100 : 0;
+        });
+
+        // Merge labels
+        labels.forEach((l, i) => {
+          if (allLabels.indexOf(l) === -1) allLabels.push(l);
+        });
+
+        datasets.push({
+          label: strategyLabel,
+          data: values,
+          borderColor: color,
+          backgroundColor: color.replace('rgb', 'rgba').replace(')', ', 0.1)'),
+          tension: 0.1,
+          pointRadius: 0,
+          fill: false,
+          yAxisID: 'y',
+        });
+      })();
+      {% endif %}
+      {% endfor %}
+
+      // Sort labels chronologically
+      allLabels.sort();
+
+      // Reindex data to match allLabels
+      {% for r in results %}
+      {% if r.get('history') and r['history']|length > 0 %}
+      (function() {
+        const history = {{ r['history']|tojson }};
+        const baseValue = history[0] ? (history[0].total_value || 0) : 1;
+        const dataMap = {};
+        history.forEach(h => {
+          const v = h.total_value || 0;
+          dataMap[h.date] = baseValue > 0 ? (v / baseValue) * 100 : 0;
+        });
+        const idx = datasets.length - 1;
+        datasets[idx].data = allLabels.map(date => dataMap[date] !== undefined ? dataMap[date] : null);
+      })();
+      {% endif %}
+      {% endfor %}
+
+      if (datasets.length > 0) {
+        const ctx = document.getElementById('compareChart').getContext('2d');
+        const chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: allLabels,
+            datasets: datasets,
+          },
+          options: {
+            responsive: true,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+              legend: { display: true, position: 'top' },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const val = context.parsed.y;
+                    return context.dataset.label + ': ' + (val !== null ? val.toFixed(2) : 'N/A') + ' (起点=100)';
+                  }
+                }
+              }
+            },
+            scales: {
+              x: {
+                display: true,
+                ticks: {
+                  maxTicksLimit: 20,
+                  maxRotation: 45,
+                }
+              },
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: { display: true, text: '归一化资产（起点=100）' }
+              }
+            }
+          }
+        });
+
+        window.compareChart = chart;
+
+        function resetZoom() {
+          if (chart.resetZoom) chart.resetZoom();
+        }
+
+        function downloadChart() {
+          const url = chart.toBase64Image();
+          const link = document.createElement('a');
+          link.download = '多策略对比_{{ symbol }}_{{ start_date }}.png';
+          link.href = url;
+          link.click();
+        }
+      } else {
+        document.getElementById('compareChart').parentElement.innerHTML = '<p style="color:#999;text-align:center;padding:2rem;">无资产曲线数据</p>';
+      }
+      {% else %}
+      document.getElementById('compareChart').parentElement.innerHTML = '<p style="color:#999;text-align:center;padding:2rem;">无回测结果数据</p>';
+      {% endif %}
+    </script>
+    {% endif %}
+  </body>
+</html>

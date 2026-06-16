@@ -646,9 +646,32 @@
         .then(response => response.json())
         .then(data => {
           if (data.success) {
-            // 跳转到策略配置页面（使用tojson过滤器防止XSS）
-            const strategyType = {{ strategy_type | tojson }};
-            window.location.href = '/strategy/' + encodeURIComponent(strategyType);
+            // Check if we're in multi-strategy compare mode
+            const urlParams = new URLSearchParams(window.location.search);
+            const mode = urlParams.get('mode');
+            if (mode === 'compare') {
+              // For multi-strategy, skip config page and go directly to run
+              // Create a hidden form to POST to /run_multi
+              const form = document.createElement('form');
+              form.method = 'POST';
+              form.action = '/run_multi';
+              const hiddenStart = document.createElement('input');
+              hiddenStart.type = 'hidden';
+              hiddenStart.name = 'start';
+              hiddenStart.value = startFormatted;
+              form.appendChild(hiddenStart);
+              const hiddenEnd = document.createElement('input');
+              hiddenEnd.type = 'hidden';
+              hiddenEnd.name = 'end';
+              hiddenEnd.value = endFormatted;
+              form.appendChild(hiddenEnd);
+              document.body.appendChild(form);
+              form.submit();
+            } else {
+              // 跳转到策略配置页面（使用tojson过滤器防止XSS）
+              const strategyType = {{ strategy_type | tojson }};
+              window.location.href = '/strategy/' + encodeURIComponent(strategyType);
+            }
           } else {
             alert('保存时间段失败：' + (data.error || '未知错误'));
           }
