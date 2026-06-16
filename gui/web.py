@@ -1108,9 +1108,29 @@ def download_pdf():
         pdf = FPDF()
         pdf.add_page()
 
-        # Register a Unicode font for Chinese character support
-        _CJK_FONT_PATH = '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
-        if os.path.exists(_CJK_FONT_PATH):
+        # Register a Unicode font for Chinese character support via fontconfig
+        def _find_cjk_font():
+            import subprocess
+            try:
+                result = subprocess.run(
+                    ['fc-match', '-f', '%{file}', 'wqy-zenhei,Noto Sans CJK SC,SimHei,Microsoft YaHei,Droid Sans Fallback'],
+                    capture_output=True, text=True, timeout=5
+                )
+                path = result.stdout.strip()
+                if path and os.path.exists(path):
+                    return path
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass
+            # fallback: scan known directories
+            for d in ['/usr/share/fonts', '/usr/local/share/fonts', os.path.expanduser('~/.fonts')]:
+                for root, _dirs, files in os.walk(d):
+                    for f in files:
+                        if f.endswith(('.ttc', '.ttf')) and any(k in f.lower() for k in ['wqy', 'noto', 'simhei', 'yahei', 'droid']):
+                            return os.path.join(root, f)
+            return None
+
+        _CJK_FONT_PATH = _find_cjk_font()
+        if _CJK_FONT_PATH:
             pdf.add_font('CJK', '', _CJK_FONT_PATH)
             font_body = 'CJK'
             font_body_bold = 'CJK'
