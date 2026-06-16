@@ -48,6 +48,19 @@
       .toast.info { background: #1976d2; }
       @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
       @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+      /* 资金预览 */
+      .fund-preview {
+        background: #f0f7ff; border: 1px solid #bbdefb; border-radius: 8px;
+        padding: 1rem 1.2rem; margin-top: 1.5rem;
+      }
+      .fund-preview .preview-title { font-size: 0.9rem; font-weight: bold; color: #1565c0; margin-bottom: 0.6rem; }
+      .fund-preview .preview-grid { display: flex; gap: 1.5rem; flex-wrap: wrap; }
+      .fund-preview .preview-item { text-align: center; min-width: 100px; }
+      .fund-preview .preview-item .value { font-size: 1.2rem; font-weight: bold; color: #1976d2; }
+      .fund-preview .preview-item .value.green { color: #2e7d32; }
+      .fund-preview .preview-item .value.red { color: #c62828; }
+      .fund-preview .preview-item .label { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
+      .fund-preview .loading { color: #999; font-size: 0.9rem; }
     
 /* === 移动端响应式适配 === */
 @media (max-width: 640px) {
@@ -121,6 +134,9 @@
   .preset-banner { flex-direction: column; text-align: center; padding: 0.8rem; }
   .preset-banner .btn-banner { width: 100%; text-align: center; }
   .form-row { grid-template-columns: 1fr; }
+  .fund-preview .preview-grid { flex-direction: column; gap: 0.5rem; }
+  .fund-preview .preview-item { text-align: left; display: flex; justify-content: space-between; align-items: center; min-width: auto; }
+  .fund-preview .preview-item .value { font-size: 1rem; }
 }
 
 @media (max-width: 400px) {
@@ -221,14 +237,33 @@
         </label>
 
         <label>交易单位（股/份）
-          <input type="number" name="lot" value="100" min="0.01" step="0.01" required />
+          <input type="number" name="lot" id="lot-input" value="100" min="0.01" step="0.01" required oninput="updateFundPreview()" />
           <div class="param-hint">股票常用 100；ETF/场外基金可设置为 1 或 0.01</div>
         </label>
 
         <label>初始资金（元）
-          <input type="number" name="cash" value="100000" min="1000" step="1000" required />
+          <input type="number" name="cash" id="cash-input" value="100000" min="1000" step="1000" required oninput="updateFundPreview()" />
           <div class="param-hint">回测初始资金，建议至少 10000 元</div>
         </label>
+
+        <!-- 资金预览 -->
+        <div class="fund-preview" id="fund-preview">
+          <div class="preview-title">💰 资金预览</div>
+          <div class="preview-grid">
+            <div class="preview-item">
+              <div class="value" id="preview-price"><span class="loading">加载中...</span></div>
+              <div class="label">最新股价</div>
+            </div>
+            <div class="preview-item">
+              <div class="value" id="preview-per-lot">-</div>
+              <div class="label">每手金额</div>
+            </div>
+            <div class="preview-item">
+              <div class="value" id="preview-tradable">-</div>
+              <div class="label">资金支持手数</div>
+            </div>
+          </div>
+        </div>
 
         <button type="submit">🚀 开始回测</button>
       </form>
@@ -248,6 +283,53 @@
         container.appendChild(t);
         setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 2000);
       }
+
+      /* ── 资金预览 ── */
+      const stockCode = '{{ stock_code }}';
+      let latestPrice = null;
+
+      function updateFundPreview() {
+        const cash = parseFloat(document.getElementById('cash-input').value) || 0;
+        const lot = parseFloat(document.getElementById('lot-input').value) || 0;
+        const perLot = latestPrice * lot;
+        const tradable = perLot > 0 ? Math.floor(cash / perLot) : 0;
+
+        document.getElementById('preview-per-lot').textContent = perLot > 0 ? perLot.toFixed(2) + ' 元' : '-';
+        const el = document.getElementById('preview-tradable');
+        if (tradable > 0) {
+          el.textContent = tradable + ' 手';
+          el.className = 'value green';
+        } else if (latestPrice !== null && cash >= 0) {
+          el.textContent = '不足 1 手';
+          el.className = 'value red';
+        } else {
+          el.textContent = '-';
+          el.className = 'value';
+        }
+      }
+
+      // 加载最新股价
+      (function() {
+        const priceEl = document.getElementById('preview-price');
+        if (!stockCode) { priceEl.textContent = '无股票'; return; }
+        fetch('/api/stock_price/' + encodeURIComponent(stockCode))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.price) {
+              latestPrice = data.price;
+              priceEl.textContent = latestPrice.toFixed(2) + ' 元（' + (data.date || '') + '）';
+              priceEl.className = 'value';
+              updateFundPreview();
+            } else {
+              priceEl.textContent = '未获取到';
+              priceEl.className = 'value red';
+            }
+          })
+          .catch(function() {
+            priceEl.textContent = '获取失败';
+            priceEl.className = 'value red';
+          });
+      })();
 
       /* ── Preset helpers ── */
       const strategyKey = '{{ strategy_key }}';
@@ -284,6 +366,8 @@
           const el = document.querySelector('[name="' + key + '"]');
           if (el) el.value = data[key];
         });
+        /* Refresh fund preview after loading preset */
+        updateFundPreview();
       }
 
       function loadPresetList() {
