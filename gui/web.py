@@ -578,6 +578,42 @@ def select_strategy_api():
     return jsonify({'success': True})
 
 
+@app.route('/api/select_multi_strategies', methods=['POST'])
+def select_multi_strategies_api():
+    """多策略对比 — 保存选中的策略列表到session"""
+    data = request.get_json()
+    strategies = data.get('strategies', [])
+    strategy_names = data.get('strategy_names', [])
+
+    if not strategies or len(strategies) < 2:
+        return jsonify({'success': False, 'error': '请至少选择 2 个策略'})
+
+    session['multi_strategies'] = strategies
+    session['multi_strategy_names'] = strategy_names
+    session['strategy_type'] = strategies[0]  # fallback
+    session['strategy_name'] = strategy_names[0] if strategy_names else strategies[0]
+
+    return jsonify({'success': True})
+
+
+@app.route('/select_strategies_multi', methods=['GET'])
+def select_strategies_multi():
+    """多策略选择页面 — 勾选多个策略"""
+    stock_code = session.get('stock_code')
+    stock_name = session.get('stock_name')
+
+    if not stock_code or not stock_name:
+        return _render_stock_selection()
+
+    strategy_specs = _list_strategy_specs()
+    return render_template(
+        'select_strategies_multi.html',
+        stock_code=stock_code,
+        stock_name=stock_name,
+        strategy_specs=strategy_specs,
+    )
+
+
 @app.route('/select_strategy', methods=['GET'])
 def select_strategy():
     """策略选择页面"""
@@ -955,6 +991,111 @@ def view_result():
             return render_template('result_generic.html', error='回测结果格式不正确')
     except Exception as e:
         return render_template('result_generic.html', error=f'解析结果失败: {e}')
+
+
+@app.route('/run_multi', methods=['POST'])
+def run_multi():
+    """多策略对比回测入口"""
+    symbol = session.get('stock_code')
+    if not symbol:
+        symbol = request.form.get('symbol', '600900').strip()
+
+    strategies = session.get('multi_strategies', [])
+    strategy_names = session.get('multi_strategy_names', [])
+
+    if not strategies or len(strategies) < 2:
+        return render_template('result_compare.html',
+                               error='请至少选择 2 个策略进行对比',
+                               strategy_names=[],
+                               results=[])
+
+    form_start = request.form.get('start', '').strip()
+    form_end = request.form.get('end', '').strip()
+
+    start = form_start if form_start else (session.get('backtest_start') or None)
+    end = form_end if form_end else (session.get('backtest_end') or None)
+
+    source = request.form.get('source', 'auto')
+    lot = float(request.form.get('lot') or 100.0)
+    cash = float(request.form.get('cash') or 100000.0)
+
+    progress_mgr = get_progress_manager()
+    task_id = progress_mgr.create_task()
+
+    def progress_callback(current, total):
+        progress_mgr.update_progress(task_id, current, total)
+
+    def run_multi_backtest():
+        try:
+            res = stocks.run_multi_strategy_backtest(
+                symbol=symbol,
+                source=source,
+                start_date=start,
+                end_date=end,
+                lot_size=lot,
+                init_cash=cash,
+                trade_price=stocks.TRADE_PRICE_OPEN,
+                strategies=strategies,
+                progress_callback=progress_callback,
+            )
+
+            if progress_mgr.is_cancelled(task_id):
+                return
+
+            progress_mgr.set_result(task_id, res)
+
+        except Exception as e:
+            progress_mgr.set_error(task_id, str(e))
+
+    if app.testing:
+        run_multi_backtest()
+    else:
+        thread = threading.Thread(target=run_multi_backtest, daemon=True)
+        thread.start()
+
+    return render_template(
+        'backtest_progress.html',
+        task_id=task_id,
+        symbol=symbol,
+        strategy='multi',
+        strategy_label='多策略对比',
+        back_url='/select_strategies_multi',
+        result_url='/view_result_compare',
+    )
+
+
+@app.route('/view_result_compare', methods=['POST'])
+def view_result_compare():
+    """多策略对比结果页面"""
+    result_json = request.form.get('result_json')
+    if not result_json:
+        return render_template('result_compare.html',
+                               error='无法获取回测结果',
+                               strategy_names=[],
+                               results=[])
+
+    try:
+        res = json.loads(result_json)
+        strategies = res.get('strategies', [])
+        strategy_names = [s.get('strategy_label', s.get('strategy_key', '未知')) for s in strategies]
+
+        # 过滤掉有错误的策略
+        valid_results = [s for s in strategies if 'error' not in s]
+
+        return render_template(
+            'result_compare.html',
+            results=valid_results,
+            strategy_names=strategy_names,
+            symbol=res.get('symbol', ''),
+            start_date=res.get('start_date', ''),
+            end_date=res.get('end_date', ''),
+            error=None,
+        )
+    except Exception as e:
+        return render_template('result_compare.html',
+                               error=f'解析结果失败: {e}',
+                               strategy_names=[],
+                               results=[])
 
 
 @app.route('/download/excel', methods=['POST'])
