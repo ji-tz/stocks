@@ -18,7 +18,9 @@ def main():
         pass
 
     # 启动前端 Flask 应用（由 gui/web.py 提供 `app`）
-    web.app.run(debug=True)
+    # debug=True 仅用于开发，生产环境用 env var FLASK_DEBUG=0
+    debug_mode = os.environ.get('FLASK_DEBUG', '1').lower() in ('1', 'true', 'yes')
+    web.app.run(debug=debug_mode)
  
 
 if __name__ == '__main__':
