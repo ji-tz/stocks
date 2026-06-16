@@ -75,6 +75,16 @@
         color: #666;
         margin-top: 0.3rem;
       }
+      /* Toast */
+      .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+      .toast { background: #333; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-size: 0.95rem; animation: fadeIn 0.3s, fadeOut 0.3s 1.7s; max-width: 350px; }
+      .toast.success { background: #2e7d32; }
+      .toast.error { background: #c62828; }
+      .toast.info { background: #1976d2; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+      .history-link { display: inline-block; padding: 0.5rem 1rem; background: #1976d2; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; }
+      .history-link:hover { background: #1565c0; }
     </style>
   </head>
   <body>
@@ -136,7 +146,14 @@
           📄 导出 PDF
         </button>
       </form>
+      <button id="save-history-btn" style="padding:0.5rem 1rem; background:#1565c0; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
+        💾 保存到历史记录
+      </button>
+      <a href="/history" class="history-link">📋 查看历史记录</a>
     </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
 
     <h2>资产曲线</h2>
     <div class="chart-container">
@@ -171,6 +188,107 @@
     </table>
 
     <p><a href="/">返回</a></p>
+
+    <!-- Toast container moved above -->
+    <script>
+      /* ── Toast helper ── */
+      function showToast(msg, type) {
+        type = type || 'info';
+        var container = document.getElementById('toast-container');
+        if (!container) { container = document.createElement('div'); container.className = 'toast-container'; container.id = 'toast-container'; document.body.appendChild(container); }
+        var t = document.createElement('div');
+        t.className = 'toast ' + type;
+        t.textContent = msg;
+        container.appendChild(t);
+        setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 2000);
+      }
+
+      /* ── Build the payload to save ── */
+      function getResultPayload() {
+        /* Try to get the Jinja-rendered result as a JS object */
+        var resultData = null;
+        try {
+          var scriptTags = document.querySelectorAll('script');
+          for (var i = 0; i < scriptTags.length; i++) {
+            var t = scriptTags[i].textContent || '';
+            if (t.indexOf('const labels') !== -1) {
+              /* We're on a page with chart data — result is rendered into JS */
+            }
+          }
+        } catch(e) {}
+
+        /* Build payload from the rendered template data embedded in the page */
+        var payload = {
+          symbol: '{{ result.symbol if result and result.symbol else "" }}',
+          strategy_name: '{{ strategy_name or "" }}',
+          start_date: '{{ result.start_date if result and result.start_date else "" }}',
+          end_date: '{{ result.end_date if result and result.end_date else "" }}',
+          init_cash: {{ result.init_cash if result and result.init_cash else 0 }},
+          total_value: {{ result.total_value if result and result.total_value else 0 }},
+          trades: {{ result.trades if result and result.trades else 0 }},
+          realized_pl: {{ result.realized_pl if result and result.realized_pl else 0 }},
+          unrealized_pl: {{ result.unrealized_pl if result and result.unrealized_pl else 0 }}
+        };
+        {% if result and result.metrics is defined and result.metrics %}
+        payload.metrics = {
+          total_return_rate: {{ result.metrics.total_return_rate if result.metrics.total_return_rate is defined else 0 }},
+          annualized_return: {{ result.metrics.annualized_return if result.metrics.annualized_return is defined else 0 }},
+          max_drawdown: {{ result.metrics.max_drawdown if result.metrics.max_drawdown is defined else 0 }},
+          sharpe_ratio: {{ result.metrics.sharpe_ratio if result.metrics.sharpe_ratio is defined else 0 }},
+          total_pl: {{ result.metrics.total_pl if result.metrics.total_pl is defined else 0 }},
+          final_value: {{ result.metrics.final_value if result.metrics.final_value is defined else 0 }}
+        };
+        {% endif %}
+        return payload;
+      }
+
+      /* ── Save to history ── */
+      function saveToHistory() {
+        var payload = getResultPayload();
+        fetch('/save_result_history', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        })
+        .then(function(r) { return r.json(); })
+        .then(function(data) {
+          if (data.error) {
+            console.warn('保存历史记录失败:', data.error);
+          } else {
+            showToast('✅ 已保存到历史记录', 'success');
+          }
+        })
+        .catch(function() {
+          /* silent fail for auto-save */
+        });
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        /* Auto-save on page load */
+        saveToHistory();
+
+        /* Manual save on button click */
+        var btn = document.getElementById('save-history-btn');
+        if (btn) {
+          btn.addEventListener('click', function(e) {
+            e.preventDefault();
+            /* Save again with explicit toast */
+            var payload = getResultPayload();
+            fetch('/save_result_history', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.error) { showToast('保存失败: ' + data.error, 'error'); return; }
+              showToast('✅ 已保存到历史记录', 'success');
+            })
+            .catch(function() { showToast('保存失败', 'error'); });
+          });
+        }
+      });
+    </script>
 
     <script>
       {% if result.history and result.history|length > 0 %}

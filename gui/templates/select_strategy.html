@@ -93,6 +93,25 @@
       .strategy-card .btn:hover { 
         background: #1565c0; 
       }
+      .preset-badge {
+        display: inline-block;
+        background: #fff3e0;
+        color: #e65100;
+        font-size: 0.75rem;
+        padding: 2px 8px;
+        border-radius: 10px;
+        margin-left: 0.5rem;
+        vertical-align: middle;
+        font-weight: normal;
+      }
+      .preset-bookmark {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        font-size: 1.2rem;
+        opacity: 0.7;
+      }
+      .strategy-card { position: relative; }
     </style>
   </head>
   <body>
@@ -112,7 +131,14 @@
     <div class="strategy-cards">
       {% for strategy in strategy_specs %}
       <div class="strategy-card" onclick='selectStrategy({{ strategy.key | tojson }}, {{ strategy.label | tojson }})'>
-        <h3>📌 {{ strategy.label }}策略</h3>
+        {% if strategy.preset_count is defined and strategy.preset_count > 0 %}
+        <span class="preset-bookmark">🔖</span>
+        {% endif %}
+        <h3>📌 {{ strategy.label }}策略
+          {% if strategy.preset_count is defined and strategy.preset_count > 0 %}
+          <span class="preset-badge">{{ strategy.preset_count }} 预设</span>
+          {% endif %}
+        </h3>
         <p><strong>{{ strategy.description or '通用量化策略' }}</strong></p>
         <p>策略标识：{{ strategy.key }}</p>
         <a href="#" onclick='event.preventDefault(); selectStrategy({{ strategy.key | tojson }}, {{ strategy.label | tojson }});' class="btn">选择此策略 →</a>
@@ -120,6 +146,13 @@
       {% endfor %}
     </div>
     
+    <div style="text-align: center; margin-top: 2rem; padding-top: 2rem; border-top: 1px solid #ddd;">
+      <a href="/select_strategies_multi" style="display: inline-block; padding: 0.8rem 2rem; background: #2e7d32; color: white; text-decoration: none; border-radius: 6px; font-size: 1.1rem;">
+        🎯 多策略对比（勾选多个策略）
+      </a>
+      <p style="color: #666; font-size: 0.85rem; margin-top: 0.5rem;">同一股票、同一时间段，对比多个策略的收益率、回撤和夏普率</p>
+    </div>
+
     <script>
       function selectStrategy(strategyType, strategyName) {
         // 保存策略信息到后端session

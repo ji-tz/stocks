@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>📋 历史回测记录 - 量化回测平台</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; background: #f5f5f5; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+      .header h1 { margin: 0; color: #1976d2; }
+      .back-link { color: #1976d2; text-decoration: none; font-size: 0.95rem; }
+      .back-link:hover { text-decoration: underline; }
+      .breadcrumb { background: #f5f5f5; padding: 0.8rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.9rem; }
+      .breadcrumb-item { display: inline-block; color: #666; }
+      .breadcrumb-item.active { color: #1976d2; font-weight: bold; }
+      .breadcrumb-separator { margin: 0 0.5rem; color: #999; }
+      .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); padding: 1.5rem; margin-bottom: 1.5rem; }
+      .table-container { overflow-x: auto; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+      th { background: #1976d2; color: white; padding: 10px 12px; text-align: left; font-weight: 500; white-space: nowrap; }
+      td { padding: 10px 12px; border-bottom: 1px solid #eee; cursor: pointer; }
+      tr:nth-child(even) td { background: #f9f9f9; }
+      tr:nth-child(odd) td { background: white; }
+      tr:hover td { background: #e3f2fd; }
+      .empty-state { text-align: center; padding: 3rem 2rem; color: #999; }
+      .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+      .empty-state p { font-size: 1.1rem; line-height: 1.6; }
+      .badge { display: inline-block; background: #e3f2fd; color: #1976d2; padding: 2px 8px; border-radius: 10px; font-size: 0.8rem; }
+      .return-pos { color: #2e7d32; font-weight: bold; }
+      .return-neg { color: #c62828; font-weight: bold; }
+      @media (max-width: 768px) {
+        table { font-size: 0.8rem; }
+        th, td { padding: 6px 8px; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>📋 历史回测记录</h1>
+      <a href="/" class="back-link">← 返回首页</a>
+    </div>
+
+    <div class="breadcrumb">
+      <span class="breadcrumb-item"><a href="/" style="color:#1976d2;text-decoration:none;">首页</a></span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item active">历史回测记录</span>
+    </div>
+
+    <div class="card">
+      {% if records and records|length > 0 %}
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr>
+              <th>序号</th>
+              <th>策略</th>
+              <th>股票</th>
+              <th>月份</th>
+              <th>总收益率</th>
+              <th>夏普比率</th>
+              <th>最大回撤</th>
+              <th>交易次数</th>
+              <th>预设名称</th>
+              <th>时间</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in records %}
+            <tr onclick="location.href='/result/{{ r.id }}'" style="cursor:pointer;">
+              <td>{{ loop.index }}</td>
+              <td>{{ r.strategy_name or r.strategy or '-' }}</td>
+              <td>{{ r.symbol or '-' }}</td>
+              <td>{{ r.month or (r.start_date[:6] if r.start_date else '-') }}</td>
+              <td class="{% if r.metrics and r.metrics.total_return_rate is defined %}{% if r.metrics.total_return_rate >= 0 %}return-pos{% else %}return-neg{% endif %}{% endif %}">
+                {% if r.metrics and r.metrics.total_return_rate is defined %}
+                  {{ '%.2f'|format(r.metrics.total_return_rate * 100) }}%
+                {% elif r.total_return_rate is defined %}
+                  {{ '%.2f'|format(r.total_return_rate * 100) }}%
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if r.metrics and r.metrics.sharpe_ratio is defined %}
+                  {{ '%.2f'|format(r.metrics.sharpe_ratio) }}
+                {% elif r.sharpe_ratio is defined %}
+                  {{ '%.2f'|format(r.sharpe_ratio) }}
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>
+                {% if r.metrics and r.metrics.max_drawdown is defined %}
+                  {{ '%.2f'|format(r.metrics.max_drawdown * 100) }}%
+                {% elif r.max_drawdown is defined %}
+                  {{ '%.2f'|format(r.max_drawdown * 100) }}%
+                {% else %}
+                  -
+                {% endif %}
+              </td>
+              <td>{{ r.trades or r.trade_count or '-' }}</td>
+              <td>{% if r.preset_name %}<span class="badge">{{ r.preset_name }}</span>{% else %}-{% endif %}</td>
+              <td>{{ r.created_at or r.timestamp or '-' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <div class="empty-state">
+        <div class="icon">📭</div>
+        <p>暂无历史回测记录<br>运行一次回测并保存即可在此查看</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <p style="text-align:center;margin-top:1.5rem;">
+      <a href="/" style="color:#1976d2;">← 返回首页</a>
+    </p>
+  </body>
+</html>

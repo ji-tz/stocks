@@ -30,6 +30,24 @@
       button:hover { background: #1565c0; }
       .param-hint { color: #666; font-size: 0.9rem; margin-top: 0.25rem; }
       .empty-params { color: #666; font-size: 0.95rem; margin-top: 1rem; }
+      /* Preset management styles */
+      .preset-box { background: #fff3e0; border: 1px solid #ffe0b2; border-radius: 8px; padding: 1rem 1.5rem; margin-bottom: 1rem; }
+      .preset-box h3 { margin: 0 0 0.8rem 0; color: #e65100; font-size: 1rem; }
+      .preset-row { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+      .preset-row select { flex: 1; min-width: 180px; max-width: 300px; padding: 0.5rem; border: 1px solid #ccc; border-radius: 4px; }
+      .preset-row .btn-sm { margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; }
+      .btn-sm-outline { margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; background: transparent; color: #c62828; border: 1px solid #c62828; border-radius: 4px; cursor: pointer; }
+      .btn-sm-outline:hover { background: #ffebee; }
+      .btn-sm-save { margin: 0; padding: 0.5rem 1rem; font-size: 0.9rem; background: #e65100; color: white; border: none; border-radius: 4px; cursor: pointer; }
+      .btn-sm-save:hover { background: #bf360c; }
+      /* Toast */
+      .toast-container { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+      .toast { background: #333; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,0.2); font-size: 0.95rem; animation: fadeIn 0.3s, fadeOut 0.3s 1.7s; max-width: 350px; }
+      .toast.success { background: #2e7d32; }
+      .toast.error { background: #c62828; }
+      .toast.info { background: #1976d2; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(-10px); } to { opacity: 1; transform: translateY(0); } }
+      @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
     </style>
   </head>
   <body>
@@ -71,6 +89,18 @@
       <h2>策略说明</h2>
       <p><strong>{{ strategy_label }}</strong></p>
       <p>{{ strategy_description or '该策略已完成自动注册，可直接在 GUI 进行参数配置并回测。' }}</p>
+    </div>
+
+    <div class="preset-box">
+      <h3>📋 预设管理</h3>
+      <div class="preset-row">
+        <select id="preset-select">
+          <option value="">— 选择预设 —</option>
+        </select>
+        <button class="btn-sm" id="load-preset-btn" style="margin:0;padding:0.5rem 1rem;font-size:0.9rem;">📂 加载预设</button>
+        <button class="btn-sm-save" id="save-preset-btn">💾 保存当前为预设...</button>
+        <button class="btn-sm-outline" id="delete-preset-btn">🗑 删除预设</button>
+      </div>
     </div>
 
     <div class="form-section">
@@ -119,5 +149,130 @@
         <button type="submit">🚀 开始回测</button>
       </form>
     </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+      /* ── Toast helper ── */
+      function showToast(msg, type) {
+        type = type || 'info';
+        const container = document.getElementById('toast-container');
+        const t = document.createElement('div');
+        t.className = 'toast ' + type;
+        t.textContent = msg;
+        container.appendChild(t);
+        setTimeout(function() { if (t.parentNode) t.parentNode.removeChild(t); }, 2000);
+      }
+
+      /* ── Preset helpers ── */
+      const strategyKey = '{{ strategy_key }}';
+
+      function getFormData() {
+        const data = {};
+        data.strategy = strategyKey;
+        data.source = document.querySelector('select[name="source"]').value;
+        data.lot = document.querySelector('input[name="lot"]').value;
+        data.cash = document.querySelector('input[name="cash"]').value;
+        document.querySelectorAll('input[name^="param_"], input[name^="period_"], input[name^="threshold_"], input[name^="ma_"], input[name^="rsi_"], input[name^="bb_"], input[name^="std_"]').forEach(function(inp) {
+          data[inp.name] = inp.value;
+        });
+        /* Also capture any input that is a strategy parameter (all inputs inside form-section except source/lot/cash) */
+        document.querySelectorAll('.form-section input:not([name="source"]):not([name="lot"]):not([name="cash"])').forEach(function(inp) {
+          if (inp.name && inp.type !== 'hidden') data[inp.name] = inp.value;
+        });
+        return data;
+      }
+
+      function fillForm(data) {
+        /* Fill source */
+        const srcEl = document.querySelector('select[name="source"]');
+        if (srcEl && data.source) srcEl.value = data.source;
+        /* Fill lot */
+        const lotEl = document.querySelector('input[name="lot"]');
+        if (lotEl && data.lot) lotEl.value = data.lot;
+        /* Fill cash */
+        const cashEl = document.querySelector('input[name="cash"]');
+        if (cashEl && data.cash) cashEl.value = data.cash;
+        /* Fill all other inputs by name */
+        Object.keys(data).forEach(function(key) {
+          if (key === 'strategy' || key === 'source' || key === 'lot' || key === 'cash') return;
+          const el = document.querySelector('[name="' + key + '"]');
+          if (el) el.value = data[key];
+        });
+      }
+
+      function loadPresetList() {
+        fetch('/api/presets_for_strategy/' + encodeURIComponent(strategyKey))
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            var sel = document.getElementById('preset-select');
+            sel.innerHTML = '<option value="">— 选择预设 —</option>';
+            if (data.presets && data.presets.length > 0) {
+              data.presets.forEach(function(p) {
+                var opt = document.createElement('option');
+                opt.value = p;
+                opt.textContent = p;
+                sel.appendChild(opt);
+              });
+            }
+          })
+          .catch(function() { /* silently fail */ });
+      }
+
+      document.addEventListener('DOMContentLoaded', function() {
+        loadPresetList();
+
+        /* Load preset */
+        document.getElementById('load-preset-btn').addEventListener('click', function() {
+          var name = document.getElementById('preset-select').value;
+          if (!name) { showToast('请先选择一个预设', 'error'); return; }
+          fetch('/load_preset/' + encodeURIComponent(name))
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.error) { showToast('加载失败: ' + data.error, 'error'); return; }
+              fillForm(data);
+              showToast('✅ 已加载预设: ' + name, 'success');
+            })
+            .catch(function() { showToast('加载预设失败', 'error'); });
+        });
+
+        /* Save preset */
+        document.getElementById('save-preset-btn').addEventListener('click', function() {
+          var name = prompt('请输入预设名称：');
+          if (!name || !name.trim()) return;
+          name = name.trim();
+          var formData = getFormData();
+          formData.preset_name = name;
+          fetch('/save_preset', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          })
+          .then(function(r) { return r.json(); })
+          .then(function(data) {
+            if (data.error) { showToast('保存失败: ' + data.error, 'error'); return; }
+            showToast('✅ 预设已保存: ' + name, 'success');
+            loadPresetList();
+          })
+          .catch(function() { showToast('保存失败', 'error'); });
+        });
+
+        /* Delete preset */
+        document.getElementById('delete-preset-btn').addEventListener('click', function() {
+          var name = document.getElementById('preset-select').value;
+          if (!name) { showToast('请先选择要删除的预设', 'error'); return; }
+          if (!confirm('确定删除预设 "' + name + '" 吗？')) return;
+          fetch('/delete_preset/' + encodeURIComponent(name), { method: 'DELETE' })
+            .then(function(r) { return r.json(); })
+            .then(function(data) {
+              if (data.error) { showToast('删除失败: ' + data.error, 'error'); return; }
+              showToast('🗑 已删除预设: ' + name, 'success');
+              loadPresetList();
+            })
+            .catch(function() { showToast('删除失败', 'error'); });
+        });
+      });
+    </script>
   </body>
 </html>
