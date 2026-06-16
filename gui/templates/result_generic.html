@@ -263,6 +263,19 @@
         });
       }
 
+      /* ── Check hidden form payload size before download ── */
+      function checkFormPayloadSize(form) {
+        var input = form.querySelector('input[name="result_json"]');
+        if (!input) return true;
+        var size = new Blob([input.value]).size;
+        /* 15 KB threshold — Flask/Werkzeug may silently truncate beyond ~16 KB */
+        if (size > 15360) {
+          showToast('⚠️ 结果数据过大（' + (size / 1024).toFixed(1) + ' KB），建议先点击"保存到历史记录"再从历史记录页面导出', 'error');
+          return false;
+        }
+        return true;
+      }
+
       document.addEventListener('DOMContentLoaded', function() {
         /* Auto-save on page load */
         saveToHistory();
@@ -285,6 +298,16 @@
               showToast('✅ 已保存到历史记录', 'success');
             })
             .catch(function() { showToast('保存失败', 'error'); });
+          });
+        }
+
+        /* Intercept download form submits to check payload size */
+        var downloadForms = document.querySelectorAll('form[action*="/download/"]');
+        for (var i = 0; i < downloadForms.length; i++) {
+          downloadForms[i].addEventListener('submit', function(e) {
+            if (!checkFormPayloadSize(this)) {
+              e.preventDefault();
+            }
           });
         }
       });

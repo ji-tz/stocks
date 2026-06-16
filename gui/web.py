@@ -1149,10 +1149,14 @@ def download_excel():
     if not result_json:
         return jsonify({'error': '无法获取回测结果'}), 400
 
+    # Detect potential truncation: warn if unusually large data was sent
+    if len(result_json) > 15000:
+        pass  # Likely truncated — let JSON decode catch it below
+
     try:
         res = json.loads(result_json)
     except json.JSONDecodeError:
-        return jsonify({'error': '结果数据格式错误'}), 400
+        return jsonify({'error': '结果数据格式错误 — 可能是回测结果太大，表单传输中被截断。请先保存到历史记录（点击"保存到历史记录"按钮），再从历史记录页面导出。'}), 400
 
     if not isinstance(res, dict):
         return jsonify({'error': '结果数据格式错误'}), 400
@@ -1196,7 +1200,7 @@ def download_pdf():
     try:
         res = json.loads(result_json)
     except json.JSONDecodeError:
-        return jsonify({'error': '结果数据格式错误'}), 400
+        return jsonify({'error': '结果数据格式错误 — 可能是回测结果太大，表单传输中被截断。请先保存到历史记录，再从历史记录页面导出。'}), 400
 
     if not isinstance(res, dict):
         return jsonify({'error': '结果数据格式错误'}), 400
