@@ -15,6 +15,9 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable, Mapping
 
 from exchange.source.data_provider import get_data as _get_data
+import logging
+
+logger = logging.getLogger(__name__)
 
 try:
     from trader.simulator import simulate_mean_cost, simulate_fixed_amount
@@ -141,6 +144,7 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
     try:
         import strategy
     except Exception:
+        logger.debug("策略模块不可用，跳过自动发现")
         return discovered
 
     for mod in pkgutil.iter_modules(strategy.__path__):
@@ -201,6 +205,7 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
             )
         except Exception:
             # 自动发现应是 best-effort，单个策略异常不应影响其他策略
+            logger.debug("策略 %s 自动发现异常", module_name, exc_info=True)
             continue
 
     return discovered
@@ -275,6 +280,7 @@ def get_data(symbol: str = "600900",
                 df = df[df['date'] <= ed_dt]
     except Exception:
         # 若过滤过程中出错，不阻塞原始行为，返回原始 df
+        logger.debug("日期范围过滤出错", exc_info=True)
         pass
 
     return df
@@ -463,6 +469,7 @@ def run_futures_a50_prev_night(symbol: str = "600900", source: object = "auto",
     try:
         futures_df = get_data(symbol=futures_symbol, source=source, cache_dir='data')
     except Exception:
+        logger.debug("期货数据获取失败", exc_info=True)
         futures_df = None
 
     if futures_df is None or getattr(futures_df, 'empty', False):
@@ -803,7 +810,7 @@ def run_multi_strategy_backtest(
             start_date_str = str(_pd.to_datetime(df['date'].iloc[0]).strftime('%Y-%m-%d'))
             end_date_str = str(_pd.to_datetime(df['date'].iloc[-1]).strftime('%Y-%m-%d'))
     except Exception:
-        pass
+        logger.debug("无法从DataFrame提取日期范围")
 
     results: list[dict[str, Any]] = []
     total = len(strategies)

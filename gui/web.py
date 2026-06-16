@@ -1,3 +1,4 @@
+import logging
 from trader import persistence
 from gui.backtest_progress import get_progress_manager
 from trader.export import export_to_excel, prepare_pdf_data, generate_filename
@@ -11,6 +12,8 @@ import time
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, session, jsonify, Response
+
+logger = logging.getLogger(__name__)
 
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
@@ -808,7 +811,7 @@ def refresh_stock_chart_cache(stock_code):
                 payload['source_logs'] = payload.get('source_logs', [])
                 return jsonify(payload)
             except Exception:
-                pass
+                logger.warning("缓存恢复与降级payload构建均失败")
         return jsonify({'error': f'清除缓存并重新下载失败: {str(exc)}'}), 500
 
 
