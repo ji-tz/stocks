@@ -733,6 +733,147 @@ def export_prepare_pdf_data(
     return prepare_pdf_data(backtest_result, strategy_name=strategy_name)
 
 
+# ---------------------------------------------------------------------------
+# 多策略对比回测
+# ---------------------------------------------------------------------------
+
+
+def run_multi_strategy_backtest(
+    symbol: str = "600900",
+    source: object = "auto",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    lot_size: float = 100.0,
+    init_cash: float = 100000.0,
+    trade_price: str = TRADE_PRICE_OPEN,
+    strategies: Optional[list[str]] = None,
+    strategies_params: Optional[dict[str, dict[str, Any]]] = None,
+    progress_callback: Optional[Callable[[int, int], None]] = None,
+) -> Dict[str, Any]:
+    """多策略对比回测：一次获取行情数据，多个策略共享运行。
+
+    Args:
+        symbol: 股票代码
+        source: 数据源
+        start_date: 起始日期
+        end_date: 结束日期
+        lot_size: 交易手数
+        init_cash: 初始资金
+        trade_price: 成交价格字段
+        strategies: 策略 key 列表（如 ['sma', 'dual_ma', 'rsi']）
+        strategies_params: 各策略专属参数 {key: {param: value}}
+        progress_callback: 进度回调
+
+    Returns:
+        {
+            'symbol': str,
+            'start_date': str,
+            'end_date': str,
+            'strategies': [
+                {
+                    'key': str,
+                    'label': str,
+                    'metrics': { ... },
+                    'history': [ ... ],
+                    'trades_list': [ ... ],
+                    'init_cash': float,
+                    'final_cash': float,
+                },
+                ...
+            ]
+        }
+    """
+    if not strategies:
+        raise ValueError("strategies 列表不能为空")
+
+    strategies_params = strategies_params or {}
+
+    # 1. 只获取一次行情数据
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+
+    start_date_str = ""
+    end_date_str = ""
+    try:
+        import pandas as _pd
+        if not df.empty and 'date' in df.columns:
+            start_date_str = str(_pd.to_datetime(df['date'].iloc[0]).strftime('%Y-%m-%d'))
+            end_date_str = str(_pd.to_datetime(df['date'].iloc[-1]).strftime('%Y-%m-%d'))
+    except Exception:
+        pass
+
+    results: list[dict[str, Any]] = []
+    total = len(strategies)
+
+    for idx, strategy_key in enumerate(strategies):
+        if progress_callback:
+            progress_callback(idx, total)
+
+        spec = get_strategy_spec(strategy_key)
+        params = strategies_params.get(strategy_key, {})
+
+        try:
+            if spec.module_interface and spec.module_name:
+                # 自动注册的策略模块走通用流程
+                from trader.simulator import Simulator
+
+                module = importlib.import_module(spec.module_name)
+
+                validate_parameters = getattr(module, 'validate_strategy_parameters', None)
+                if callable(validate_parameters):
+                    validate_parameters(**params)
+
+                df_copy = df[["date", "open", "high", "low", "close", "volume"]].copy()
+
+                prepare_backtest_data = getattr(module, 'prepare_backtest_data', None)
+                if callable(prepare_backtest_data):
+                    df_copy = prepare_backtest_data(df=df_copy, source=source, **params)
+
+                create_strategy = getattr(module, 'create_strategy', None)
+                if not callable(create_strategy):
+                    raise RuntimeError(f'策略模块 {spec.module_name} 缺少 create_strategy()')
+
+                strategy = create_strategy(df=df_copy, source=source, **params)
+
+                sim = Simulator(lot_size=lot_size, init_cash=init_cash)
+                sim_res = sim.simulate(
+                    df=df_copy,
+                    strategy=strategy,
+                    symbol=symbol,
+                    trade_price=trade_price,
+                )
+                sim_res.setdefault('init_cash', init_cash)
+                sim_res.setdefault('final_cash', sim_res.get('total_value', init_cash))
+            else:
+                # 简单策略 runner
+                sim_res = spec.runner(
+                    symbol=symbol,
+                    start_date=start_date,
+                    end_date=end_date,
+                    lot_size=lot_size,
+                    init_cash=init_cash,
+                    source=source,
+                    trade_price=trade_price,
+                    **params,
+                )
+        except Exception as e:
+            sim_res = {
+                'error': str(e),
+                'symbol': symbol,
+                'init_cash': init_cash,
+            }
+
+        sim_res['strategy_key'] = strategy_key
+        sim_res['strategy_label'] = spec.label
+        results.append(sim_res)
+
+    return {
+        'symbol': symbol,
+        'start_date': start_date_str,
+        'end_date': end_date_str,
+        'strategies': results,
+    }
+
+
 if __name__ == '__main__':
     # 方便开发时直接运行并快速检查
     try:
