@@ -31,7 +31,7 @@
 - 当前策略统一以开盘价作为成交时点，先保证现有功能稳定。
 - 回测通用参数包括股票、时间范围、初始资金、交易手数、数据源。
 - 策略专属参数通过统一注册表管理，例如 `SMA` 的 `period`、定投的 `fixed_amount`。
-- 新增策略时，优先在 `solver/` 模块中补充参数、指标准备和买卖决策逻辑，并复用统一模拟交易流程。
+- 新增策略时，优先在 `strategy/` 模块中补充参数、指标准备和买卖决策逻辑，并复用统一模拟交易流程。
 
 ### 2. 数据获取
 - 支持 AKShare 和 Baostock 多数据源
@@ -56,36 +56,42 @@
 
 ## 项目结构
 
-```
+```text
 stocks/
 ├── main.py                 # 主入口文件
-├── stocks.py              # 后端业务模块
-├── gui/                   # Web界面
-│   ├── web.py            # Flask应用
-│   └── templates/        # HTML模板
-├── solver/                # 策略实现
-│   ├── sma_strategy.py   # SMA策略
+├── strategy/               # 策略算法（STRAT角色）
+│   ├── sma_strategy.py    # SMA策略
 │   ├── mean_cost_strategy.py  # 均值成本策略
-│   ├── fixed_amount_strategy.py  # 定投策略（固定金额）
+│   ├── fixed_amount_strategy.py  # 定投策略
 │   ├── dual_ma_strategy.py  # 双均线交叉策略
 │   ├── bollinger_strategy.py  # 布林带策略
-│   └── rsi_strategy.py  # RSI策略
-├── simulator/             # 模拟器
-│   └── simulator.py      # 通用模拟器框架
-├── source/                # 数据源
-│   └── data_provider.py  # 数据提供者
-├── tests/                 # 单元测试
-│   ├── guitests/          # GUI测试
-│   │   └── test_gui_backtest_report_e2e.py  # GUI完整回测与报告生成
-│   └── test_yangtze_power.py  # 股票集成测试（支持随机选择）
+│   └── rsi_strategy.py   # RSI策略
+├── trader/                 # 交易员模块（TRADER角色）
+│   ├── simulator.py      # 回测模拟器
+│   └── stocks.py         # 业务调度入口
+├── exchange/               # 交易所模块（EXCH角色）
+│   ├── source/           # 数据源 Provider
+│   │   ├── data_provider.py
+│   │   ├── akshare_provider.py
+│   │   └── baostock_provider.py
+│   ├── backtest/         # 回测交易所
+│   ├── live/             # 实盘交易所
+│   └── realtime/         # 实时仿真
+├── gui/                   # Web界面（gui角色）
+│   ├── web.py           # Flask应用
+│   └── templates/       # HTML模板
+├── tests/                 # 测试
+│   ├── unit/            # 单元测试（ITEST）
+│   ├── integration/     # 集成测试（ITEST）
+│   └── guitests/        # GUI E2E测试（GTEST）
 ├── data/                  # 本地数据缓存
-├── testing/               # GUI测试截图与Markdown报告输出目录
+├── testing/               # GUI测试产物
 └── .github/
     └── workflows/
-        ├── lint.yml       # 代码检视工作流
-        ├── test.yml       # 单元测试和集成测试工作流
-      ├── testgui.yml    # GUI完整回测报告工作流
-        └── package.yml    # 打包工作流
+        ├── lint.yml
+        ├── test.yml
+        ├── testgui.yml
+        └── package.yml
 ```
 
 ## 快速开始
@@ -126,8 +132,8 @@ python main.py
 
 **Web界面操作流程：**
 1. **选取股票**：通过股票代码（如 600900）或股票名称（如 长江电力）搜索
-2. **选取策略**：从 SMA、均值成本、定投三种策略中选择
-3. **配置参数**：设置策略参数、初始资金、回测时间范围（SMA / 双均线 / 布林带 / RSI 参数均可调）
+2. **选取策略**：从 SMA、均值成本、定投、双均线、布林带、RSI、期货开仓信号等策略中选择
+3. **配置参数**：设置策略参数、初始资金、回测时间范围
 4. **查看复盘**：查看回测结果、收益曲线、交易明细
 
 #### 方式2: 使用命令行工具
@@ -142,22 +148,21 @@ python run_mean_cost.py --symbol 600900 --start 20200101 --cash 100000
 #### 方式3: 使用 Python API
 
 ```python
-from simulator import Simulator
-from solver.mean_cost_strategy import MeanCostDecision
-import stocks
-
 # 初始化
+import trader.stocks as stocks
 stocks.init()
 
 # 获取股票数据
 data = stocks.get_data(symbol="600900", start_date="20200101")
 
-# 创建模拟器和策略
-sim = Simulator(lot_size=100, init_cash=100000.0, verbose=True)
-strategy = MeanCostDecision()
-
-# 运行回测
-result = sim.simulate(df=data, strategy=strategy, symbol="600900")
+# 使用 stocks.run_backtest() 运行回测
+result = stocks.run_backtest(
+    symbol="600900",
+    start_date="20200101",
+    end_date="20231231",
+    strategy_key="mean_cost",
+    init_cash=100000.0,
+)
 
 # 查看结果
 print(f"总交易次数: {result['trades']}")
@@ -176,99 +181,66 @@ python main.py
 ### 运行测试
 
 ```bash
+# 激活虚拟环境
+source .venv/bin/activate
+
 # 运行所有测试
-python -m unittest discover tests -v
+python -m pytest tests/ -v
 
-# 运行股票集成测试（随机选择）
-python -m tests.test_yangtze_power
+# 运行单元测试
+python -m pytest tests/unit/ -v
 
-# 运行股票集成测试（指定股票）
-python -c "from tests.test_yangtze_power import run_yangtze_power_test; run_yangtze_power_test(symbol='600900')"
+# 运行集成测试
+python -m pytest tests/integration/ -v
+
+# 运行 GUI E2E 测试
+python -m pytest tests/guitests/ -v
 ```
 
 ### 代码检查
 
 ```bash
 # Pylint检查
-pylint --rcfile=.pylintrc stocks.py main.py
+pylint --rcfile=.pylintrc main.py trader/ exchange/ strategy/ gui/
 
 # Flake8检查
 flake8 .
 
 # Mypy类型检查
-mypy stocks.py main.py --config-file=mypy.ini
+mypy main.py --config-file=mypy.ini
 ```
 
 ### GUI 回测报告
 
 ```bash
-# 运行完整GUI回测报告测试
-python -m unittest tests.guitests.test_gui_backtest_report_e2e -v
-
+# 运行 GUI E2E 测试
+python -m pytest tests/guitests/ -v
 ```
 
-执行后会在 `testing/` 目录下生成 8 张步骤截图和 `guitest.md`。
+执行后会在 `testing/` 目录下生成截图和报告。
 
-## 命令行工具
-
-### 均值成本策略回测 (run_mean_cost.py)
-
-直接从命令行运行均值成本策略回测：
-
-```bash
-# 基本用法（默认：600900长江电力，从2025年1月1日开始）
-python run_mean_cost.py
-
-# 自定义参数
-python run_mean_cost.py \
-  --symbol 600519 \          # 股票代码（贵州茅台）
-  --start 20200101 \         # 起始日期
-  --lot 100 \                # 每次交易手数
-  --cash 100000.0 \          # 初始资金
-  --source auto              # 数据源（auto/akshare/baostock）
-```
-
-**参数说明：**
-- `--symbol, -s`: 股票代码（默认：600900）
-- `--start`: 回测起始日期，格式YYYYMMDD（默认：20250101）
-- `--lot`: 每次交易手数（默认：100股）
-- `--cash`: 初始资金（默认：100000元）
-- `--source`: 数据源，可选 auto/akshare/baostock（默认：auto）
-
-**输出示例：**
-```python
-{'avg_cost': 23.45,
- 'cash': 52340.00,
- 'realized_pl': 1234.56,
- 'shares': 2000,
- 'total_value': 99240.00,
- 'trades': 20,
- 'unrealized_pl': 456.78}
-```
-
-### 定投策略（Fixed Amount）使用示例
+## GitHub Actions 工作流
 
 定投策略每天投入固定金额购买股票，无需择时，适合长期投资：
 
 ```python
-from simulator.simulator import simulate_fixed_amount
+import trader.stocks as stocks
 
 # 运行定投策略回测
-result = simulate_fixed_amount(
+result = stocks.run_backtest(
     symbol="600900",           # 股票代码
     start_date="20230101",     # 开始日期
     end_date="20231231",       # 结束日期
-    fixed_amount=1000.0,       # 每次投入 1000 元
-    lot_size=100,              # 交易手数（100股为1手）
-    init_cash=100000.0,        # 初始资金
-    verbose=True               # 显示详细日志
+    strategy_key="fixed_amount",
+    strategy_params={"fixed_amount": 1000.0},
+    init_cash=100000.0,
 )
 
 # 查看结果
 print(f"总交易次数: {result['trades']}")
 print(f"最终持仓: {result['shares']} 股")
 print(f"总资产: {result['total_value']:.2f} 元")
-print(f"收益率: {(result['total_value'] - result['init_cash']) / result['init_cash'] * 100:.2f}%")
+print(f"收益率: {result['total_return_pct']:.2f}%")
 ```
 
 **定投策略的优势：**
@@ -276,25 +248,6 @@ print(f"收益率: {(result['total_value'] - result['init_cash']) / result['init
 - 📊 **平滑成本**：价格低时买入更多，价格高时买入较少
 - 💡 **简单易行**：无需复杂的技术分析
 - ⏰ **适合长期**：通过时间平滑市场波动
-
-### 演示脚本 (demo_simulator.py)
-
-展示 Simulator 模块的增强功能，包括详细日志、解耦架构等：
-
-```bash
-python demo_simulator.py
-```
-
-**演示内容：**
-1. **Simulator + verbose模式**: 显示每日详细交易日志
-2. **直接使用SimulatorEngine**: 展示底层API用法
-3. **架构说明**: 展示模块的解耦设计和可扩展性
-
-**特色功能：**
-- ✨ 详细的每日交易日志（开盘价、收盘价、操作、持仓、浮盈等）
-- 🏗️ 清晰的分层架构（BaseEngine → SimulatorEngine/RealEngine）
-- 🔄 向后兼容的高层接口
-- 📊 完整的交易报告和统计数据
 
 ## GitHub Actions 工作流
 
@@ -413,31 +366,23 @@ python demo_simulator.py
 
 ### Q1: 如何添加新的交易策略？
 
-在 `solver/` 目录下创建新的策略类，继承适当的基类并实现 `decide()` 方法：
+在 `strategy/` 目录下创建新的策略类，实现 `prepare_backtest_data()` 和 `simulate()` 方法：
 
 ```python
-# solver/my_strategy.py
+# strategy/my_strategy.py
 class MyStrategy:
-    def decide(self, row):
-        """根据当前行数据决定买入或卖出"""
-        # 实现你的策略逻辑
-        if 满足买入条件:
-            return 'buy'
-        elif 满足卖出条件:
-            return 'sell'
-        return 'hold'
+    @staticmethod
+    def prepare_backtest_data(df, **params):
+        # 计算技术指标
+        return df
+
+    @staticmethod
+    def simulate(df, position, **params):
+        # 输出 buy/sell/None 信号
+        return {'signal': 'buy' if ... else 'sell'}
 ```
 
-然后在测试文件中使用：
-
-```python
-from solver.my_strategy import MyStrategy
-from simulator import Simulator
-
-sim = Simulator(lot_size=100, init_cash=100000.0)
-strategy = MyStrategy()
-result = sim.simulate(df=data, strategy=strategy, symbol="600900")
-```
+然后在策略注册表中注册（`strategy/__init__.py`），Web 界面会自动出现配置页面。
 
 ### Q2: 支持哪些数据源？
 

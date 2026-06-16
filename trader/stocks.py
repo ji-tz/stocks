@@ -280,7 +280,7 @@ def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_
                   lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto", 
                   progress_callback: Optional[Callable[[int, int], None]] = None,
                   trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
-    """调用均值成本模拟（封装自 solver.mean_cost_strategy.simulate_mean_cost）。"""
+    """调用均值成本模拟（封装自 strategy.mean_cost_strategy.simulate_mean_cost）。"""
     if simulate_mean_cost is None:
         raise RuntimeError("mean_cost 模块不可用")
     return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, 
@@ -297,7 +297,7 @@ def run_fixed_amount(symbol: str = "600900",
                     source: object = "auto",
                     progress_callback: Optional[Callable[[int, int], None]] = None,
                     trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
-    """调用定投策略模拟（封装自 simulator.simulator.simulate_fixed_amount）。
+    """调用定投策略模拟（封装自 strategy.fixed_amount_strategy.simulate_fixed_amount）。
     
     Args:
         symbol: 股票代码
