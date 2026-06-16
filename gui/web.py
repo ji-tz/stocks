@@ -500,6 +500,21 @@ def strategies_index():
     return render_template('index.html', strategy_specs=specs)
 
 
+@app.route('/api/list_strategy_specs', methods=['GET'])
+def list_strategy_specs_api():
+    """返回策略规格 JSON 列表，供前端动态加载。"""
+    specs = _list_strategy_specs()
+    return jsonify([
+        {
+            'key': s.key,
+            'label': s.label,
+            'icon': s.icon,
+            'description': s.description,
+        }
+        for s in specs
+    ])
+
+
 @app.route('/api/search_stock', methods=['GET'])
 def search_stock():
     """搜索股票API"""

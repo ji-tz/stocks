@@ -121,14 +121,24 @@
           <label for="strategy_key">🧠 选择策略</label>
           <select id="strategy_key" name="strategy_key" required>
             <option value="">— 请选择策略 —</option>
-            <option value="sma">SMA 均线策略</option>
-            <option value="dual_ma">双均线策略</option>
-            <option value="bollinger">布林带策略</option>
-            <option value="rsi">RSI 相对强弱指标</option>
-            <option value="mean_cost">持仓均摊策略</option>
-            <option value="fixed_amount">固定金额定投策略</option>
           </select>
         </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  fetch('/api/list_strategy_specs')
+    .then(r => r.json())
+    .then(specs => {
+      const sel = document.getElementById('strategy_key');
+      specs.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.key;
+        opt.textContent = `${s.icon || '📌'} ${s.label}`;
+        sel.appendChild(opt);
+      });
+    });
+});
+</script>
 
         <div class="form-row">
           <div class="form-group">
