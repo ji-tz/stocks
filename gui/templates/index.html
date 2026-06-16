@@ -5,17 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>量化回测平台</title>
     <style>
-      body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
-      h1 { color: #1976d2; }
+      body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; background: #f5f5f5; }
+      .header { text-align: center; margin-bottom: 2rem; }
+      .header h1 { color: #1976d2; }
+      .header p { color: #666; font-size: 1.1rem; }
 
       .strategy-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; margin: 2rem 0; }
       .strategy-card { 
         border: 1px solid #ddd; 
         border-radius: 8px; 
         padding: 1.5rem; 
-        background: #f9f9f9;
+        background: white;
         cursor: pointer;
         transition: all 0.3s;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
       }
       .strategy-card:hover { 
         box-shadow: 0 4px 8px rgba(0,0,0,0.1); 
@@ -35,38 +38,24 @@
         transition: background 0.3s;
       }
       .strategy-card .btn:hover { background: #1565c0; }
+      .strategy-icon { font-size: 2rem; margin-bottom: 0.5rem; }
     </style>
   </head>
   <body>
-    <h1>量化回测平台</h1>
-    <p>选择投资策略，配置参数并运行回测分析。</p>
+    <div class="header">
+      <h1>📈 量化回测平台</h1>
+      <p>选择投资策略，配置参数并运行回测分析。</p>
+    </div>
     
     <div class="strategy-cards">
-      <div class="strategy-card" onclick="location.href='/strategy/sma'">
-        <h3>📈 SMA 策略</h3>
-        <p><strong>简单移动平均策略</strong></p>
-        <p>基于移动平均线的趋势跟随策略。当价格突破均线时买入，跌破时卖出。</p>
-        <p>✓ 趋势跟随 | ✓ 简单有效 | ✓ 适合单边行情</p>
-        <a href="/strategy/sma" class="btn">配置并运行 →</a>
+      {% for spec in strategy_specs %}
+      <div class="strategy-card" onclick="location.href='/strategy/{{ spec.key }}'">
+        <div class="strategy-icon">{{ spec.icon if spec.icon else '📌' }}</div>
+        <h3>{{ spec.label }} 策略</h3>
+        <p><strong>{{ spec.description or '通用量化策略' }}</strong></p>
+        <a href="/strategy/{{ spec.key }}" class="btn">配置并运行 →</a>
       </div>
-      
-      <div class="strategy-card" onclick="location.href='/strategy/mean_cost'">
-        <h3>💰 均值成本策略</h3>
-        <p><strong>低买高卖策略</strong></p>
-        <p>在价格低于平均成本时加仓，高于成本时减仓。适合震荡市场。</p>
-        <p>✓ 摊低成本 | ✓ 逢低加仓 | ✓ 适合震荡行情</p>
-        <a href="/strategy/mean_cost" class="btn">配置并运行 →</a>
-      </div>
-      
-      <div class="strategy-card" onclick="location.href='/strategy/fixed_amount'">
-        <h3>🎯 定投策略</h3>
-        <p><strong>固定金额投资策略</strong></p>
-        <p>每天投入固定金额买入股票，平滑市场波动，适合长期投资。</p>
-        <p>✓ 降低择时风险 | ✓ 平滑成本 | ✓ 适合长期持有</p>
-        <a href="/strategy/fixed_amount" class="btn">配置并运行 →</a>
-      </div>
+      {% endfor %}
     </div>
-
-
   </body>
 </html>

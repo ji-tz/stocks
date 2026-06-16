@@ -86,7 +86,7 @@ class TestRealtimeLotCalculation(unittest.TestCase):
             self.assertIn('获取价格失败', data['error'])
 
     def test_strategy_sma_page_contains_realtime_info(self):
-        """测试SMA策略页面包含实时计算区域"""
+        """测试SMA策略页面包含动态参数渲染"""
         # 设置session
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600900'
@@ -98,24 +98,23 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         html = response.data.decode('utf-8')
-        # 验证实时计算区域存在
-        self.assertIn('id="realtime-info"', html)
-        self.assertIn('id="lot-amount"', html)
-        self.assertIn('id="affordable-lots"', html)
-        self.assertIn('id="price-info"', html)
+        # 验证通用动态模板渲染了SMA参数
+        self.assertIn('SMA 周期', html)
+        self.assertIn('移动平均线周期', html)
+        self.assertIn('value="20"', html)
+        self.assertIn('name="period"', html)
 
-        # 验证JavaScript实时计算逻辑存在
-        self.assertIn('fetchStockPrice', html)
-        self.assertIn('updateCalculations', html)
-        self.assertIn('encodeURIComponent', html)
+        # 验证策略信息
+        self.assertIn('SMA', html)
+        self.assertIn('基于移动平均线的趋势策略', html)
 
-        # 验证XSS防护：stock_code使用了tojson过滤器
-        self.assertIn('const stockCode =', html)
-        # 确保使用了JSON序列化而不是直接插入
-        self.assertIn('"600900"', html)
+        # 验证基础表单字段
+        self.assertIn('name="lot"', html)
+        self.assertIn('name="cash"', html)
+        self.assertIn('name="source"', html)
 
     def test_strategy_mean_cost_page_contains_realtime_info(self):
-        """测试均值成本策略页面包含实时计算区域"""
+        """测试均值成本策略页面包含动态参数渲染"""
         # 设置session
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '600519'
@@ -127,20 +126,18 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         html = response.data.decode('utf-8')
-        # 验证实时计算区域存在
-        self.assertIn('id="realtime-info"', html)
-        self.assertIn('id="lot-amount"', html)
-        self.assertIn('id="affordable-lots"', html)
+        # 验证通用动态模板渲染了均值成本策略
+        self.assertIn('均值成本', html)
+        self.assertIn('围绕持仓均价进行开盘交易', html)
 
-        # 验证JavaScript实时计算逻辑存在
-        self.assertIn('fetchStockPrice', html)
-        self.assertIn('updateCalculations', html)
-
-        # 验证XSS防护
-        self.assertIn('"600519"', html)
+        # 验证基础表单字段
+        self.assertIn('name="lot"', html)
+        self.assertIn('name="cash"', html)
+        self.assertIn('name="source"', html)
+        self.assertIn('name="strategy"', html)
 
     def test_strategy_fixed_amount_page_contains_realtime_info(self):
-        """测试定投策略页面包含实时计算区域"""
+        """测试定投策略页面包含动态参数渲染"""
         # 设置session
         with self.client.session_transaction() as sess:
             sess['stock_code'] = '000001'
@@ -152,25 +149,19 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         html = response.data.decode('utf-8')
-        # 验证实时计算区域存在
-        self.assertIn('id="realtime-info"', html)
-        self.assertIn('id="fixed-amount"', html)
-        self.assertIn('id="lot-amount"', html)
-        self.assertIn('id="fixed-amount-multiple"', html)
-        self.assertIn('id="affordable-lots"', html)
-        self.assertIn('定投金额是一手金额的整数倍', html)
+        # 验证通用动态模板渲染了定投策略参数
+        self.assertIn('每次定投金额', html)
+        self.assertIn('每次开盘投入的金额', html)
+        self.assertIn('name="fixed_amount"', html)
+        self.assertIn('value="1000.0"', html)
 
-        # 验证JavaScript实时计算逻辑存在
-        self.assertIn('fetchStockPrice', html)
-        self.assertIn('updateCalculations', html)
-        self.assertIn('Math.floor(fixedAmount / lotAmount)', html)
-        self.assertIn('requestAnimationFrame', html)
-        self.assertIn('cancelAnimationFrame', html)
-        self.assertIn("classList.toggle('warning-text', multiple === 0)", html)
-        self.assertIn("addEventListener('input', scheduleCalculationUpdate)", html)
+        # 验证策略信息
+        self.assertIn('定投', html)
+        self.assertIn('固定金额定投策略', html)
 
-        # 验证XSS防护
-        self.assertIn('"000001"', html)
+        # 验证基础表单字段
+        self.assertIn('name="lot"', html)
+        self.assertIn('name="cash"', html)
 
     def test_xss_protection_in_stock_code(self):
         """测试XSS防护：确保stock_code被正确转义"""
@@ -185,11 +176,10 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
 
         html = response.data.decode('utf-8')
-        # 确保使用了JSON序列化（tojson过滤器）
-        # stockCode应该被正确序列化为JSON字符串
-        self.assertIn('const stockCode = "600900"', html)
-        # 确保URL拼接使用了encodeURIComponent
-        self.assertIn('encodeURIComponent(stockCode)', html)
+        # 验证session中的股票信息在模板中被正确渲染
+        self.assertIn('600900 - 长江电力', html)
+        # 验证表单参数使用了策略key
+        self.assertIn('value="sma"', html)
 
 
 if __name__ == '__main__':

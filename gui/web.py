@@ -485,6 +485,13 @@ def index():
     return _render_stock_selection()
 
 
+@app.route('/strategies', methods=['GET'])
+def strategies_index():
+    """策略列表首页 — 由注册表驱动的 Jinja2 循环渲染"""
+    specs = _list_strategy_specs()
+    return render_template('index.html', strategy_specs=specs)
+
+
 @app.route('/api/search_stock', methods=['GET'])
 def search_stock():
     """搜索股票API"""
@@ -760,77 +767,9 @@ def refresh_stock_chart_cache(stock_code):
         return jsonify({'error': f'清除缓存并重新下载失败: {str(exc)}'}), 500
 
 
-@app.route('/strategy/sma', methods=['GET'])
-def strategy_sma():
-    """SMA策略配置页面"""
-    stock_code = session.get('stock_code')
-    stock_name = session.get('stock_name')
-    strategy_type = session.get('strategy_type')
-    run_mode = session.get('run_mode')
-    
-
-    # 检查是否有必要的信息
-    if not stock_code or not stock_name:
-        return _render_stock_selection()
-    if not strategy_type:
-        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
-    if not run_mode:
-        return render_template('select_mode.html',
-                             stock_code=stock_code,
-                             stock_name=stock_name,
-                             strategy_type=strategy_type,
-                             strategy_name=session.get('strategy_name', 'SMA'))
-
-    return render_template('strategy_sma.html', stock_code=stock_code, stock_name=stock_name)
-
-
-@app.route('/strategy/mean_cost', methods=['GET'])
-def strategy_mean_cost():
-    """均值成本策略配置页面"""
-    stock_code = session.get('stock_code')
-    stock_name = session.get('stock_name')
-    strategy_type = session.get('strategy_type')
-    run_mode = session.get('run_mode')
-
-    if not stock_code or not stock_name:
-        return _render_stock_selection()
-    if not strategy_type:
-        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
-    if not run_mode:
-        return render_template('select_mode.html',
-                             stock_code=stock_code,
-                             stock_name=stock_name,
-                             strategy_type=strategy_type,
-                             strategy_name=session.get('strategy_name', '均值成本'))
-
-    return render_template('strategy_mean_cost.html', stock_code=stock_code, stock_name=stock_name)
-
-
-@app.route('/strategy/fixed_amount', methods=['GET'])
-def strategy_fixed_amount():
-    """定投策略配置页面"""
-    stock_code = session.get('stock_code')
-    stock_name = session.get('stock_name')
-    strategy_type = session.get('strategy_type')
-    run_mode = session.get('run_mode')
-
-    if not stock_code or not stock_name:
-        return _render_stock_selection()
-    if not strategy_type:
-        return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
-    if not run_mode:
-        return render_template('select_mode.html',
-                             stock_code=stock_code,
-                             stock_name=stock_name,
-                             strategy_type=strategy_type,
-                             strategy_name=session.get('strategy_name', '定投'))
-
-    return render_template('strategy_fixed_amount.html', stock_code=stock_code, stock_name=stock_name)
-
-
 @app.route('/strategy/<strategy_key>', methods=['GET'])
-def strategy_dynamic(strategy_key: str):
-    """通用策略配置页面，支持自动注册的新策略。"""
+def strategy_config(strategy_key: str):
+    """通用策略配置页面 — 所有策略共用单一路由。"""
     stock_code = session.get('stock_code')
     stock_name = session.get('stock_name')
     strategy_type = session.get('strategy_type')
@@ -849,31 +788,13 @@ def strategy_dynamic(strategy_key: str):
             strategy_name=session.get('strategy_name', strategy_key),
         )
 
-    # 兼容历史三大策略的原有页面，避免破坏现有交互和测试。
-    if strategy_key == 'sma':
-        return strategy_sma()
-    if strategy_key == 'mean_cost':
-        return strategy_mean_cost()
-    if strategy_key == 'fixed_amount':
-        return strategy_fixed_amount()
-
     try:
         spec = stocks.get_strategy_spec(strategy_key)
     except Exception:
         return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
 
-    if strategy_key == 'signal_template':
-        return render_template(
-            'strategy_signal_template.html',
-            stock_code=stock_code,
-            stock_name=stock_name,
-            strategy_key=spec.key,
-            strategy_label=spec.label,
-            strategy_description=spec.description,
-        )
-
     return render_template(
-        'strategy_dynamic.html',
+        spec.template,
         stock_code=stock_code,
         stock_name=stock_name,
         strategy_key=spec.key,
