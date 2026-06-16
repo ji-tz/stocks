@@ -85,7 +85,91 @@
       @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
       .history-link { display: inline-block; padding: 0.5rem 1rem; background: #1976d2; color: white; text-decoration: none; border-radius: 4px; font-size: 0.9rem; }
       .history-link:hover { background: #1565c0; }
-    </style>
+    
+/* === 移动端响应式适配 === */
+@media (max-width: 640px) {
+  body { padding: 0 0.75rem; margin: 1rem auto; font-size: 0.95rem; }
+  .header { flex-direction: column; text-align: center; gap: 0.5rem; }
+  .header h1 { font-size: 1.25rem; }
+  .breadcrumb { font-size: 0.75rem; padding: 0.6rem; line-height: 1.6; }
+  .breadcrumb-item { white-space: nowrap; }
+  .breadcrumb-separator { margin: 0 0.3rem; }
+  .strategy-cards, .mode-cards, .strategy-grid { grid-template-columns: 1fr; }
+  .stock-grid { grid-template-columns: repeat(2, 1fr); gap: 0.6rem; }
+  .stock-card { padding: 0.6rem; }
+  .stock-info-bar, .stock-info, .selected-info-box, .selected-info { flex-direction: column; text-align: center; gap: 0.5rem; padding: 0.8rem; }
+  .stock-info-left h2 { font-size: 1.1rem; }
+  .stock-info-right button, .change-btn { width: 100%; }
+  .search-box { flex-direction: column; }
+  .search-box button { width: 100%; }
+  .search-result-card { flex-direction: column; text-align: center; gap: 0.6rem; }
+  .search-result-card .btn-select { width: 100%; }
+  .form-section { padding: 1rem; }
+  .form-group input, .form-group select { max-width: none; }
+  input, select { max-width: none; }
+  .submit-btn, .btn-submit { width: 100%; }
+  .preset-buttons { flex-direction: column; gap: 0.4rem; }
+  .preset-btn { width: 100%; }
+  .preset-row { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .preset-row select { max-width: none; width: 100%; }
+  .preset-row .btn-sm, .preset-row .btn-sm-save, .preset-row .btn-sm-outline { width: 100%; }
+  .metric-card { min-width: auto; }
+  .card { padding: 0.8rem; }
+  .summary { flex-direction: column; gap: 0.4rem; }
+  .summary .card, .summary-item { width: 100%; }
+  .chart-container { padding: 0.6rem; }
+  .chart-canvas-wrap { min-height: 180px; }
+  canvas { max-height: 220px; }
+  table { font-size: 0.75rem; }
+  td, th { padding: 4px 5px; word-break: break-word; }
+  .toast { max-width: 260px; font-size: 0.85rem; right: 10px; top: 10px; }
+  .toast-container { right: 10px; top: 10px; }
+  .info-box { padding: 0.8rem; }
+  .info-box h2 { font-size: 1rem; }
+  .chart-toolbar { flex-direction: column; align-items: stretch; }
+  .chart-toolbar .chart-btn { width: 100%; }
+  .chart-help { font-size: 0.8rem; }
+  .selected-info-row { flex-direction: column; align-items: flex-start; gap: 0.2rem; }
+  .selected-info-value { font-size: 1rem; }
+  .danger-btn { width: 100%; }
+  .action-bar { flex-direction: column; text-align: center; }
+  .action-bar .btn-primary { width: 100%; }
+  .account-grid { grid-template-columns: repeat(2, 1fr); gap: 0.5rem; }
+  .account-card { padding: 0.6rem; }
+  .account-card .value { font-size: 1rem; }
+  .controls-bar { flex-direction: column; align-items: stretch; }
+  .controls-bar .actions { justify-content: stretch; }
+  .controls-bar .actions .btn { flex: 1; }
+  .layout { grid-template-columns: 1fr; }
+  .container { padding: 16px; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.1rem; }
+  h3 { font-size: 1rem; }
+  .strategy-card { padding: 1rem; }
+  .mode-card { padding: 1rem; }
+  .mode-card .mode-card-icon { font-size: 2rem; }
+  .btn { text-align: center; }
+  .stock-card .code { font-size: 0.9rem; }
+  .stock-card .name { font-size: 0.8rem; }
+  .log-stream { min-height: 300px; max-height: 400px; }
+  .position-table, .trade-table { font-size: 0.75rem; }
+  .position-table td, .position-table th, .trade-table td, .trade-table th { padding: 4px 5px; }
+  .breadcrumb br { display: none; }
+  .preset-banner { flex-direction: column; text-align: center; padding: 0.8rem; }
+  .preset-banner .btn-banner { width: 100%; text-align: center; }
+  .form-row { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 400px) {
+  .stock-grid { grid-template-columns: 1fr; }
+  .account-grid { grid-template-columns: 1fr 1fr; }
+  .breadcrumb { font-size: 0.7rem; padding: 0.4rem; }
+  body { padding: 0 0.5rem; }
+  .chart-canvas-wrap { min-height: 150px; }
+  canvas { max-height: 180px; }
+}
+
+</style>
   </head>
   <body>
     <h1>{{ strategy_name or "策略" }}回测结果</h1>
