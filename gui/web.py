@@ -455,6 +455,10 @@ def _init_stock_data():
         for stock in _STOCK_LIST:
             _STOCK_INDEX[stock['code']] = stock
             _STOCK_INDEX[stock['name']] = stock
+            # HK stocks: also index by bare code (e.g. "00700" → "00700.HK")
+            if '.HK' in stock['code']:
+                bare = stock['code'].replace('.HK', '')
+                _STOCK_INDEX[bare] = stock
 
 
 def get_stock_list():

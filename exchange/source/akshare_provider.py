@@ -138,9 +138,32 @@ class AkshareProvider(BaseProvider):
             return norm_df[["date", "open", "high", "low", "close", "volume"]
                            ].sort_values("date").reset_index(drop=True)
 
+        def _fetch_hk_hist() -> pd.DataFrame:
+            """港股历史数据 — 通过 AKShare stock_hk_hist 获取。"""
+            # 从 "00700.HK" 格式中提取裸代码 "00700"
+            hk_symbol = symbol.replace('.hk', '').replace('.HK', '').strip()
+            hk_df = ak.stock_hk_hist(symbol=hk_symbol,
+                                     period="daily",
+                                     start_date=start_date,
+                                     end_date=end_date,
+                                     adjust="qfq")
+            if hk_df is None or hk_df.empty:
+                return pd.DataFrame()
+            return _normalize_ohlcv(
+                hk_df,
+                date_col="日期",
+                open_col="开盘",
+                high_col="最高",
+                low_col="最低",
+                close_col="收盘",
+                volume_col="成交量",
+            )
+
         fetchers = []
         if any(ch.isalpha() for ch in symbol):
             fetchers.append(_fetch_global_futures_hist)
+        if '.hk' in symbol.lower():
+            fetchers.insert(0, _fetch_hk_hist)
         fetchers.extend((_fetch_stock_hist, _fetch_etf_hist, _fetch_open_fund_nav))
         last_errors: list[str] = []
 
