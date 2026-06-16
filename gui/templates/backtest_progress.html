@@ -397,6 +397,13 @@
             if (!resultData) {
                 return;
             }
+            /* Check payload size before creating the form */
+            var payloadStr = JSON.stringify(resultData);
+            var payloadSize = new Blob([payloadStr]).size;
+            if (payloadSize > 15360) {
+                alert('⚠️ 结果数据过大（' + (payloadSize / 1024).toFixed(1) + ' KB），无法通过隐藏表单传输。\n请先点击下方"保存回测结果"按钮保存到历史记录，再从历史记录页面查看和导出。');
+                return;
+            }
             const form = document.createElement('form');
             form.method = 'POST';
             form.action = resultUrl;
