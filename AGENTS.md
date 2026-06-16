@@ -342,95 +342,112 @@ tests/
 | `ai-done` | AI 已完成 | QA |
 | `ai-routed` | 已进入流程 | Hermes 自动 |
 
-### 6.2 完整工作流步骤
+### 6.2 全流程 9 步（不可跳过）
 
-核心原则：**Issue 管需求跟踪，PR 管代码实现。**
+> **每一条 Issue，无论大小，都必须走完这个完整流程。** 没有"小改动快车道"，没有"直接改"。
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  第一步：提 Issue                                    │
-│  PM / 用户 / ARCH / LEAD / QA 任何人                  │
-│  打标签：requirements / bug / exchange / trader 等    │
-│  自动补打：needs-triage                               │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  第二步：ARCH 拆解 + 建 PR（Pro 模型）                 │
-│                                                      │
-│  1. 读取 Issue → 分析需求 → 判断范围                  │
-│  小 Issue → 直接指定一个 Agent                        │
-│  大 Issue → 拆成多个子任务，每个标注角色标签            │
-│                                                      │
-│  2. 在 Issue 评论中发布拆解方案：                       │
-│     ## ARCH 拆解方案                                   │
-│     ### 任务1：[角色] - [描述]                        │
-│     ### 任务2：[角色] - [描述]                        │
-│     执行顺序：[R1] → [R2] → [R3]                     │
-│                                                      │
-│  3. ⭐ 创建 PR（从 main 开分支）。分支名：              │
-│     feat/issue-<num>-<short-desc>                    │
-│     PR 标题关联 Issue #<num>                          │
-│     PR body 贴拆解方案 + 各子任务 checkboxes           │
-│                                                      │
-│  4. 打标签：triaged                                   │
-│  移除标签：needs-triage                                │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  第三步：AGENT 串行开发（本地 OpenCode）               │
-│                                                      │
-│  ⚠️ 串行执行，一次只开发一个 Agent 的任务              │
-│  顺序由 ARCH 指定（在 Issue 评论中标注）               │
-│                                                      │
-│  1. Hermes 检测到带角色标签且无 ai-in-progress 的子任务 │
-│  2. checkout 已有 PR 分支（← 同一个分支！）             │
-│     git checkout feat/issue-<num>-<slug>               │
-│  3. 运行 OpenCode 或直接实现                          │
-│  4. commit + push 到 PR 分支 → 自动触发 CI           │
-│  5. 在 Issue 评论中标明该子任务已完成 + 修改要点        │
-│  6. 在 PR 的 checkbox 中勾掉已完成项                   │
-│  7. 移除当前角色的标签 + ai-in-progress                 │
-│  8. 取下个子任务（下个 cron tick 自动处理）             │
-│                                                      │
-│  角色分工（严格文件所有权）：                           │
-│  · STRAT → strategy/                                 │
-│  · EXCH  → exchange/                                 │
-│  · TRADER→ trader/                                   │
-│  · WEB   → gui/                                      │
-│  · ITEST → tests/unit/ + tests/integration/          │
-│  · GTEST → tests/guitests/                            │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  第四步：CI Workflow + LEAD Review                    │
-│                                                      │
-│  每个 push 到 PR 分支自动触发 CI：                     │
-│  · Test  ✅/❌   单元 + 集成测试                      │
-│  · Lint  ✅/❌   代码风格                             │
-│  · Test GUI ✅/❌  GUI 端到端测试                      │
-│  · Package ✅/❌  打包                                │
-│                                                      │
-│  所有子任务完成后 + CI 通过 → LEAD Review             │
-│  · 代码 OK → 打 needs-qa                             │
-│  · 有问题 → 评论 @对应 Agent 修复                     │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  第五步：QA 本地测试                                   │
-│                                                      │
-│  QA checkout PR 分支 → 本地验证                      │
-│  · 功能验证 + 回归验证 + 边界情况                      │
-│                                                      │
-│  通过 → 打 ai-done（允许合并）                        │
-│  不通过 → 评论 @对应 Agent 修复                       │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  第六步：合并 PR（CI 必须通过）                         │
-│                                                      │
-│  QA 确认 ai-done → 合并 PR 到 main                   │
-│  关闭关联 Issue                                       │
-└─────────────────────────────────────────────────────┘
+用户提需求
+  │
+  ▼
+ [步骤1] ── 建 Issue
+   Hermes 在 GitHub 创建 Issue
+   · 标题带优先级前缀（P0/P1/P2）
+   · 写清需求描述、现状、改动范围
+   · 打标签（enhancement/bug/exchange/trader 等）
+   · 自动补打：needs-triage
+  │
+  ▼
+ [步骤2] ── ARCH 拆解（Pro 模型）
+   架构师在 Issue 评论中发布拆解方案：
+   · 分析需求 → 判断范围
+   · 识别涉及哪些角色（EXCH/STRAT/TRADER/GUI/ITEST/GTEST）
+   · 每个角色分配具体任务（文件路径、改动内容）
+   · 标注执行顺序：[R1] → [R2] → [R3]
+   · 打角色标签（exchange/trader/strategy/gui/test/ci）
+  │
+  ▼
+ [步骤3] ── 建分支 + PR
+   · git checkout -b feat/issue-<num>-<slug>
+   · 先做第一个角色的最小改动（不必空 commit）
+   · git push + 创建 PR（从 main）
+   · PR 标题关联 Issue #<num>
+   · PR body 贴拆解方案 + 每个子任务一个 checkbox
+   · 打标签：triaged，移除 needs-triage
+  │
+  ▼
+ [步骤4] ── 各角色实现（链式执行）
+   > 串行执行，一次只做一个角色
+
+   每个角色独立做：
+   1. git fetch origin + git checkout feat/issue-<num>-<slug>
+   2. 仅修改自己角色目录下的文件（见§四文件所有权）
+   3. 运行 pytest tests/ -q 确认无回归
+   4. git commit + git push → 自动触发 CI
+   5. 在 Issue 评论报告完成 + 修改要点
+   6. 更新 PR body 中对应的 checkbox
+
+   角色与目录对应：
+   · STRAT → strategy/
+   · EXCH  → exchange/
+   · TRADER→ trader/
+   · GUI   → gui/
+   · ITEST → tests/unit/ + tests/integration/
+   · GTEST → tests/guitests/
+
+   链式调度策略：
+   · 本 tick 未超时（< 300s）→ 继续做下一个角色
+   · 本 tick 超时 → 等下一个 cron tick 继续（自动检测）
+   · 跳过所有标签 API 调用（同一 tick 内标签无意义）
+  │
+  ▼
+ [步骤5] ── CI 自动运行
+   GitHub Actions 运行 4 个 required checks：
+   · 自动化测试 (Automated Testing)
+   · 代码检视 (Code Linting)
+   · GUI 截图测试
+   · 自动化打包 (Automated Packaging)
+   非 required checks 失败不影响合并。
+  │
+  ▼
+ [步骤6] ── LEAD 审查
+   研发主管审查 PR diff（逐文件评审表）：
+   · 文件所有权合规——不跨角色
+   · 代码质量——无硬编码、无 except:pass、有类型提示
+   · 测试覆盖——新增功能有对应测试
+   · 然后检查 CI 状态：
+     ├── ✅ 全部通过 + 代码 OK → 打 needs-qa
+     ├── ⏳ 仍在运行 → 保留 needs-review，下个 tick
+     └── ❌ 有 required check 失败 → 仲裁（步骤 6a）
+  │
+  ▼
+ [步骤6a] CI 失败仲裁（按需）
+   LEAD 判断失败原因：
+   · dev-bug → @对应角色修复，保留 needs-review
+   · test-needs-update → LEAD 直接修测试并 push
+   · flaky → 忽略，打 needs-qa 继续推进
+  │
+  ▼
+ [步骤7] ── QA 验收
+   · checkout PR 分支
+   · 运行全部测试：单元 + 集成 + GUI
+   · 逐条核对 Issue 中的验收标准
+   · 手动验证 UI 改动（如需）
+   · 发布 QA 报告到 PR 评论
+   · 通过 → 打 ai-done
+   · 不通过 → 评论 @对应角色修复
+  │
+  ▼
+ [步骤8] ── 合并
+   · 确认 CI 全部通过（4/4 required checks）
+   · squash-merge PR 到 main
+   · GitHub 自动关闭关联 Issue（#N 在标题中）
+  │
+  ▼
+ [步骤9] ── 部署
+   · stock-nightly/ 每天 18:00 自动拉 main（cron）
+   · 自动重启服务
+   · 非紧急情况不等，等次日 18:00 自动更新
 ```
 
 ### 6.3 标签流转规则
@@ -439,27 +456,61 @@ tests/
 提 Issue → [needs-triage] → ARCH 拆解 + 建 PR → [triaged]
                                     → 子任务打角色标签
                                                 ↓
-                        Hermes 检测 → 串行 push 到同一 PR 分支
+                        Hermes 链式执行 → 串行 push 到同一 PR 分支
                                                 ↓
                         每个角色完成 → 更新 Issue 评论 + 勾 PR checkbox
                                                 ↓
                         最后一个子任务完成 → [needs-review]
                                                 ↓
                         LEAD Review:
-                          ├── CI 全过 + 代码 OK → [needs-qa] → QA 测试
+                          ├── CI 全过 + 代码 OK → [needs-qa] → QA 验收
                           │                                    ↓
                           │                           QA 通过 → [ai-done] → 合并 PR
                           │                                    ↓          ↓
                           │                           QA 不通过 → @Agent 修复  关闭 Issue
                           │
-                          └── CI 失败 / 代码问题 → @Agent 修复
+                          └── CI 失败 / 代码问题 → @Agent 修复（仲裁见步骤 6a）
 ```
 
 ### 6.4 串行执行规则
 
 - **一次只开发一个 Agent 的任务**，避免多人改同一文件的冲突
-- ARCH 在拆解时确定执行顺序（通常：STRAT → EXCH → TRADER → WEB → 测试）
-- Hermes 自动检测当前轮到谁，等上一个 push 后再启动下一个
+- ARCH 在拆解时确定执行顺序（通常：STRAT → EXCH → TRADER → GUI → ITEST → GTEST）
+- 链式执行时，本 tick 内连续完成多个角色（跳过标签 API 调用）
+- 超时未完成 → 等下一个 cron tick 自动检测并继续
+
+### 6.5 禁止行为
+
+| ❌ | 说明 |
+|----|------|
+| 不在 Issue 外直接改代码 | 所有改动必须关联一个 Issue |
+| 不跨角色提交代码 | EXCH 不能改 `gui/`，GUI 不能改 `exchange/` |
+| 不直接推 main | 所有改动必须走 PR |
+| 不在 stock-nightly/ 直接改 | 那是部署目录，只能 git pull |
+| 不等 CI 就合并 | 必须 4/4 required checks 通过 |
+| 不在 CI 失败时继续推进 | 必须先仲裁（dev-bug / test-needs-update / flaky） |
+| 不跳过任何角色 | ARCH → 实现 → LEAD → QA → 合并，缺一不可 |
+| 不跳过测试 | 每次 push 前自测，LEAD 审查时核验 |
+| 不等 merge 确认就说"完成" | 只有 GitHub API 返回 `merged: true` 才算合并完成 |
+
+### 6.6 LEAD Review 标准
+
+| 检查项 | 要求 |
+|--------|------|
+| 文件所有权 | 每个改动文件必须在对应角色目录内 |
+| 代码质量 | 无硬编码、无 `except:pass`、有适当 logging、类型提示 |
+| 测试覆盖 | 新增功能有对应测试（ITEST/GTEST 负责） |
+| CI 状态 | 所有 required checks 通过才可合并 |
+| CI 失败仲裁 | dev-bug → @对应角色修复；test-needs-update → LEAD 修；flaky → 忽略继续 |
+
+### 6.7 QA 验收标准
+
+| 检查项 | 要求 |
+|--------|------|
+| 测试运行 | 单元 + 集成 + GUI 全部通过 |
+| 无回归 | 已有测试全部通过 |
+| 需求核对 | 逐条核对 Issue 中的验收标准 |
+| CI 状态 | 合并前确认 required checks 全部通过 |
 
 ---
 
@@ -523,8 +574,5 @@ class StrategySimulator:
 
 ---
 
-本文件由 Hermes Agent 维护，随团队协作流程迭代更新。
-最后更新：2026-06-16（v3 — 工作流迁移到独立的 WORKFLOW.md）
-
-> 开发工作流（Issue → ARCH → 角色实现 → LEAD → QA → 合并）请参见 **[WORKFLOW.md](./WORKFLOW.md)**。
+本文件由 Hermes Agent 维护，随团队协作流程迭代更新。最后更新：2026-06-17（v4 — §6 合并完整工作流 + 禁止行为 + LEAD/QA 标准）
 
