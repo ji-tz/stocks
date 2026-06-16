@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ strategy_name or "策略" }}回测结果</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/hammerjs@2.0.8"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.min.js"></script>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 1000px; margin: 2rem auto; padding: 0 1rem; }
+      table { border-collapse: collapse; margin-top: 1rem; width: 100%; }
+      td, th { padding: 6px 10px; border: 1px solid #ddd; }
+      .summary { display:flex; gap:1rem; flex-wrap:wrap; }
+      .card { padding:0.6rem 1rem; border:1px solid #eee; border-radius:6px; }
+      .chart-container { 
+        position: relative; 
+        margin: 1rem 0;
+        padding: 1rem;
+        background: #f9f9f9;
+        border-radius: 8px;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+      }
+      .chart-toolbar {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .chart-btn {
+        padding: 0.5rem 1rem;
+        background: #1976d2;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: background 0.3s;
+      }
+      .chart-btn:hover {
+        background: #1565c0;
+      }
+      .chart-btn:active {
+        background: #0d47a1;
+      }
+      .chart-help {
+        color: #666;
+        font-size: 0.85rem;
+        padding: 0.5rem;
+        background: #fff;
+        border-radius: 4px;
+        border-left: 3px solid #1976d2;
+      }
+      .metrics-grid {
+        display: flex;
+        gap: 1rem;
+        flex-wrap: wrap;
+        margin: 1rem 0;
+      }
+      .metric-card {
+        padding: 0.8rem 1.2rem;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        background: #fafafa;
+        text-align: center;
+        min-width: 120px;
+      }
+      .metric-card .value {
+        font-size: 1.3rem;
+        font-weight: bold;
+        color: #1976d2;
+      }
+      .metric-card .label {
+        font-size: 0.8rem;
+        color: #666;
+        margin-top: 0.3rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>{{ strategy_name or "策略" }}回测结果</h1>
+    <div class="summary">
+      <div class="card"><strong>代码：</strong> {{ result.symbol }}</div>
+      <div class="card"><strong>日期：</strong> {{ result.start_date }} → {{ result.end_date }}</div>
+      <div class="card"><strong>初始资金：</strong> {{ result.init_cash }}</div>
+      {% if result.max_capital_used is defined %}
+      <div class="card"><strong>最大占用资金：</strong> {{ '%.2f'|format(result.max_capital_used) }}</div>
+      {% endif %}
+      {% if result.market_value is defined %}
+      <div class="card"><strong>总共动用资金：</strong> {{ '%.2f'|format(result.market_value) }}</div>
+      {% endif %}
+      <div class="card"><strong>交易次数：</strong> {{ result.trades }}</div>
+      <div class="card"><strong>最终总资产：</strong> {{ result.total_value }}</div>
+      <div class="card"><strong>已实现盈亏：</strong> {{ result.realized_pl }}</div>
+      <div class="card"><strong>未实现盈亏：</strong> {{ result.unrealized_pl }}</div>
+    </div>
+
+    {% if result.metrics is defined and result.metrics %}
+    <h2>关键指标</h2>
+    <div class="metrics-grid">
+      <div class="metric-card">
+        <div class="value">{{ '%.2f'|format(result.metrics.total_return_rate * 100) }}%</div>
+        <div class="label">总收益率</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ '%.2f'|format(result.metrics.annualized_return * 100) }}%</div>
+        <div class="label">年化收益率</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ '%.2f'|format(result.metrics.max_drawdown * 100) }}%</div>
+        <div class="label">最大回撤</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ '%.2f'|format(result.metrics.sharpe_ratio) }}</div>
+        <div class="label">夏普比率</div>
+      </div>
+      <div class="metric-card">
+        <div class="value">{{ '%.2f'|format(result.metrics.total_pl) }}</div>
+        <div class="label">总盈亏</div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div style="margin: 1rem 0; display: flex; gap: 0.5rem; flex-wrap: wrap;">
+      <form method="post" action="/download/excel" style="display:inline;">
+        <input type="hidden" name="result_json" value='{{ result | tojson | forceescape }}'>
+        <input type="hidden" name="strategy_name" value="{{ strategy_name }}">
+        <button type="submit" style="padding:0.5rem 1rem; background:#2e7d32; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
+          📥 导出 Excel
+        </button>
+      </form>
+      <form method="post" action="/download/pdf" style="display:inline;">
+        <input type="hidden" name="result_json" value='{{ result | tojson | forceescape }}'>
+        <input type="hidden" name="strategy_name" value="{{ strategy_name }}">
+        <button type="submit" style="padding:0.5rem 1rem; background:#c62828; color:white; border:none; border-radius:4px; cursor:pointer; font-size:0.9rem;">
+          📄 导出 PDF
+        </button>
+      </form>
+    </div>
+
+    <h2>资产曲线</h2>
+    <div class="chart-container">
+      <div class="chart-toolbar">
+        <button class="chart-btn" onclick="resetZoom()">🔄 重置缩放</button>
+        <button class="chart-btn" onclick="downloadChart()">💾 导出图片</button>
+        <div class="chart-help">
+          💡 提示：使用鼠标滚轮缩放，拖拽平移，点击图例切换显示
+        </div>
+      </div>
+      <canvas id="chart" width="900" height="300"></canvas>
+    </div>
+
+    <h2>近 50 笔交易</h2>
+    <table>
+      <tr><th>日期</th><th>动作</th><th>价格</th><th>手数</th><th>交易后现金</th><th>交易后持仓</th><th>已实现盈亏</th></tr>
+      {% if result.trades_list %}
+      {% for t in result.trades_list[-50:] %}
+      <tr>
+        <td>{{ t.date }}</td>
+        <td>{{ t.action }}</td>
+        <td>{{ '%.2f'|format(t.price) }}</td>
+        <td>{{ t.shares }}</td>
+        <td>{{ '%.2f'|format(t.cash) }}</td>
+        <td>{{ t.shares_after }}</td>
+        <td>{% if t.realized_pl is defined %}{{ '%.2f'|format(t.realized_pl) }}{% else %}-{% endif %}</td>
+      </tr>
+      {% endfor %}
+      {% else %}
+      <tr><td colspan="7" style="text-align:center; color:#999;">无交易记录</td></tr>
+      {% endif %}
+    </table>
+
+    <p><a href="/">返回</a></p>
+
+    <script>
+      {% if result.history and result.history|length > 0 %}
+      const labels = [
+        {% for h in result.history %}
+          '{{ h.date }}',
+        {% endfor %}
+      ];
+      const totalValueData = [
+        {% for h in result.history %}
+          {{ h.total_value }},
+        {% endfor %}
+      ];
+      const stockPriceData = [
+        {% for h in result.history %}
+          {{ h.last_price if (h.last_price is not none and h.last_price == h.last_price) else 'null' }},
+        {% endfor %}
+      ];
+
+      // 归一化处理：将股价和总资产都转换为以起点为100的指数形式
+      const normalizedTotalValue = [];
+      const normalizedStockPrice = [];
+      
+      // 找到第一个有效的总资产值作为基准
+      const baseValue = totalValueData[0];
+      
+      if (baseValue === null || baseValue === undefined || baseValue <= 0) {
+        console.error('❌ 无效的基准总资产值:', baseValue);
+        document.getElementById('chart').parentElement.innerHTML = '<p style="color:red">数据错误：无法计算资产变化曲线</p>';
+      } else {
+        // 找到第一个有效的股价作为基准
+        let basePrice = null;
+        for (let i = 0; i < stockPriceData.length; i++) {
+          if (stockPriceData[i] !== null && stockPriceData[i] > 0) {
+            basePrice = stockPriceData[i];
+            break;
+          }
+        }
+        
+        if (basePrice === null) {
+          console.warn('⚠️ 未找到有效的股价数据，仅显示总资产曲线');
+        }
+        
+        // 归一化总资产数据
+        for (let i = 0; i < totalValueData.length; i++) {
+          const value = totalValueData[i];
+          if (value !== null && value !== undefined) {
+            normalizedTotalValue.push((value / baseValue) * 100);
+          } else {
+            normalizedTotalValue.push(null);
+          }
+        }
+        
+        // 归一化股价数据
+        if (basePrice !== null) {
+          for (let i = 0; i < stockPriceData.length; i++) {
+            if (stockPriceData[i] !== null) {
+              normalizedStockPrice.push((stockPriceData[i] / basePrice) * 100);
+            } else {
+              normalizedStockPrice.push(null);
+            }
+          }
+        }
+
+        console.log('📊 图表数据检查:');
+        console.log('总资产数据点数:', totalValueData.length);
+        console.log('股价数据点数:', stockPriceData.length);
+        console.log('归一化后总资产起点:', normalizedTotalValue[0]);
+        console.log('归一化后股价起点:', normalizedStockPrice.find(p => p !== null));
+
+        const ctx = document.getElementById('chart').getContext('2d');
+        const chart = new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: labels,
+            datasets: [{
+              label: '总资产变化',
+              data: normalizedTotalValue,
+              borderColor: 'rgb(75, 192, 192)',
+              backgroundColor: 'rgba(75, 192, 192, 0.1)',
+              tension: 0.1,
+              pointRadius: 0,
+              yAxisID: 'y'
+            }, {
+              label: '股价变化',
+              data: normalizedStockPrice,
+              borderColor: 'rgb(255, 99, 132)',
+              backgroundColor: 'rgba(255, 99, 132, 0.1)',
+              tension: 0.1,
+              pointRadius: 0,
+              yAxisID: 'y'
+            }]
+          },
+          options: {
+            responsive: true,
+            interaction: {
+              mode: 'index',
+              intersect: false
+            },
+            plugins: {
+              legend: {
+                display: true,
+                position: 'top',
+                onClick: function(e, legendItem, legend) {
+                  const index = legendItem.datasetIndex;
+                  const ci = legend.chart;
+                  if (ci.isDatasetVisible(index)) {
+                    ci.hide(index);
+                    legendItem.hidden = true;
+                  } else {
+                    ci.show(index);
+                    legendItem.hidden = false;
+                  }
+                }
+              },
+              tooltip: {
+                callbacks: {
+                  label: function(context) {
+                    const datasetLabel = context.dataset.label;
+                    const value = context.parsed.y;
+                    const index = context.dataIndex;
+                    
+                    if (datasetLabel.includes('总资产')) {
+                      const originalValue = totalValueData[index];
+                      if (originalValue !== null && originalValue !== undefined) {
+                        return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + originalValue.toFixed(2) + ' 元)';
+                      } else {
+                        return datasetLabel + ': ' + value.toFixed(2);
+                      }
+                    } else {
+                      const originalPrice = stockPriceData[index];
+                      if (originalPrice !== null && originalPrice !== undefined) {
+                        return datasetLabel + ': ' + value.toFixed(2) + ' (原始: ' + originalPrice.toFixed(2) + ' 元)';
+                      } else {
+                        return datasetLabel + ': 无数据';
+                      }
+                    }
+                  }
+                }
+              },
+              zoom: {
+                zoom: {
+                  wheel: {
+                    enabled: true,
+                    speed: 0.15
+                  },
+                  pinch: {
+                    enabled: true
+                  },
+                  mode: 'x'
+                },
+                pan: {
+                  enabled: true,
+                  mode: 'x',
+                  modifierKey: null
+                },
+                limits: {
+                  x: {min: 'original', max: 'original'},
+                  y: {min: 'original', max: 'original'}
+                }
+              }
+            },
+            scales: {
+              x: { display: true },
+              y: {
+                type: 'linear',
+                display: true,
+                position: 'left',
+                title: {
+                  display: true,
+                  text: '相对变化（起点=100）'
+                }
+              }
+            }
+          }
+        });
+
+        function resetZoom() {
+          chart.resetZoom();
+        }
+
+        function downloadChart() {
+          const url = chart.toBase64Image();
+          const link = document.createElement('a');
+          link.download = '回测结果_{{ result.symbol }}_{{ result.start_date }}.png';
+          link.href = url;
+          link.click();
+        }
+      }
+      {% else %}
+      document.getElementById('chart').parentElement.innerHTML = '<p style="color:#999">无持仓变化数据，无法绘制资产曲线</p>';
+      {% endif %}
+    </script>
+  </body>
+</html>

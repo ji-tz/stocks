@@ -1020,21 +1020,20 @@ def get_result(task_id):
 
 @app.route('/view_result', methods=['POST'])
 def view_result():
-    """查看回测结果"""
+    """查看回测结果 — 统一使用通用模板"""
     result_json = request.form.get('result_json')
     if not result_json:
-        return render_template('result.html', error='无法获取回测结果')
+        return render_template('result_generic.html', error='无法获取回测结果')
 
     try:
         res = json.loads(result_json)
-        # 使用详细模板显示结果
-        if isinstance(res, dict) and ('trades_list' in res or 'history' in res):
+        if isinstance(res, dict):
             strategy_name = session.get('strategy_name', '')
-            return render_template('result_mean.html', result=res, strategy_name=strategy_name)
+            return render_template('result_generic.html', result=res, strategy_name=strategy_name)
         else:
-            return render_template('result.html', error='回测结果格式不正确')
+            return render_template('result_generic.html', error='回测结果格式不正确')
     except Exception as e:
-        return render_template('result.html', error=f'解析结果失败: {e}')
+        return render_template('result_generic.html', error=f'解析结果失败: {e}')
 
 
 @app.route('/download/excel', methods=['POST'])
@@ -1109,9 +1108,29 @@ def download_pdf():
         pdf = FPDF()
         pdf.add_page()
 
-        # Register a Unicode font for Chinese character support
-        _CJK_FONT_PATH = '/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc'
-        if os.path.exists(_CJK_FONT_PATH):
+        # Register a Unicode font for Chinese character support via fontconfig
+        def _find_cjk_font():
+            import subprocess
+            try:
+                result = subprocess.run(
+                    ['fc-match', '-f', '%{file}', 'wqy-zenhei,Noto Sans CJK SC,SimHei,Microsoft YaHei,Droid Sans Fallback'],
+                    capture_output=True, text=True, timeout=5
+                )
+                path = result.stdout.strip()
+                if path and os.path.exists(path):
+                    return path
+            except (subprocess.SubprocessError, FileNotFoundError):
+                pass
+            # fallback: scan known directories
+            for d in ['/usr/share/fonts', '/usr/local/share/fonts', os.path.expanduser('~/.fonts')]:
+                for root, _dirs, files in os.walk(d):
+                    for f in files:
+                        if f.endswith(('.ttc', '.ttf')) and any(k in f.lower() for k in ['wqy', 'noto', 'simhei', 'yahei', 'droid']):
+                            return os.path.join(root, f)
+            return None
+
+        _CJK_FONT_PATH = _find_cjk_font()
+        if _CJK_FONT_PATH:
             pdf.add_font('CJK', '', _CJK_FONT_PATH)
             font_body = 'CJK'
             font_body_bold = 'CJK'
