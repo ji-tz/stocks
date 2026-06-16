@@ -1020,21 +1020,20 @@ def get_result(task_id):
 
 @app.route('/view_result', methods=['POST'])
 def view_result():
-    """查看回测结果"""
+    """查看回测结果 — 统一使用通用模板"""
     result_json = request.form.get('result_json')
     if not result_json:
-        return render_template('result.html', error='无法获取回测结果')
+        return render_template('result_generic.html', error='无法获取回测结果')
 
     try:
         res = json.loads(result_json)
-        # 使用详细模板显示结果
-        if isinstance(res, dict) and ('trades_list' in res or 'history' in res):
+        if isinstance(res, dict):
             strategy_name = session.get('strategy_name', '')
-            return render_template('result_mean.html', result=res, strategy_name=strategy_name)
+            return render_template('result_generic.html', result=res, strategy_name=strategy_name)
         else:
-            return render_template('result.html', error='回测结果格式不正确')
+            return render_template('result_generic.html', error='回测结果格式不正确')
     except Exception as e:
-        return render_template('result.html', error=f'解析结果失败: {e}')
+        return render_template('result_generic.html', error=f'解析结果失败: {e}')
 
 
 @app.route('/download/excel', methods=['POST'])
