@@ -1,5 +1,8 @@
 import os
+import logging
 import pandas as pd
+
+logger = logging.getLogger(__name__)
 
 try:
     import akshare as ak
@@ -53,12 +56,13 @@ def _save_cache(df: pd.DataFrame, cache_file: str):
         try:
             os.replace(tmp_file, cache_file)
         except OSError:
+            logger.warning("缓存文件原子替换失败，尝试直接写入")
             try:
                 df.to_csv(cache_file, index=False)
             except OSError:
-                pass
+                logger.warning("缓存文件直接写入也失败")
     except Exception:
-        pass
+        logger.warning("缓存保存异常", exc_info=True)
 
 
 def _expand_fetch_range(start_date: str | None,
@@ -131,7 +135,7 @@ def _merge_into_cache(cache_file: str, df_new: pd.DataFrame) -> None:
         else:
             _save_cache(df_new.sort_values('date').reset_index(drop=True), cache_file)
     except Exception:
-        pass
+        logger.warning("缓存合并失败: %s", cache_file)
 
 
 _PROVIDER_FACTORIES = {
@@ -190,7 +194,7 @@ def get_data(symbol: str = "600900",
             else:
                 return cached_out
         except Exception:
-            pass
+            logger.debug("缓存覆盖范围检查失败")
 
     if not source:
         source = "auto"
@@ -246,7 +250,7 @@ def get_data(symbol: str = "600900",
             return pd.read_csv(cache_file, parse_dates=["date"]).loc[:, [
                 "date", "open", "high", "low", "close", "volume"]]
         except Exception:
-            pass
+            logger.warning("缓存回退读取失败: %s", cache_file)
 
     msg = "; ".join([f"{s}: {err}" for s, err in errors]) if errors else "unknown error"
     raise RuntimeError(f"所有数据源均失败: {msg}")

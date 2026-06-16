@@ -1,8 +1,11 @@
+import logging
 from gui import web
 from trader import persistence
 import trader.stocks as stocks
 import os
 import sys
+
+logger = logging.getLogger(__name__)
 
 # 确保工程根目录在 sys.path，便于导入 sibling 模块
 sys.path.insert(0, os.path.dirname(__file__))
@@ -18,7 +21,7 @@ def main():
         # 仅尝试预热默认 code，不成功也不阻塞启动
         stocks.get_data()
     except Exception:
-        pass
+        logger.warning("数据预热失败", exc_info=True)
 
     # 启动前端 Flask 应用（由 gui/web.py 提供 `app`）
     # debug=True 仅用于开发，生产环境用 env var FLASK_DEBUG=0
