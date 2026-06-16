@@ -31,10 +31,15 @@ def format_date_for_source(value, source_name: str) -> str | None:
 
 def format_symbol_for_tencent(symbol: str) -> str:
     s = str(symbol).strip().lower()
-    if s.startswith('sh') or s.startswith('sz'):
+    if s.startswith('sh') or s.startswith('sz') or s.startswith('bj'):
         return s
     if s.isdigit() and len(s) == 6:
-        return f"sh{s}" if s.startswith('6') else f"sz{s}"
+        if s.startswith('6'):
+            return f"sh{s}"
+        elif s.startswith('8'):
+            return f"bj{s}"
+        else:
+            return f"sz{s}"
     return s
 
 
