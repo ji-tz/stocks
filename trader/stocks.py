@@ -59,6 +59,8 @@ class StrategySpec:
     runner: Callable[..., Dict[str, Any]]
     parameters: tuple[StrategyParameter, ...] = ()
     description: str = ''
+    icon: str = '📌'
+    template: str = 'strategy_dynamic.html'
     supported_trade_prices: tuple[str, ...] = (TRADE_PRICE_OPEN,)
     module_name: Optional[str] = None
     module_interface: bool = False
@@ -191,6 +193,8 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
                 runner=runner,
                 parameters=tuple(parameters),
                 description=str(raw.get('description', '')).strip(),
+                icon=str(raw.get('icon', '📌')),
+                template=str(raw.get('template', 'strategy_dynamic.html')),
                 supported_trade_prices=supported_trade_prices if supported_trade_prices else (TRADE_PRICE_OPEN,),
                 module_name=module_name,
                 module_interface=module_interface,
@@ -575,12 +579,14 @@ def _build_strategy_registry() -> Dict[str, StrategySpec]:
                 ),
             ),
             description='基于移动平均线的趋势策略',
+            icon='📈',
         ),
         'mean_cost': StrategySpec(
             key='mean_cost',
             label='均值成本',
             runner=run_mean_cost,
             description='围绕持仓均价进行开盘交易',
+            icon='💰',
         ),
         'fixed_amount': StrategySpec(
             key='fixed_amount',
@@ -596,6 +602,7 @@ def _build_strategy_registry() -> Dict[str, StrategySpec]:
                 ),
             ),
             description='固定金额定投策略',
+            icon='🎯',
         ),
     }
 

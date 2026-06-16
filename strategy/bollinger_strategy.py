@@ -9,6 +9,8 @@ AUTO_STRATEGY_SPEC = {
     "label": "布林带",
     "runner": "run_module_strategy_backtest",
     "module_interface": True,
+    "icon": "📉",
+    "template": "strategy_dynamic.html",
     "parameters": [
         {
             "name": "period",
