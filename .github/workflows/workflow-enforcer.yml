@@ -1,0 +1,116 @@
+name: 流程合规检查
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled, edited]
+
+permissions:
+  pull-requests: read
+  issues: read
+  contents: read
+  checks: write
+
+jobs:
+  enforce:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 1️⃣ 分支命名
+        run: |
+          BRANCH="${{ github.head_ref }}"
+          if echo "$BRANCH" | grep -qE '^feat/issue-[0-9]+-|^fix/|^chore/|^dependabot/|^renovate/'; then
+            echo "✅ 分支名: $BRANCH"
+          else
+            echo "❌ 分支名不合规: $BRANCH"
+            echo "允许: feat/issue-<数字>-*, fix/*, chore/*, dependabot/*"
+            exit 1
+          fi
+
+      - name: 2️⃣ Issue 关联
+        run: |
+          TITLE="${{ github.event.pull_request.title }}"
+          BODY="${{ github.event.pull_request.body }}"
+          if echo "$TITLE" | grep -qE '#[0-9]+'; then
+            echo "✅ 标题关联: $(echo "$TITLE" | grep -oE '#[0-9]+')"
+          elif echo "$BODY" | grep -qE '#[0-9]+'; then
+            echo "✅ Body 关联: $(echo "$BODY" | grep -oE '#[0-9]+')"
+          else
+            echo "❌ 未关联 Issue（请在标题或 body 中含 #编号）"
+            exit 1
+          fi
+
+      - name: 3️⃣ 文件所有权
+        run: |
+          git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
+          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null || echo "")
+          if [ -z "$CHANGED" ]; then
+            echo "（无变更文件或无法比较）"
+            exit 0
+          fi
+          bash .github/scripts/check-ownership.sh "${{ github.base_ref }}" $CHANGED
+
+      - name: 4️⃣ PR 主体完整性
+        run: |
+          bash .github/scripts/check-pr-body.sh "${{ github.event.pull_request.body }}"
+
+      - name: 5️⃣ LEAD Review（需有 needs-qa / ai-done 标签时检查）
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels) }}'
+          if echo "$LABELS" | grep -qE '"needs-qa"|"ai-done"'; then
+            PR_NUM=${{ github.event.pull_request.number }}
+            COMMENTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/issues/$PR_NUM/comments")
+            if echo "$COMMENTS" | python3 -c "
+import json,sys
+for c in json.load(sys.stdin):
+    b=c.get('body','')
+    if 'LEAD' in b or '审查' in b: print('OK'); sys.exit(0)
+sys.exit(1)
+"; then
+              echo "✅ LEAD Review 通过"
+            else
+              echo "❌ 未找到 LEAD Review 评论"
+              echo "已在 needs-qa/ai-done 阶段但缺少研发主管审查"
+              exit 1
+            fi
+          else
+            echo "⏳ 跳过（未到 QA 阶段）"
+          fi
+
+      - name: 6️⃣ QA 验收（需有 ai-done 标签时检查）
+        run: |
+          LABELS='${{ toJSON(github.event.pull_request.labels) }}'
+          if echo "$LABELS" | grep -qE '"ai-done"'; then
+            PR_NUM=${{ github.event.pull_request.number }}
+            COMMENTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "${{ github.api_url }}/repos/${{ github.repository }}/issues/$PR_NUM/comments")
+            if echo "$COMMENTS" | python3 -c "
+import json,sys
+for c in json.load(sys.stdin):
+    b=c.get('body','')
+    if ('QA' in b or '验收' in b) and ('通过' in b or 'PASS' in b): print('OK'); sys.exit(0)
+sys.exit(1)
+"; then
+              echo "✅ QA 验收通过"
+            else
+              echo "❌ 未找到 QA 验收评论"
+              echo "标记 ai-done 但缺少 QA 通过记录"
+              exit 1
+            fi
+          else
+            echo "⏳ 跳过（未标记 ai-done）"
+          fi
+
+      - name: 📋 汇总
+        if: always()
+        run: |
+          echo "========== 流程检查报告 =========="
+          echo "分支命名     : ${{ steps.branch_check.outcome }}"
+          echo "Issue 关联   : ${{ steps.issue_check.outcome }}"
+          echo "文件所有权   : ${{ steps.ownership_check.outcome }}"
+          echo "PR body      : ${{ steps.pr_body_check.outcome }}"
+          echo "LEAD Review  : ${{ steps.lead_check.outcome }}"
+          echo "QA 验收      : ${{ steps.qa_check.outcome }}"
+          echo "==================================="
