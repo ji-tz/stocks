@@ -1,0 +1,309 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>⚡ 模拟盘交易 — 配置</title>
+    <style>
+      body { font-family: Arial, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; background: #f5f5f5; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; }
+      .header h1 { margin: 0; color: #1976d2; }
+      .back-link { color: #1976d2; text-decoration: none; }
+      .back-link:hover { text-decoration: underline; }
+
+      .breadcrumb { background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid #e0e0e0; }
+      .breadcrumb-item { display: inline-block; color: #666; }
+      .breadcrumb-item.active { color: #1976d2; font-weight: bold; }
+      .breadcrumb-separator { margin: 0 0.5rem; color: #999; }
+
+      .card { background: white; border-radius: 8px; padding: 2rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 2rem; }
+      .card h2 { margin-top: 0; color: #333; font-size: 1.3rem; margin-bottom: 1.5rem; }
+
+      .form-group { margin-bottom: 1.5rem; }
+      .form-group label { display: block; font-weight: bold; color: #333; margin-bottom: 0.5rem; font-size: 0.95rem; }
+      .form-group .hint { color: #888; font-size: 0.85rem; margin-top: 0.3rem; }
+      .form-group input, .form-group select {
+        width: 100%; padding: 0.7rem 0.8rem; border: 2px solid #ddd; border-radius: 4px;
+        font-size: 1rem; box-sizing: border-box; transition: border-color 0.3s;
+      }
+      .form-group input:focus, .form-group select:focus {
+        outline: none; border-color: #1976d2;
+      }
+      .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+
+      .search-section { margin-bottom: 1.5rem; }
+      .search-box { display: flex; gap: 0.5rem; }
+      .search-box input { flex: 1; padding: 0.7rem 0.8rem; border: 2px solid #ddd; border-radius: 4px; font-size: 1rem; }
+      .search-box input:focus { outline: none; border-color: #1976d2; }
+      .search-box button {
+        padding: 0.7rem 1.5rem; background: #1976d2; color: white; border: none;
+        border-radius: 4px; cursor: pointer; font-size: 1rem; white-space: nowrap;
+      }
+      .search-box button:hover { background: #1565c0; }
+      .search-hint { color: #888; font-size: 0.85rem; margin-top: 0.4rem; }
+
+      .search-result-card {
+        display: flex; justify-content: space-between; align-items: center;
+        padding: 1rem 1.2rem; background: #e3f2fd; border-radius: 4px; margin-top: 0.8rem;
+      }
+      .search-result-card h3 { margin: 0; color: #1976d2; font-size: 1.1rem; }
+      .search-result-card p { margin: 0.3rem 0 0 0; color: #666; font-size: 0.9rem; }
+      .search-result-card .btn-select {
+        padding: 0.5rem 1.2rem; background: #4caf50; color: white; border: none;
+        border-radius: 4px; cursor: pointer; font-size: 0.9rem;
+      }
+      .search-result-card .btn-select:hover { background: #45a049; }
+
+      .btn-submit {
+        width: 100%; padding: 1rem; background: #1976d2; color: white; border: none;
+        border-radius: 8px; font-size: 1.2rem; font-weight: bold; cursor: pointer; transition: background 0.3s;
+      }
+      .btn-submit:hover { background: #1565c0; }
+      .btn-submit:disabled { background: #90caf9; cursor: not-allowed; }
+
+      .error-msg { color: #d32f2f; padding: 0.8rem; background: #ffebee; border-radius: 4px; margin-bottom: 1rem; display: none; }
+      .success-msg { color: #2e7d32; padding: 0.8rem; background: #e8f5e9; border-radius: 4px; margin-bottom: 1rem; display: none; }
+
+      .toast {
+        position: fixed; top: 20px; right: 20px; padding: 1rem 1.5rem; border-radius: 8px;
+        color: white; font-size: 0.95rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: slideIn 0.3s ease; display: none;
+      }
+      .toast.success { background: #4caf50; }
+      .toast.error { background: #f44336; }
+      @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+      @media (max-width: 600px) {
+        .form-row { grid-template-columns: 1fr; }
+        .search-box { flex-direction: column; }
+        .search-box button { width: 100%; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>⚡ 模拟盘交易 — 配置</h1>
+      <a href="/strategies" class="back-link">← 返回首页</a>
+    </div>
+
+    <div class="breadcrumb">
+      <span class="breadcrumb-item"><a href="/strategies" style="color:#666;text-decoration:none;">首页</a></span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item">模拟盘</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item active">配置</span>
+    </div>
+
+    <div class="card">
+      <h2>📋 模拟盘配置</h2>
+
+      <div id="error-msg" class="error-msg"></div>
+      <div id="success-msg" class="success-msg"></div>
+
+      <form id="setup-form">
+        <!-- Stock Search -->
+        <div class="form-group">
+          <label for="stock-search">📈 选择股票</label>
+          <div class="search-section">
+            <div class="search-box">
+              <input type="text" id="stock-search" name="stock_query" placeholder="输入股票代码（如 600900）或股票名称（如 长江电力）" required>
+              <button type="button" onclick="searchStock()">🔍 搜索</button>
+            </div>
+            <div class="search-hint">💡 输入股票代码或名称搜索</div>
+          </div>
+          <div id="stock-result"></div>
+          <input type="hidden" id="stock_code" name="stock_code" value="">
+          <input type="hidden" id="stock_name" name="stock_name" value="">
+        </div>
+
+        <!-- Strategy -->
+        <div class="form-group">
+          <label for="strategy_key">🧠 选择策略</label>
+          <select id="strategy_key" name="strategy_key" required>
+            <option value="">— 请选择策略 —</option>
+            <option value="sma">SMA 均线策略</option>
+            <option value="dual_ma">双均线策略</option>
+            <option value="bollinger">布林带策略</option>
+            <option value="rsi">RSI 相对强弱指标</option>
+            <option value="mean_cost">持仓均摊策略</option>
+            <option value="fixed_amount">固定金额定投策略</option>
+          </select>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="init_cash">💰 初始资金</label>
+            <input type="number" id="init_cash" name="init_cash" value="100000" min="1000" step="1000" required>
+            <div class="hint">建议 10,000 元以上</div>
+          </div>
+          <div class="form-group">
+            <label for="lot_size">📦 每手股数</label>
+            <input type="number" id="lot_size" name="lot_size" value="100" min="1" step="1" required>
+            <div class="hint">A股通常为 100 股/手</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label for="source">🌐 数据源</label>
+            <select id="source" name="source">
+              <option value="auto" selected>自动选择</option>
+              <option value="akshare">AKShare</option>
+              <option value="baostock">BaoStock</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label for="interval">⏱️ 更新间隔</label>
+            <select id="interval" name="interval" required>
+              <option value="60">1 分钟</option>
+              <option value="300" selected>5 分钟</option>
+              <option value="900">15 分钟</option>
+              <option value="1800">30 分钟</option>
+              <option value="3600">1 小时</option>
+            </select>
+            <div class="hint">模拟盘更新频率</div>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="submit-btn">🚀 启动模拟盘</button>
+      </form>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      let selectedStockCode = '';
+      let selectedStockName = '';
+
+      function searchStock() {
+        const query = document.getElementById('stock-search').value.trim();
+        if (!query) return;
+
+        fetch('/api/search_stock?query=' + encodeURIComponent(query))
+          .then(r => r.json())
+          .then(data => {
+            const resultDiv = document.getElementById('stock-result');
+            if (data.error) {
+              resultDiv.innerHTML = '<div style="color:#d32f2f;padding:0.8rem;background:#ffebee;border-radius:4px;">' + data.error + '</div>';
+              return;
+            }
+            let items = [];
+            if (data.results && Array.isArray(data.results)) {
+              items = data.results;
+            } else if (data.code && data.name) {
+              items = [{ code: data.code, name: data.name }];
+            }
+            if (items.length === 0) {
+              resultDiv.innerHTML = '<div style="color:#d32f2f;padding:0.8rem;background:#ffebee;border-radius:4px;">未找到匹配的股票</div>';
+              return;
+            }
+            if (items.length === 1) {
+              showStockSelected(items[0].code, items[0].name);
+            } else {
+              let html = '<div style="color:#2e7d32;padding:0.5rem 0;">✓ 找到多个匹配项，请选择：</div>';
+              for (const it of items) {
+                html += '<div class="search-result-card">' +
+                  '<div><h3>' + it.code + ' - ' + it.name + '</h3></div>' +
+                  '<div><button class="btn-select" onclick="showStockSelected(\'' + it.code + '\', \'' + it.name + '\')">选择</button></div>' +
+                  '</div>';
+              }
+              resultDiv.innerHTML = html;
+            }
+          })
+          .catch(err => {
+            document.getElementById('stock-result').innerHTML = '<div style="color:#d32f2f;padding:0.8rem;background:#ffebee;border-radius:4px;">搜索失败：' + err.message + '</div>';
+          });
+      }
+
+      function showStockSelected(code, name) {
+        selectedStockCode = code;
+        selectedStockName = name;
+        document.getElementById('stock_code').value = code;
+        document.getElementById('stock_name').value = name;
+        document.getElementById('stock-result').innerHTML =
+          '<div class="search-result-card">' +
+          '<div><h3>' + code + ' - ' + name + '</h3><p>✓ 已选择</p></div>' +
+          '<div><button class="btn-select" onclick="clearStockSelection()" style="background:#f44336;">取消选择</button></div>' +
+          '</div>';
+      }
+
+      function clearStockSelection() {
+        selectedStockCode = '';
+        selectedStockName = '';
+        document.getElementById('stock_code').value = '';
+        document.getElementById('stock_name').value = '';
+        document.getElementById('stock-result').innerHTML = '';
+      }
+
+      function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+      }
+
+      document.getElementById('setup-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        const btn = document.getElementById('submit-btn');
+        btn.disabled = true;
+        btn.textContent = '⏳ 启动中...';
+
+        if (!selectedStockCode) {
+          showToast('请先搜索并选择股票', 'error');
+          btn.disabled = false;
+          btn.textContent = '🚀 启动模拟盘';
+          return;
+        }
+
+        const formData = {
+          stock_code: selectedStockCode,
+          stock_name: selectedStockName,
+          strategy_key: document.getElementById('strategy_key').value,
+          init_cash: parseFloat(document.getElementById('init_cash').value),
+          lot_size: parseInt(document.getElementById('lot_size').value),
+          source: document.getElementById('source').value,
+          interval_seconds: parseInt(document.getElementById('interval').value),
+          params: {}
+        };
+
+        if (!formData.strategy_key) {
+          showToast('请选择策略', 'error');
+          btn.disabled = false;
+          btn.textContent = '🚀 启动模拟盘';
+          return;
+        }
+
+        fetch('/papertrade/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(formData)
+        })
+        .then(r => r.json())
+        .then(data => {
+          if (data.success) {
+            showToast('✅ 模拟盘启动成功！', 'success');
+            setTimeout(() => { window.location.href = '/papertrade'; }, 1000);
+          } else {
+            showToast('❌ 启动失败：' + (data.error || '未知错误'), 'error');
+            btn.disabled = false;
+            btn.textContent = '🚀 启动模拟盘';
+          }
+        })
+        .catch(err => {
+          showToast('❌ 网络错误：' + err.message, 'error');
+          btn.disabled = false;
+          btn.textContent = '🚀 启动模拟盘';
+        });
+      });
+
+      // Support hitting Enter in stock search
+      document.getElementById('stock-search').addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') {
+          e.preventDefault();
+          searchStock();
+        }
+      });
+    </script>
+  </body>
+</html>

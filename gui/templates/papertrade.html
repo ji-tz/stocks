@@ -1,0 +1,525 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>⚡ 模拟盘交易</title>
+    <style>
+      * { box-sizing: border-box; }
+      body { font-family: Arial, sans-serif; max-width: 1100px; margin: 2rem auto; padding: 0 1rem; background: #f5f5f5; }
+      .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+      .header h1 { margin: 0; color: #1976d2; }
+
+      .breadcrumb { background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-bottom: 2rem; border: 1px solid #e0e0e0; }
+      .breadcrumb-item { display: inline-block; color: #666; }
+      .breadcrumb-item a { color: #666; text-decoration: none; }
+      .breadcrumb-item.active { color: #1976d2; font-weight: bold; }
+      .breadcrumb-separator { margin: 0 0.5rem; color: #999; }
+
+      .controls-bar {
+        background: white; border-radius: 8px; padding: 1rem 1.5rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem;
+        display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem;
+      }
+      .controls-bar .info { display: flex; align-items: center; gap: 1.5rem; flex-wrap: wrap; }
+      .controls-bar .info-item { font-size: 0.95rem; }
+      .controls-bar .info-item strong { color: #1976d2; }
+      .controls-bar .status-badge {
+        display: inline-block; padding: 0.3rem 0.8rem; border-radius: 12px;
+        font-size: 0.85rem; font-weight: bold;
+      }
+      .status-badge.running { background: #e8f5e9; color: #2e7d32; }
+      .status-badge.stopped { background: #ffebee; color: #c62828; }
+      .status-badge.paused { background: #fff3e0; color: #e65100; }
+      .controls-bar .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+
+      .btn {
+        padding: 0.5rem 1.2rem; border: none; border-radius: 4px; cursor: pointer;
+        font-size: 0.9rem; font-weight: 500; transition: all 0.2s;
+        text-decoration: none; display: inline-block;
+      }
+      .btn-primary { background: #1976d2; color: white; }
+      .btn-primary:hover { background: #1565c0; }
+      .btn-success { background: #4caf50; color: white; }
+      .btn-success:hover { background: #45a049; }
+      .btn-danger { background: #f44336; color: white; }
+      .btn-danger:hover { background: #d32f2f; }
+      .btn-warning { background: #ff9800; color: white; }
+      .btn-warning:hover { background: #f57c00; }
+      .btn-outline { background: transparent; border: 1px solid #1976d2; color: #1976d2; }
+      .btn-outline:hover { background: #e3f2fd; }
+
+      .card { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+      .card-title { font-size: 1.1rem; font-weight: bold; color: #333; margin-bottom: 1rem; }
+
+      .account-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+      .account-card {
+        background: white; border-radius: 8px; padding: 1rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        text-align: center; transition: transform 0.2s;
+      }
+      .account-card:hover { transform: translateY(-2px); }
+      .account-card .label { color: #888; font-size: 0.8rem; margin-bottom: 0.4rem; }
+      .account-card .value { font-size: 1.2rem; font-weight: bold; color: #333; }
+      .account-card .value.green { color: #4caf50; }
+      .account-card .value.red { color: #f44336; }
+      .account-card .value.blue { color: #1976d2; }
+
+      .position-table { width: 100%; border-collapse: collapse; }
+      .position-table th {
+        background: #1976d2; color: white; padding: 0.7rem 0.8rem;
+        text-align: left; font-size: 0.85rem; font-weight: 500;
+      }
+      .position-table th:first-child { border-radius: 4px 0 0 0; }
+      .position-table th:last-child { border-radius: 0 4px 0 0; }
+      .position-table td { padding: 0.7rem 0.8rem; border-bottom: 1px solid #e0e0e0; font-size: 0.9rem; }
+      .position-table tr:nth-child(even) { background: #fafafa; }
+      .position-table .profit { color: #4caf50; font-weight: bold; }
+      .position-table .loss { color: #f44336; font-weight: bold; }
+      .position-table .no-position { text-align: center; color: #999; padding: 2rem; }
+
+      .trade-table { width: 100%; border-collapse: collapse; }
+      .trade-table th {
+        background: #1976d2; color: white; padding: 0.6rem 0.8rem;
+        text-align: left; font-size: 0.85rem; font-weight: 500; white-space: nowrap;
+      }
+      .trade-table th:first-child { border-radius: 4px 0 0 0; }
+      .trade-table th:last-child { border-radius: 0 4px 0 0; }
+      .trade-table td { padding: 0.6rem 0.8rem; border-bottom: 1px solid #e0e0e0; font-size: 0.9rem; }
+      .trade-table tr:nth-child(even) { background: #fafafa; }
+      .trade-table .buy { color: #f44336; font-weight: bold; }
+      .trade-table .sell { color: #4caf50; font-weight: bold; }
+      .trade-table .pl-profit { color: #4caf50; }
+      .trade-table .pl-loss { color: #f44336; }
+
+      .loading-overlay {
+        display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.3); z-index: 999; justify-content: center; align-items: center;
+      }
+      .loading-overlay.show { display: flex; }
+      .loading-spinner {
+        background: white; padding: 2rem 3rem; border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.2); text-align: center;
+      }
+      .loading-spinner .spinner {
+        border: 4px solid #e0e0e0; border-top: 4px solid #1976d2;
+        border-radius: 50%; width: 40px; height: 40px; animation: spin 0.8s linear infinite;
+        margin: 0 auto 1rem auto;
+      }
+      @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+
+      .toast {
+        position: fixed; top: 20px; right: 20px; padding: 1rem 1.5rem; border-radius: 8px;
+        color: white; font-size: 0.95rem; z-index: 1000; box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        animation: slideIn 0.3s ease; display: none;
+      }
+      .toast.success { background: #4caf50; }
+      .toast.error { background: #f44336; }
+      @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+
+      @media (max-width: 600px) {
+        .account-grid { grid-template-columns: repeat(2, 1fr); }
+        .controls-bar { flex-direction: column; align-items: stretch; }
+        .trade-table { font-size: 0.8rem; }
+        .trade-table th, .trade-table td { padding: 0.4rem 0.5rem; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>⚡ 模拟盘交易</h1>
+      <div>
+        <a href="/papertrade/setup" class="btn btn-primary">⚙ 重新配置</a>
+        <a href="/strategies" class="btn btn-outline">🏠 返回首页</a>
+      </div>
+    </div>
+
+    <div class="breadcrumb">
+      <span class="breadcrumb-item"><a href="/strategies">首页</a></span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item">模拟盘</span>
+      <span class="breadcrumb-separator">→</span>
+      <span class="breadcrumb-item active">仪表盘</span>
+    </div>
+
+    <!-- Controls Bar -->
+    <div class="controls-bar" id="controls-bar">
+      <div class="info">
+        <div class="info-item">📈 <strong id="stock-info">-</strong></div>
+        <div class="info-item">🧠 <strong id="strategy-info">-</strong></div>
+        <div class="info-item">💹 最新价: <strong id="last-price">-</strong></div>
+        <div class="info-item">
+          <span id="status-badge" class="status-badge stopped">● 已停止</span>
+        </div>
+        <div class="info-item" style="font-size:0.85rem;color:#888;">
+          交易次数: <span id="trade-count">0</span>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-success" id="btn-start" onclick="startPaperTrade()">▶ 启动</button>
+        <button class="btn btn-warning" id="btn-pause" onclick="pausePaperTrade()" style="display:none;">⏸ 暂停</button>
+        <button class="btn btn-danger" id="btn-stop" onclick="stopPaperTrade()" style="display:none;">⏹ 停止</button>
+      </div>
+    </div>
+
+    <!-- Account Summary -->
+    <div class="account-grid" id="account-grid">
+      <div class="account-card">
+        <div class="label">💰 总资产</div>
+        <div class="value blue" id="total-value">-</div>
+      </div>
+      <div class="account-card">
+        <div class="label">📊 持仓市值</div>
+        <div class="value blue" id="market-value">-</div>
+      </div>
+      <div class="account-card">
+        <div class="label">💵 可用现金</div>
+        <div class="value blue" id="cash">-</div>
+      </div>
+      <div class="account-card">
+        <div class="label">📈 总收益率</div>
+        <div class="value" id="return-rate">-</div>
+      </div>
+      <div class="account-card">
+        <div class="label">✅ 已实现盈亏</div>
+        <div class="value" id="realized-pl">-</div>
+      </div>
+      <div class="account-card">
+        <div class="label">🔮 未实现盈亏</div>
+        <div class="value" id="unrealized-pl">-</div>
+      </div>
+    </div>
+
+    <!-- Current Position -->
+    <div class="card">
+      <div class="card-title">📦 当前持仓</div>
+      <table class="position-table" id="position-table">
+        <thead>
+          <tr>
+            <th>股票</th>
+            <th>持仓量</th>
+            <th>成本价</th>
+            <th>现价</th>
+            <th>持仓市值</th>
+            <th>盈亏</th>
+            <th>盈亏率</th>
+          </tr>
+        </thead>
+        <tbody id="position-body">
+          <tr><td colspan="7" class="no-position">暂无持仓数据</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Trade History -->
+    <div class="card">
+      <div class="card-title">📝 交易记录</div>
+      <div style="overflow-x:auto;">
+        <table class="trade-table" id="trade-table">
+          <thead>
+            <tr>
+              <th>时间</th>
+              <th>方向</th>
+              <th>价格</th>
+              <th>数量</th>
+              <th>成交额</th>
+              <th>本次盈亏</th>
+              <th>余额</th>
+            </tr>
+          </thead>
+          <tbody id="trade-body">
+            <tr><td colspan="7" style="text-align:center;color:#999;padding:2rem;">暂无交易记录</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading-overlay">
+      <div class="loading-spinner">
+        <div class="spinner"></div>
+        <div id="loading-text" style="color:#333;font-size:1rem;">处理中...</div>
+      </div>
+    </div>
+
+    <!-- Toast -->
+    <div class="toast" id="toast"></div>
+
+    <script>
+      let statusTimer = null;
+      let tradesTimer = null;
+      let currentStatus = 'stopped';
+
+      function showToast(message, type) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.className = 'toast ' + type;
+        toast.style.display = 'block';
+        setTimeout(() => { toast.style.display = 'none'; }, 4000);
+      }
+
+      function showLoading(text) {
+        document.getElementById('loading-text').textContent = text || '处理中...';
+        document.getElementById('loading-overlay').classList.add('show');
+      }
+
+      function hideLoading() {
+        document.getElementById('loading-overlay').classList.remove('show');
+      }
+
+      function formatMoney(val) {
+        if (val === null || val === undefined) return '-';
+        return '¥' + Number(val).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      }
+
+      function formatNumber(val, decimals) {
+        if (val === null || val === undefined) return '-';
+        decimals = decimals || 2;
+        return Number(val).toFixed(decimals);
+      }
+
+      function formatPercent(val) {
+        if (val === null || val === undefined) return '-';
+        return (Number(val) * 100).toFixed(2) + '%';
+      }
+
+      function setValueColor(elementId, value, isRate) {
+        const el = document.getElementById(elementId);
+        if (value === null || value === undefined) { el.textContent = '-'; el.className = 'value'; return; }
+        const num = Number(value);
+        el.className = 'value';
+        if (num > 0) el.classList.add('green');
+        else if (num < 0) el.classList.add('red');
+      }
+
+      function updateDashboard(status) {
+        if (!status) return;
+
+        currentStatus = status.status || 'stopped';
+
+        // Stock & Strategy info
+        document.getElementById('stock-info').textContent = status.stock_code || '-';
+        document.getElementById('strategy-info').textContent = status.strategy_key || '-';
+        document.getElementById('last-price').textContent = status.last_price ? formatMoney(status.last_price) : '-';
+        document.getElementById('trade-count').textContent = status.trade_count || 0;
+
+        // Status badge
+        const badge = document.getElementById('status-badge');
+        if (currentStatus === 'running') {
+          badge.className = 'status-badge running';
+          badge.textContent = '● 运行中';
+        } else if (currentStatus === 'paused') {
+          badge.className = 'status-badge paused';
+          badge.textContent = '● 已暂停';
+        } else {
+          badge.className = 'status-badge stopped';
+          badge.textContent = '● 已停止';
+        }
+
+        // Buttons visibility
+        document.getElementById('btn-start').style.display = (currentStatus === 'stopped') ? '' : 'none';
+        document.getElementById('btn-pause').style.display = (currentStatus === 'running') ? '' : 'none';
+        document.getElementById('btn-stop').style.display = (currentStatus !== 'stopped') ? '' : 'none';
+
+        // Account summary
+        const acct = status.account;
+        if (acct) {
+          document.getElementById('total-value').textContent = formatMoney(acct.total_value);
+          document.getElementById('market-value').textContent = formatMoney(acct.market_value);
+          document.getElementById('cash').textContent = formatMoney(acct.cash);
+
+          // Total return rate
+          const returnRateEl = document.getElementById('return-rate');
+          const rPL = Number(acct.realized_pl) || 0;
+          const uPL = Number(acct.unrealized_pl) || 0;
+          const tv = Number(acct.total_value) || 0;
+          const totalPL = rPL + uPL;
+          const invested = tv - totalPL;
+          const returnRate = invested > 0 ? totalPL / invested : 0;
+          returnRateEl.textContent = formatPercent(returnRate);
+          returnRateEl.className = 'value';
+          if (returnRate > 0) returnRateEl.classList.add('green');
+          else if (returnRate < 0) returnRateEl.classList.add('red');
+
+          setValueColor('realized-pl', acct.realized_pl);
+          document.getElementById('realized-pl').textContent = formatMoney(acct.realized_pl);
+          
+          setValueColor('unrealized-pl', acct.unrealized_pl);
+          document.getElementById('unrealized-pl').textContent = formatMoney(acct.unrealized_pl);
+        }
+
+        // Position section
+        const posBody = document.getElementById('position-body');
+        if (acct && Number(acct.shares) > 0) {
+          const avgCost = Number(acct.avg_cost) || 0;
+          const lastPrice = Number(status.last_price) || 0;
+          const shares = Number(acct.shares) || 0;
+          const marketValue = shares * lastPrice;
+          const pl = (lastPrice - avgCost) * shares;
+          const plRate = avgCost > 0 ? (lastPrice - avgCost) / avgCost : 0;
+          const plClass = pl >= 0 ? 'profit' : 'loss';
+
+          posBody.innerHTML = 
+            '<tr>' +
+            '<td><strong>' + (status.stock_code || '-') + '</strong></td>' +
+            '<td>' + shares + '</td>' +
+            '<td>' + formatMoney(avgCost) + '</td>' +
+            '<td>' + formatMoney(lastPrice) + '</td>' +
+            '<td>' + formatMoney(marketValue) + '</td>' +
+            '<td class="' + plClass + '">' + formatMoney(pl) + '</td>' +
+            '<td class="' + plClass + '">' + formatPercent(plRate) + '</td>' +
+            '</tr>';
+        } else {
+          posBody.innerHTML = '<tr><td colspan="7" class="no-position">暂无持仓数据</td></tr>';
+        }
+      }
+
+      function updateTrades(trades) {
+        const tbody = document.getElementById('trade-body');
+        if (!trades || trades.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="7" style="text-align:center;color:#999;padding:2rem;">暂无交易记录</td></tr>';
+          return;
+        }
+        let html = '';
+        for (const t of trades) {
+          const direction = (t.action === 'buy' || t.direction === '买入') ? '买入' : '卖出';
+          const directionClass = direction === '买入' ? 'buy' : 'sell';
+          const amount = (Number(t.price) || 0) * (Number(t.shares) || 0);
+          const pl = t.pl;
+          const plClass = pl !== undefined && pl !== null ? (Number(pl) >= 0 ? 'pl-profit' : 'pl-loss') : '';
+          html += '<tr>' +
+            '<td>' + (t.time || t.date || '-') + '</td>' +
+            '<td class="' + directionClass + '">' + direction + '</td>' +
+            '<td>' + formatMoney(t.price) + '</td>' +
+            '<td>' + (t.shares || '-') + '</td>' +
+            '<td>' + formatMoney(amount) + '</td>' +
+            '<td class="' + plClass + '">' + (pl !== undefined && pl !== null ? formatMoney(pl) : '-') + '</td>' +
+            '<td>' + (t.cash_remaining !== undefined ? formatMoney(t.cash_remaining) : '-') + '</td>' +
+            '</tr>';
+        }
+        tbody.innerHTML = html;
+        // Auto-scroll to latest
+        const table = document.getElementById('trade-table');
+        if (table && table.parentElement) {
+          table.parentElement.scrollTop = 0;
+        }
+      }
+
+      function fetchStatus() {
+        fetch('/papertrade/status')
+          .then(r => {
+            if (!r.ok) throw new Error('Status unavailable');
+            return r.json();
+          })
+          .then(data => {
+            if (data.error) return;
+            updateDashboard(data);
+          })
+          .catch(() => {
+            // Silently handle when backend not ready
+          });
+      }
+
+      function fetchTrades() {
+        fetch('/papertrade/trades?limit=50')
+          .then(r => {
+            if (!r.ok) throw new Error('Trades unavailable');
+            return r.json();
+          })
+          .then(data => {
+            if (data.error) return;
+            if (Array.isArray(data)) {
+              updateTrades(data);
+            } else if (data.trades && Array.isArray(data.trades)) {
+              updateTrades(data.trades);
+            } else if (data.results && Array.isArray(data.results)) {
+              updateTrades(data.results);
+            }
+          })
+          .catch(() => {});
+      }
+
+      function startPaperTrade() {
+        showLoading('正在启动模拟盘...');
+        fetch('/papertrade/start', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({})
+        })
+        .then(r => r.json())
+        .then(data => {
+          hideLoading();
+          if (data.success) {
+            showToast('✅ 模拟盘已启动', 'success');
+            fetchStatus();
+            fetchTrades();
+          } else {
+            showToast('❌ 启动失败：' + (data.error || '未知错误'), 'error');
+          }
+        })
+        .catch(err => {
+          hideLoading();
+          showToast('❌ 请求失败：' + err.message, 'error');
+        });
+      }
+
+      function pausePaperTrade() {
+        showLoading('正在暂停...');
+        // For now treat pause as stop
+        fetch('/papertrade/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          hideLoading();
+          if (data.success) {
+            showToast('⏸ 模拟盘已暂停', 'success');
+            fetchStatus();
+          } else {
+            showToast('❌ 操作失败', 'error');
+          }
+        })
+        .catch(err => {
+          hideLoading();
+          showToast('❌ 请求失败：' + err.message, 'error');
+        });
+      }
+
+      function stopPaperTrade() {
+        if (!confirm('⚠️ 确认停止当前模拟盘？停止后当前会话数据将被清除。')) return;
+        showLoading('正在停止模拟盘...');
+        fetch('/papertrade/stop', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' }
+        })
+        .then(r => r.json())
+        .then(data => {
+          hideLoading();
+          if (data.success) {
+            showToast('⏹ 模拟盘已停止', 'success');
+            fetchStatus();
+            fetchTrades();
+          } else {
+            showToast('❌ 停止失败', 'error');
+          }
+        })
+        .catch(err => {
+          hideLoading();
+          showToast('❌ 请求失败：' + err.message, 'error');
+        });
+      }
+
+      function startPolling() {
+        if (statusTimer) clearInterval(statusTimer);
+        if (tradesTimer) clearInterval(tradesTimer);
+        fetchStatus();
+        fetchTrades();
+        statusTimer = setInterval(fetchStatus, 5000);
+        tradesTimer = setInterval(fetchTrades, 10000);
+      }
+
+      // Initialize
+      document.addEventListener('DOMContentLoaded', startPolling);
+    </script>
+  </body>
+</html>

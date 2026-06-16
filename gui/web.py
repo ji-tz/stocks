@@ -1287,6 +1287,114 @@ def download_pdf():
     except Exception as e:
         return jsonify({'error': f'导出 PDF 失败: {str(e)}'}), 500
 
+# ── 模拟盘交易 (Paper Trading) ───────────────────────────
+
+try:
+    from trader.papertrade import engine as _paper_engine
+    HAS_PAPER_ENGINE = True
+except (ImportError, AttributeError):
+    _paper_engine = None
+    HAS_PAPER_ENGINE = False
+
+
+def _get_paper_engine():
+    """Return the paper trade engine singleton, or None if unavailable."""
+    global _paper_engine, HAS_PAPER_ENGINE
+    if _paper_engine is None:
+        try:
+            from trader.papertrade import engine as e
+            _paper_engine = e
+            HAS_PAPER_ENGINE = True
+            return _paper_engine
+        except (ImportError, AttributeError):
+            return None
+    return _paper_engine
+
+
+@app.route('/papertrade')
+def papertrade():
+    """模拟盘仪表盘页面"""
+    engine = _get_paper_engine()
+    status = {}
+    if engine:
+        try:
+            status = engine.get_status()
+        except Exception:
+            status = {'status': 'stopped'}
+    return render_template('papertrade.html', status=status)
+
+
+@app.route('/papertrade/setup', methods=['GET', 'POST'])
+def papertrade_setup():
+    """模拟盘配置页面"""
+    if request.method == 'POST':
+        # Handle form-based POST (redirect approach)
+        return papertrade_start()
+    return render_template('papertrade_setup.html')
+
+
+@app.route('/papertrade/start', methods=['POST'])
+def papertrade_start():
+    """启动模拟盘"""
+    engine = _get_paper_engine()
+    if engine is None:
+        return jsonify({'success': False, 'error': '模拟盘引擎未加载，请先构建 trader.papertrade 模块'}), 503
+
+    data = request.get_json(silent=True) or {}
+    try:
+        engine.configure(
+            strategy_key=data.get('strategy_key', 'sma'),
+            stock_code=data.get('stock_code', '600900'),
+            params=data.get('params', {}),
+            init_cash=float(data.get('init_cash', 100000)),
+            lot_size=float(data.get('lot_size', 100)),
+            source=data.get('source', 'auto'),
+            interval_seconds=int(data.get('interval_seconds', 300)),
+        )
+        ok = engine.start()
+        return jsonify({'success': ok})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/papertrade/stop', methods=['POST'])
+def papertrade_stop():
+    """停止模拟盘"""
+    engine = _get_paper_engine()
+    if engine is None:
+        return jsonify({'success': False, 'error': '模拟盘引擎未加载'}), 503
+    try:
+        ok = engine.stop()
+        return jsonify({'success': ok})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@app.route('/papertrade/status')
+def papertrade_status():
+    """获取模拟盘状态 (JSON)"""
+    engine = _get_paper_engine()
+    if engine is None:
+        return jsonify({'status': 'stopped', 'error': '引擎未加载'})
+    try:
+        return jsonify(engine.get_status())
+    except Exception as e:
+        return jsonify({'status': 'stopped', 'error': str(e)})
+
+
+@app.route('/papertrade/trades')
+def papertrade_trades():
+    """获取交易记录列表 (JSON)"""
+    engine = _get_paper_engine()
+    if engine is None:
+        return jsonify({'trades': [], 'error': '引擎未加载'})
+    try:
+        limit = request.args.get('limit', 50, type=int)
+        return jsonify(engine.get_trades(limit=limit))
+    except Exception as e:
+        return jsonify({'trades': [], 'error': str(e)})
+
+
 # ── 参数预设 API ─────────────────────────────────────────
 
 @app.route('/save_preset', methods=['POST'])
