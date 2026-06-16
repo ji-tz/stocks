@@ -80,9 +80,10 @@ class TestSimulatorEngine(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(result.shares_after, 100)
-        self.assertEqual(result.cash_after, 90000.0)
+        # 买入成本 = 100*100 + 佣金(10000*0.00025=2.5) = 10002.5
+        self.assertEqual(result.cash_after, 89997.5)
         self.assertEqual(engine.get_position().shares, 100)
-        self.assertEqual(engine.get_cash(), 90000.0)
+        self.assertEqual(engine.get_cash(), 89997.5)
 
     def test_buy_success_with_fractional_shares(self):
         """测试基金场景：支持小数份额买入。"""
@@ -92,7 +93,9 @@ class TestSimulatorEngine(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertAlmostEqual(result.shares_after, 100.25, places=6)
-        self.assertAlmostEqual(result.cash_after, 10000.0 - 1.234 * 100.25, places=6)
+        # 买入成本 = 1.234*100.25 + 佣金(1.234*100.25*0.00025) = 123.7085 + 0.030927 = 123.739427
+        expected_cash = 10000.0 - 1.234 * 100.25 * (1 + 0.00025)
+        self.assertAlmostEqual(result.cash_after, expected_cash, places=6)
 
     def test_buy_insufficient_cash(self):
         """测试资金不足无法买入"""
@@ -117,8 +120,11 @@ class TestSimulatorEngine(unittest.TestCase):
 
         self.assertTrue(result.success)
         self.assertEqual(result.shares_after, 0)
-        self.assertEqual(result.cash_after, 101000.0)  # 90000 + 110*100
-        self.assertEqual(result.realized_pl, 1000.0)  # (110-100)*100
+        # 买入: 100*100+佣金2.5=10002.5 => 现金89997.5
+        # 卖出: 110*100=11000, 减佣金2.75, 减印花税11.0 => 净收入10986.25
+        self.assertEqual(result.cash_after, 100983.75)  # 89997.5 + 10986.25
+        # (110*100 - 佣金2.75 - 印花税11.0) - 成本10000 = 986.25
+        self.assertAlmostEqual(result.realized_pl, 986.25, places=2)
         self.assertEqual(engine.get_position().shares, 0)
 
     def test_sell_insufficient_shares(self):
@@ -150,8 +156,9 @@ class TestSimulatorEngine(unittest.TestCase):
         result = engine.sell(date=date, price=130.0)
         self.assertTrue(result.success)
         self.assertEqual(engine.get_position().shares, 200)
-        # 已实现盈亏应该是 (130-110)*100 = 2000
-        self.assertAlmostEqual(engine.realized_pl, 2000.0, places=2)
+        # 已实现盈亏 = 净收入12983.75 - 成本11000 = 1983.75
+        # 净收入 = 130*100 - 佣金3.25 - 印花税13.0 = 12983.75
+        self.assertAlmostEqual(engine.realized_pl, 1983.75, places=2)
 
     def test_get_summary(self):
         """测试获取账户摘要"""
@@ -164,11 +171,11 @@ class TestSimulatorEngine(unittest.TestCase):
         # 获取摘要（当前价格110）
         summary = engine.get_summary(current_price=110.0)
 
-        self.assertEqual(summary['cash'], 90000.0)
+        self.assertEqual(summary['cash'], 89997.5)
         self.assertEqual(summary['shares'], 100)
         self.assertEqual(summary['avg_cost'], 100.0)
         self.assertEqual(summary['market_value'], 11000.0)  # 100*110
-        self.assertEqual(summary['total_value'], 101000.0)  # 90000+11000
+        self.assertEqual(summary['total_value'], 100997.5)  # 89997.5+11000
         self.assertEqual(summary['unrealized_pl'], 1000.0)  # (110-100)*100
 
     def test_trade_count(self):

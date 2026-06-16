@@ -16,8 +16,13 @@ class RealtimeSimExchange(SimulatedExchangeBase):
     def __init__(self, stock_code: str = '',
                  init_cash: float = 100000.0,
                  lot_size: float = 100.0,
-                 verbose: bool = False):
-        super().__init__(init_cash=init_cash, lot_size=lot_size, verbose=verbose)
+                 verbose: bool = False,
+                 commission_pct: float = 0.00025,
+                 stamp_duty_pct: float = 0.001,
+                 slippage_pct: float = 0.0):
+        super().__init__(init_cash=init_cash, lot_size=lot_size, verbose=verbose,
+                         commission_pct=commission_pct, stamp_duty_pct=stamp_duty_pct,
+                         slippage_pct=slippage_pct)
         self.stock_code = stock_code
         self.trade_history: list[dict] = []
 

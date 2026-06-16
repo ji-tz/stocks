@@ -10,8 +10,12 @@ from exchange.exchange_interface import StockExchange
 class SimulatedExchangeBase(StockExchange):
     """仿真类交易所的通用逻辑。"""
 
-    def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0, verbose: bool = False):
-        super().__init__(init_cash=init_cash, lot_size=lot_size)
+    def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0, verbose: bool = False,
+                 commission_pct: float = 0.00025, stamp_duty_pct: float = 0.001,
+                 slippage_pct: float = 0.0):
+        super().__init__(init_cash=init_cash, lot_size=lot_size,
+                         commission_pct=commission_pct, stamp_duty_pct=stamp_duty_pct,
+                         slippage_pct=slippage_pct)
         self.verbose = verbose
         self.trade_count = 0
         self.connected = False
@@ -36,38 +40,45 @@ class SimulatedExchangeBase(StockExchange):
                 shares_after=self.account.position.shares,
             )
 
-        cost = price * buy_shares
-        if self.account.cash < cost:
+        # 应用滑点：买入时价格向上偏移（更差的价格）
+        effective_price = price * (1.0 + self.slippage_pct)
+        cost_before_fees = effective_price * buy_shares
+        commission = cost_before_fees * self.commission_pct
+        total_cost = cost_before_fees + commission
+
+        if self.account.cash < total_cost:
             if self.verbose:
-                print(f"[{date.strftime('%Y-%m-%d')}] 买入失败：资金不足 (需要 {cost:.2f}, 可用 {self.account.cash:.2f})")
+                print(f"[{date.strftime('%Y-%m-%d')}] 买入失败：资金不足 (需要 {total_cost:.2f}, 可用 {self.account.cash:.2f})")
             return TradeResult(
                 success=False,
-                message=f"资金不足：需要 {cost:.2f}，可用 {self.account.cash:.2f}",
+                message=f"资金不足：需要 {total_cost:.2f}，可用 {self.account.cash:.2f}",
                 cash_after=self.account.cash,
                 shares_after=self.account.position.shares,
             )
 
-        self.account.cash -= cost
+        self.account.cash -= total_cost
         self.account.position.shares += buy_shares
-        self.account.position.total_cost += cost
+        self.account.position.total_cost += cost_before_fees
         self.account.position.avg_cost = (
             self.account.position.total_cost / self.account.position.shares
             if self.account.position.shares > 0
             else 0.0
         )
+        self.total_fees += commission
         self.trade_count += 1
 
-        order = TradeOrder(date=date, action="buy", price=price, shares=buy_shares)
+        order = TradeOrder(date=date, action="buy", price=effective_price, shares=buy_shares)
 
         if self.verbose:
             print(
-                f"[{date.strftime('%Y-%m-%d')}] 买入成功：价格 {price:.2f}, 数量 {buy_shares}, "
-                f"成本 {cost:.2f}, 剩余现金 {self.account.cash:.2f}"
+                f"[{date.strftime('%Y-%m-%d')}] 买入成功：价格 {effective_price:.2f}, 数量 {buy_shares}, "
+                f"成本 {total_cost:.2f} (佣金 {commission:.2f}), "
+                f"剩余现金 {self.account.cash:.2f}"
             )
 
         return TradeResult(
             success=True,
-            message="买入成功",
+            message=f"买入成功 (佣金 ¥{commission:.2f})",
             order=order,
             cash_after=self.account.cash,
             shares_after=self.account.position.shares,
@@ -97,15 +108,24 @@ class SimulatedExchangeBase(StockExchange):
                 shares_after=self.account.position.shares,
             )
 
-        proceeds = price * sell_shares
+        # 应用滑点：卖出时价格向下偏移（更差的价格）
+        effective_price = price * (1.0 - self.slippage_pct)
+        proceeds_before_fees = effective_price * sell_shares
+        commission = proceeds_before_fees * self.commission_pct
+        stamp_duty = proceeds_before_fees * self.stamp_duty_pct
+        total_fees_this = commission + stamp_duty
+        net_proceeds = proceeds_before_fees - total_fees_this
+
         avg_cost = self.account.position.avg_cost
         cost_reduced = avg_cost * sell_shares
-        realized_pl_this = (price - avg_cost) * sell_shares
+        # 已实现盈亏按净收入计算（已扣除费用）
+        realized_pl_this = net_proceeds - cost_reduced
 
-        self.account.cash += proceeds
+        self.account.cash += net_proceeds
         self.account.position.shares -= sell_shares
         self.account.position.total_cost -= cost_reduced
         self.realized_pl += realized_pl_this
+        self.total_fees += total_fees_this
         self.trade_count += 1
 
         if self.account.position.shares > 0:
@@ -114,18 +134,19 @@ class SimulatedExchangeBase(StockExchange):
             self.account.position.avg_cost = 0.0
             self.account.position.total_cost = 0.0
 
-        order = TradeOrder(date=date, action="sell", price=price, shares=sell_shares)
+        order = TradeOrder(date=date, action="sell", price=effective_price, shares=sell_shares)
 
         if self.verbose:
             print(
-                f"[{date.strftime('%Y-%m-%d')}] 卖出成功：价格 {price:.2f}, 数量 {sell_shares}, "
-                f"收入 {proceeds:.2f}, 本次盈亏 {realized_pl_this:.2f}, "
+                f"[{date.strftime('%Y-%m-%d')}] 卖出成功：价格 {effective_price:.2f}, 数量 {sell_shares}, "
+                f"收入 {net_proceeds:.2f} (佣金 {commission:.2f}, 印花税 {stamp_duty:.2f}), "
+                f"本次盈亏 {realized_pl_this:.2f}, "
                 f"累计盈亏 {self.realized_pl:.2f}, 现金 {self.account.cash:.2f}"
             )
 
         return TradeResult(
             success=True,
-            message="卖出成功",
+            message=f"卖出成功 (佣金 ¥{commission:.2f}, 印花税 ¥{stamp_duty:.2f})",
             order=order,
             cash_after=self.account.cash,
             shares_after=self.account.position.shares,
