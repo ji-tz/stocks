@@ -14,5 +14,3 @@ data/*.csv
 data/backtest_records.json
 data/hermes.db
 testing
-simulator/
-source/
