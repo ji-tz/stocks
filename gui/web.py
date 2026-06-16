@@ -1082,6 +1082,20 @@ def view_result_compare():
         # 过滤掉有错误的策略
         valid_results = [s for s in strategies if 'error' not in s]
 
+        # 计算最优指标（用于高亮）
+        best_return = max(
+            [s.get('metrics', {}).get('total_return_rate', -999) for s in valid_results],
+            default=-999
+        )
+        best_sharpe = max(
+            [s.get('metrics', {}).get('sharpe_ratio', -999) for s in valid_results],
+            default=-999
+        )
+        best_drawdown = min(
+            [s.get('metrics', {}).get('max_drawdown', 999) for s in valid_results],
+            default=999
+        )
+
         return render_template(
             'result_compare.html',
             results=valid_results,
@@ -1089,6 +1103,9 @@ def view_result_compare():
             symbol=res.get('symbol', ''),
             start_date=res.get('start_date', ''),
             end_date=res.get('end_date', ''),
+            best_return=best_return,
+            best_sharpe=best_sharpe,
+            best_drawdown=best_drawdown,
             error=None,
         )
     except Exception as e:
