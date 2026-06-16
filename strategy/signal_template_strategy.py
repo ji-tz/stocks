@@ -9,6 +9,8 @@ AUTO_STRATEGY_SPEC = {
     "key": "signal_template",
     "label": "信号模板",
     "runner": "run_signal_template",
+    "icon": "🔧",
+    "template": "strategy_dynamic.html",
     "parameters": [
         {
             "name": "buy_trigger",

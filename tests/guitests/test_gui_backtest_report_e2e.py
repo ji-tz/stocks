@@ -196,7 +196,7 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
             page.fill("#end-date", "2023-01-31")
             page.click("form#timeRangeForm button[type='submit']")
             page.wait_for_url("**/strategy/mean_cost", timeout=10000)
-            page.wait_for_selector("#realtime-info", timeout=30000)
+            page.wait_for_selector(".strategy-info", timeout=30000)
             steps.append(
                 (
                     "设置回测时间段",
@@ -208,7 +208,7 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
             page.select_option("select[name='source']", "auto")
             page.fill("input[name='lot']", "100")
             page.fill("input[name='cash']", "100000")
-            expect(page.locator("#realtime-info")).to_be_visible()
+            expect(page.locator(".strategy-info")).to_be_visible()
             steps.append(
                 (
                     "配置策略参数",

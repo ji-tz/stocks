@@ -233,7 +233,7 @@ class TestGuiRoutes(unittest.TestCase):
         body = rv.data.decode('utf-8')
         self.assertIn('第五步：配置参数', body)  # 更新为第五步
         self.assertIn('策略说明', body)
-        self.assertIn('逢低加仓', body)
+        self.assertIn('围绕持仓均价', body)
         self.assertIn('股票', body)
         self.assertIn('600900', body)
         self.assertIn('长江电力', body)
@@ -311,10 +311,10 @@ class TestGuiRoutes(unittest.TestCase):
         rv = self.client.get('/strategy/signal_template')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
-        self.assertIn('买入填写', body)
-        self.assertIn('卖出填写', body)
-        self.assertIn('MACD金叉', body)
-        self.assertIn('MACD死叉', body)
+        self.assertIn('买入触发条件', body)
+        self.assertIn('卖出触发条件', body)
+        self.assertIn('信号模板', body)
+        self.assertIn('策略说明', body)
         self.assertIn('止盈', body)
         self.assertIn('止损', body)
 

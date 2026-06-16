@@ -11,6 +11,8 @@ AUTO_STRATEGY_SPEC = {
     "key": "a50_prev_night_1h",
     "label": "A50 前夜信号(1h)",
     "runner": "run_futures_a50_prev_night",
+    "icon": "⏰",
+    "template": "strategy_dynamic.html",
     "parameters": [
         {
             "name": "futures_symbol",
