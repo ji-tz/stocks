@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """检查 PR 评论中是否存在 QA 验收通过记录"""
-import json, sys
+import json
+import sys
 
 comments_json = sys.stdin.read()
 if not comments_json.strip():
