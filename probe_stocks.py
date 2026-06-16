@@ -41,7 +41,7 @@ for src in sources:
         response = requests.get(src['url'], headers=headers, timeout=15)
         status = "成功" if response.status_code == 200 else f"失败({response.status_code})"
         content_head = response.content[:20].hex()
-        
+
         info = ""
         if response.status_code == 200:
             if src['type'] == "csv":
@@ -60,7 +60,7 @@ for src in sources:
                     info = f"JSON解析失败: {str(e)[:30]}"
             elif src['type'] == "access":
                 info = "可访问"
-        
+
         results.append({
             "来源": src['name'],
             "状态": status,

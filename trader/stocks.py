@@ -212,7 +212,7 @@ def init(cache_dir: str = "data") -> None:
 
 
 def _fetch_data_for_backtest(symbol: str, source: object,
-                              start_date: Optional[str], end_date: Optional[str]):
+                             start_date: Optional[str], end_date: Optional[str]):
     """按日期范围获取回测所需数据的辅助函数。
 
     若未指定日期范围，则使用数据提供者的默认行为（返回全量数据）；
@@ -281,28 +281,28 @@ def get_data(symbol: str = "600900",
 
 
 def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
-                  lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto", 
+                  lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto",
                   progress_callback: Optional[Callable[[int, int], None]] = None,
                   trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """调用均值成本模拟（封装自 strategy.mean_cost_strategy.simulate_mean_cost）。"""
     if simulate_mean_cost is None:
         raise RuntimeError("mean_cost 模块不可用")
-    return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date, 
-                            lot_size=lot_size, init_cash=init_cash, source=source,
-                            progress_callback=progress_callback, trade_price=trade_price)
+    return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date,
+                              lot_size=lot_size, init_cash=init_cash, source=source,
+                              progress_callback=progress_callback, trade_price=trade_price)
 
 
 def run_fixed_amount(symbol: str = "600900",
-                    start_date: Optional[str] = None,
-                    end_date: Optional[str] = None,
-                    fixed_amount: float = 1000.0,
-                    lot_size: float = 100.0,
-                    init_cash: float = 100000.0,
-                    source: object = "auto",
-                    progress_callback: Optional[Callable[[int, int], None]] = None,
-                    trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
+                     start_date: Optional[str] = None,
+                     end_date: Optional[str] = None,
+                     fixed_amount: float = 1000.0,
+                     lot_size: float = 100.0,
+                     init_cash: float = 100000.0,
+                     source: object = "auto",
+                     progress_callback: Optional[Callable[[int, int], None]] = None,
+                     trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """调用定投策略模拟（封装自 strategy.fixed_amount_strategy.simulate_fixed_amount）。
-    
+
     Args:
         symbol: 股票代码
         start_date: 开始日期
@@ -312,21 +312,21 @@ def run_fixed_amount(symbol: str = "600900",
         init_cash: 初始资金
         source: 数据源
         progress_callback: 进度回调函数
-        
+
     Returns:
         包含回测结果的字典
     """
     if simulate_fixed_amount is None:
         raise RuntimeError("fixed_amount 模块不可用")
     return simulate_fixed_amount(symbol=symbol,
-                                start_date=start_date,
-                                end_date=end_date,
-                                fixed_amount=fixed_amount,
-                                lot_size=lot_size,
-                                init_cash=init_cash,
-                                source=source,
-                                progress_callback=progress_callback,
-                                trade_price=trade_price)
+                                 start_date=start_date,
+                                 end_date=end_date,
+                                 fixed_amount=fixed_amount,
+                                 lot_size=lot_size,
+                                 init_cash=init_cash,
+                                 source=source,
+                                 progress_callback=progress_callback,
+                                 trade_price=trade_price)
 
 
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
@@ -335,7 +335,7 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      progress_callback: Optional[Callable[[int, int], None]] = None,
                      trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """使用统一模拟器运行 SMA 回测并返回统一的展示结果。
-    
+
     Args:
         symbol: 股票代码
         source: 数据源
@@ -524,7 +524,11 @@ def run_signal_template(
     if start_date is None and end_date is None:
         df = get_data(symbol=symbol, source=source)
     else:
-        df = get_data(symbol=symbol, source=source, start_date=start_date or "19700101", end_date=end_date or "20500101")
+        df = get_data(
+            symbol=symbol,
+            source=source,
+            start_date=start_date or "19700101",
+            end_date=end_date or "20500101")
 
     df = df[["date", "open", "high", "low", "close", "volume"]]
     feature_df = SignalTemplateDecision.build_features(df)

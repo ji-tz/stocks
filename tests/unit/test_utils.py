@@ -27,19 +27,19 @@ def get_random_stock_code(seed: Optional[int] = None, cache_dir: str = "data") -
     """
     从股票池中随机选择一个股票代码
     如果指定了cache_dir，优先从有缓存数据的股票中选择
-    
+
     Args:
         seed: 随机种子，用于可重现的测试。如果为None，则使用真随机
         cache_dir: 缓存目录路径（相对于项目根目录或绝对路径）。
                   如果目录存在，优先从有缓存的股票中选择；
                   如果目录不存在或无缓存文件，则从完整股票池中选择
-    
+
     Returns:
         股票代码字符串
     """
     # 使用局部 RNG 避免污染全局随机状态
     rng = random.Random(seed)
-    
+
     # 检查是否有缓存目录，如果有，优先从有缓存的股票中选择
     if cache_dir and os.path.isdir(cache_dir):
         cached_stocks = []
@@ -47,11 +47,11 @@ def get_random_stock_code(seed: Optional[int] = None, cache_dir: str = "data") -
             cache_file = os.path.join(cache_dir, f"{stock_code}.csv")
             if os.path.exists(cache_file):
                 cached_stocks.append(stock_code)
-        
+
         # 如果有缓存的股票，从中随机选择
         if cached_stocks:
             return rng.choice(cached_stocks)
-    
+
     # 否则从完整股票池中随机选择
     return rng.choice(STOCK_POOL)
 
@@ -59,7 +59,7 @@ def get_random_stock_code(seed: Optional[int] = None, cache_dir: str = "data") -
 def get_stock_pool() -> List[str]:
     """
     返回测试用股票池列表
-    
+
     Returns:
         股票代码列表
     """
@@ -69,10 +69,10 @@ def get_stock_pool() -> List[str]:
 def get_cached_stock_codes(cache_dir: str = "data") -> List[str]:
     """
     返回有缓存数据的股票代码列表
-    
+
     Args:
         cache_dir: 缓存目录路径
-    
+
     Returns:
         有缓存数据的股票代码列表
     """

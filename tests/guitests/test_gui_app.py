@@ -133,8 +133,8 @@ class TestGuiRoutes(unittest.TestCase):
         # return a minimal dataframe required by the view
         dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
         df = pd.DataFrame({
-            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
-            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
+            'date': dates, 'open': [100.0 + i for i in range(5)], 'high': [101.0 + i for i in range(5)],
+            'low': [99.0 + i for i in range(5)], 'close': [100.0 + i for i in range(5)], 'volume': [1000 + i * 10 for i in range(5)]
         })
         mock_get.return_value = df
         mock_mean.return_value = {
@@ -165,11 +165,16 @@ class TestGuiRoutes(unittest.TestCase):
 
         dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
         df = pd.DataFrame({
-            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
-            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
+            'date': dates, 'open': [100.0 + i for i in range(5)], 'high': [101.0 + i for i in range(5)],
+            'low': [99.0 + i for i in range(5)], 'close': [100.0 + i for i in range(5)], 'volume': [1000 + i * 10 for i in range(5)]
         })
         mock_get.return_value = df
-        mock_sma.return_value = {'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-01-10', 'init_cash': 100000.0, 'final_cash': 100500.0}
+        mock_sma.return_value = {
+            'symbol': '600900',
+            'start_date': '2023-01-01',
+            'end_date': '2023-01-10',
+            'init_cash': 100000.0,
+            'final_cash': 100500.0}
         rv = self.client.post('/run', data={'strategy': 'sma', 'start': '20230101', 'end': '20231231'})
         self.assertEqual(rv.status_code, 200)
         # Now expect progress page instead of result page
@@ -335,8 +340,10 @@ class TestGuiRoutes(unittest.TestCase):
             'market_value': 5000,
             'max_capital_used': 50000,
             'trades_list': [
-                {'date': '2023-01-01', 'action': 'buy', 'price': 22.0, 'shares': 100, 'cash': 97800, 'shares_after': 100, 'realized_pl': 0},
-                {'date': '2023-01-05', 'action': 'sell', 'price': 22.5, 'shares': 50, 'cash': 98925, 'shares_after': 50, 'realized_pl': 25},
+                {'date': '2023-01-01', 'action': 'buy', 'price': 22.0, 'shares': 100,
+                    'cash': 97800, 'shares_after': 100, 'realized_pl': 0},
+                {'date': '2023-01-05', 'action': 'sell', 'price': 22.5, 'shares': 50,
+                    'cash': 98925, 'shares_after': 50, 'realized_pl': 25},
             ],
             'history': [
                 {'date': '2023-01-01', 'total_value': 100000, 'last_price': 22.0},
@@ -378,26 +385,26 @@ class TestGuiRoutes(unittest.TestCase):
         rv = self.client.get('/select_time_range')
         self.assertEqual(rv.status_code, 200)
         body = rv.data.decode('utf-8')
-        
+
         # 验证页面标题和说明
         self.assertIn('第3.5步：设置回测时间段', body)
         self.assertIn('时间段设置说明', body)
-        
+
         # 验证面包屑导航
         self.assertIn('✓ 选择股票', body)
         self.assertIn('✓ 选择策略', body)
         self.assertIn('✓ 选择运行模式', body)
         self.assertIn('设置时间段', body)
-        
+
         # 验证已选信息显示
         self.assertIn('600900', body)
         self.assertIn('长江电力', body)
         self.assertIn('SMA策略', body)
-        
+
         # 验证日期输入控件
         self.assertIn('<input type="date" id="start-date"', body)
         self.assertIn('<input type="date" id="end-date"', body)
-        
+
         # 验证快捷按钮
         self.assertIn('最近1年', body)
         self.assertIn('最近2年', body)
@@ -405,7 +412,7 @@ class TestGuiRoutes(unittest.TestCase):
         self.assertIn('最近5年', body)
         self.assertIn('今年至今', body)
         self.assertIn('全部数据', body)
-        
+
         # 验证JavaScript验证函数
         self.assertIn('function validateDates', body)
         self.assertIn('function setPreset', body)
@@ -428,12 +435,12 @@ class TestGuiRoutes(unittest.TestCase):
 
         # 测试保存时间段
         rv = self.client.post('/api/select_time_range',
-                             json={'start': '20230101', 'end': '20231231'},
-                             content_type='application/json')
+                              json={'start': '20230101', 'end': '20231231'},
+                              content_type='application/json')
         self.assertEqual(rv.status_code, 200)
         data = rv.get_json()
         self.assertTrue(data['success'])
-        
+
         # 验证session中保存了时间段
         with self.client.session_transaction() as sess:
             self.assertEqual(sess.get('backtest_start'), '20230101')
@@ -450,12 +457,12 @@ class TestGuiRoutes(unittest.TestCase):
 
         # 测试保存空时间段
         rv = self.client.post('/api/select_time_range',
-                             json={'start': '', 'end': ''},
-                             content_type='application/json')
+                              json={'start': '', 'end': ''},
+                              content_type='application/json')
         self.assertEqual(rv.status_code, 200)
         data = rv.get_json()
         self.assertTrue(data['success'])
-        
+
         # 验证session中保存了空字符串
         with self.client.session_transaction() as sess:
             self.assertEqual(sess.get('backtest_start'), '')
@@ -630,22 +637,22 @@ class TestGuiRoutes(unittest.TestCase):
 
         dates = pd.date_range(end="2023-12-31", periods=5, freq="D")
         df = pd.DataFrame({
-            'date': dates, 'open': [100.0+i for i in range(5)], 'high': [101.0+i for i in range(5)],
-            'low': [99.0+i for i in range(5)], 'close': [100.0+i for i in range(5)], 'volume': [1000+i*10 for i in range(5)]
+            'date': dates, 'open': [100.0 + i for i in range(5)], 'high': [101.0 + i for i in range(5)],
+            'low': [99.0 + i for i in range(5)], 'close': [100.0 + i for i in range(5)], 'volume': [1000 + i * 10 for i in range(5)]
         })
         mock_get.return_value = df
         mock_sma.return_value = {
-            'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-12-31', 
+            'symbol': '600900', 'start_date': '2023-01-01', 'end_date': '2023-12-31',
             'init_cash': 100000.0, 'final_cash': 100500.0,
             'trades': 3, 'shares': 100, 'cash': 95000,
             'total_value': 100500, 'realized_pl': 500, 'unrealized_pl': 0,
             'history': [], 'trades_list': []
         }
-        
+
         # 不在表单中传递时间段，应该从session读取
         rv = self.client.post('/run', data={'strategy': 'sma', 'period': '20'})
         self.assertEqual(rv.status_code, 200)
-        
+
         # 验证调用时使用了session中的时间段
         mock_sma.assert_called_once()
         call_args = mock_sma.call_args

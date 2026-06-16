@@ -13,7 +13,8 @@ class MeanCostDecision:
     - 否则返回 None
     """
 
-    def decide(self, open_price: float, close_price: float | None = None, avg_cost: float = 0.0, shares: float = 0.0, date: Any = None) -> str | None:
+    def decide(self, open_price: float, close_price: float | None = None,
+               avg_cost: float = 0.0, shares: float = 0.0, date: Any = None) -> str | None:
         if shares <= 0:
             return 'buy'
         if avg_cost <= 0:
@@ -23,4 +24,3 @@ class MeanCostDecision:
         if open_price > avg_cost:
             return 'sell'
         return None
-

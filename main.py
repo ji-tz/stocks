@@ -1,12 +1,11 @@
+from gui import web
+from trader import persistence
+import trader.stocks as stocks
 import os
 import sys
 
 # 确保工程根目录在 sys.path，便于导入 sibling 模块
 sys.path.insert(0, os.path.dirname(__file__))
-
-import trader.stocks as stocks
-from trader import persistence
-from gui import web
 
 
 def main():
@@ -25,7 +24,7 @@ def main():
     # debug=True 仅用于开发，生产环境用 env var FLASK_DEBUG=0
     debug_mode = os.environ.get('FLASK_DEBUG', '1').lower() in ('1', 'true', 'yes')
     web.app.run(debug=debug_mode)
- 
+
 
 if __name__ == '__main__':
     main()

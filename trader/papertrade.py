@@ -417,5 +417,3 @@ class PaperTradeEngine:
 
 engine = PaperTradeEngine()
 """Module-level singleton that can be imported by web.py."""
-
-

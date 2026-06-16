@@ -18,7 +18,7 @@ class TestDividendAdjustment(unittest.TestCase):
     # 短期策略测试（10天数据）：价格涨幅约9%，策略会频繁交易
     # 允许1%的容差，考虑策略可能在不利时机交易
     MIN_VALUE_RATIO_SHORT_TERM = 0.99
-    
+
     # 长期策略测试（250天数据）：价格涨幅约12.5%，策略会有更多交易机会
     # 允许5%的容差，考虑更多的交易成本和市场波动
     MIN_VALUE_RATIO_LONG_TERM = 0.95
@@ -29,9 +29,9 @@ class TestDividendAdjustment(unittest.TestCase):
         # 假设股票在第5天分红：10派1元（每10股派发1元现金）
         # 不复权：价格会跳空下降
         # 前复权：历史价格会向下调整，保持最新价格不变
-        
+
         dates = pd.date_range('2023-01-01', periods=10, freq='D')
-        
+
         # 前复权数据：价格连续，没有跳空
         self.adjusted_data = pd.DataFrame({
             'date': dates,
@@ -41,7 +41,7 @@ class TestDividendAdjustment(unittest.TestCase):
             'close': [10.1, 10.2, 10.3, 10.4, 10.5, 10.6, 10.7, 10.8, 10.9, 11.0],
             'volume': [1000000] * 10
         })
-        
+
         # 不复权数据：在第5天分红后价格跳空（假设除权价 = 原价 - 0.1）
         self.unadjusted_data = pd.DataFrame({
             'date': dates,
@@ -57,49 +57,49 @@ class TestDividendAdjustment(unittest.TestCase):
         # 使用定投策略：每次买入100股
         strategy = MeanCostDecision()
         simulator = Simulator(lot_size=100, init_cash=100000.0, verbose=False)
-        
+
         result = simulator.simulate(
             df=self.adjusted_data,
             strategy=strategy,
             symbol='TEST',
             verbose=False
         )
-        
+
         # 验证结果
         self.assertIn('realized_pl', result)
         self.assertIn('total_value', result)
         self.assertIn('cash', result)
-        
+
         # 前复权数据应该显示合理收益（价格从10.1涨到11.0，约9%涨幅）
         # 考虑交易成本和策略特性，最终价值应该接近初始资金
         total_pl = result['realized_pl'] + result['unrealized_pl']
         min_pl = result['init_cash'] * (self.MIN_VALUE_RATIO_SHORT_TERM - 1)
-        self.assertGreater(total_pl, min_pl, 
-                          f"使用前复权数据的收益不应该低于{(1-self.MIN_VALUE_RATIO_SHORT_TERM)*100:.0f}%")
-        
+        self.assertGreater(total_pl, min_pl,
+                           f"使用前复权数据的收益不应该低于{(1 - self.MIN_VALUE_RATIO_SHORT_TERM) * 100:.0f}%")
+
         # 最终总价值应该接近或大于初始资金
         min_value = result['init_cash'] * self.MIN_VALUE_RATIO_SHORT_TERM
         self.assertGreater(result['total_value'], min_value,
-                          f"前复权数据：最终总价值应该至少是初始资金的{self.MIN_VALUE_RATIO_SHORT_TERM*100:.0f}%")
+                           f"前复权数据：最终总价值应该至少是初始资金的{self.MIN_VALUE_RATIO_SHORT_TERM * 100:.0f}%")
 
     def test_unadjusted_data_shows_incorrect_profit(self):
         """测试不复权数据会导致收益计算不准确（文档测试）
-        
+
         这个测试展示了为什么需要复权。不复权数据在除权点会有价格跳空，
         这会导致算法误判市场走势。
-        
+
         注意：具体行为取决于策略。这个测试主要用于文档参考。
         """
         strategy = MeanCostDecision()
         simulator = Simulator(lot_size=100, init_cash=100000.0, verbose=False)
-        
+
         result = simulator.simulate(
             df=self.unadjusted_data,
             strategy=strategy,
             symbol='TEST',
             verbose=False
         )
-        
+
         # 验证结果结构完整
         self.assertIn('realized_pl', result)
         self.assertIn('unrealized_pl', result)
@@ -109,35 +109,35 @@ class TestDividendAdjustment(unittest.TestCase):
         """测试前复权数据的价格连续性"""
         # 前复权数据不应该有大的价格跳空
         adjusted_close = self.adjusted_data['close'].values
-        
+
         # 计算相邻日收益率
         returns = []
         for i in range(1, len(adjusted_close)):
-            ret = (adjusted_close[i] - adjusted_close[i-1]) / adjusted_close[i-1]
+            ret = (adjusted_close[i] - adjusted_close[i - 1]) / adjusted_close[i - 1]
             returns.append(ret)
-        
+
         # 前复权数据的日收益率应该相对平稳
         max_daily_return = max(abs(r) for r in returns)
         self.assertLess(max_daily_return, 0.02,
-                       "前复权数据的日收益率应该相对平稳（<2%）")
+                        "前复权数据的日收益率应该相对平稳（<2%）")
 
     def test_price_discontinuity_without_adjustment(self):
         """测试不复权数据在除权点有价格跳空
-        
+
         不复权数据在除权点会有跳空。例如：
         - 除权前日收益率会因分红而接近0
         - 除权后日收益率也会接近0
-        
+
         这种价格跳空会影响技术分析和策略决策的准确性。
         """
         # 不复权数据在除权点会有跳空
         unadjusted_close = self.unadjusted_data['close'].values
-        
+
         # 第4天到第5天（索引3到4）应该价格不涨
         # 第5天到第6天（索引4到5）价格平稳（除权）
         ret_4_5 = (unadjusted_close[4] - unadjusted_close[3]) / unadjusted_close[3]
         ret_5_6 = (unadjusted_close[5] - unadjusted_close[4]) / unadjusted_close[4]
-        
+
         # 验证价格变化模式
         self.assertIsNotNone(ret_4_5)
         self.assertIsNotNone(ret_5_6)
@@ -145,7 +145,7 @@ class TestDividendAdjustment(unittest.TestCase):
 
 class TestRealStockDividendScenario(unittest.TestCase):
     """测试真实股票的分红场景（使用mock数据）"""
-    
+
     # 长期策略测试阈值：250天数据，价格涨幅约12.5%
     # 允许5%的容差，考虑交易成本和市场波动
     MIN_VALUE_RATIO_LONG_TERM = 0.95
@@ -154,18 +154,18 @@ class TestRealStockDividendScenario(unittest.TestCase):
     def test_dividend_stock_with_adjusted_data(self, mock_provider_class):
         """测试使用前复权数据处理有分红的股票"""
         from exchange.source.data_provider import get_data
-        
+
         # 模拟长江电力（600900）的前复权数据
         # 这是一个经常分红的股票
         mock_provider = MagicMock()
         mock_provider_class.return_value = mock_provider
-        
+
         # 创建模拟的前复权数据
         dates = pd.date_range('2023-01-01', periods=250, freq='D')
-        
+
         # 模拟一个上涨趋势的股票（前复权）
         prices = [20.0 + i * 0.01 + (i % 30) * 0.02 for i in range(250)]
-        
+
         mock_df = pd.DataFrame({
             '日期': [d.strftime('%Y-%m-%d') for d in dates],
             '开盘': prices,
@@ -174,7 +174,7 @@ class TestRealStockDividendScenario(unittest.TestCase):
             '收盘': [p * 1.01 for p in prices],
             '成交量': [1000000] * 250
         })
-        
+
         mock_provider.fetch.return_value = pd.DataFrame({
             'date': pd.to_datetime(mock_df['日期']),
             'open': mock_df['开盘'],
@@ -183,36 +183,36 @@ class TestRealStockDividendScenario(unittest.TestCase):
             'close': mock_df['收盘'],
             'volume': mock_df['成交量']
         })
-        
+
         # 获取数据
-        df = get_data(symbol='600900', source='akshare', 
-                     start_date='20230101', end_date='20231231')
-        
+        df = get_data(symbol='600900', source='akshare',
+                      start_date='20230101', end_date='20231231')
+
         # 验证数据
         self.assertIsNotNone(df)
         self.assertFalse(df.empty)
-        
+
         # 运行回测
         strategy = MeanCostDecision()
         simulator = Simulator(lot_size=100, init_cash=100000.0, verbose=False)
-        
+
         result = simulator.simulate(
             df=df,
             strategy=strategy,
             symbol='600900',
             verbose=False
         )
-        
+
         # 验证回测结果
         self.assertIn('realized_pl', result)
         self.assertIn('total_value', result)
-        
+
         # 因为是上涨趋势（价格从20涨到~22.5，约12.5%涨幅），
         # 且使用均值成本策略（会在价格上涨时卖出获利），
         # 考虑交易成本和长期市场波动
         min_value = result['init_cash'] * self.MIN_VALUE_RATIO_LONG_TERM
         self.assertGreater(result['total_value'], min_value,
-                          f"在上涨趋势中，最终价值应该至少是初始资金的{self.MIN_VALUE_RATIO_LONG_TERM*100:.0f}%")
+                           f"在上涨趋势中，最终价值应该至少是初始资金的{self.MIN_VALUE_RATIO_LONG_TERM * 100:.0f}%")
 
 
 if __name__ == '__main__':

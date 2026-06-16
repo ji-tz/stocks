@@ -256,7 +256,7 @@ class TestPdfDataIntegration(unittest.TestCase):
         summary = pdf_data["summary"]
         pdf.cell(0, 10, f"Symbol: {summary['symbol']}")
         metrics = pdf_data["metrics"]
-        pdf.cell(0, 10, f"Total Return: {metrics['total_return_rate']*100:.1f}%")
+        pdf.cell(0, 10, f"Total Return: {metrics['total_return_rate'] * 100:.1f}%")
         pdf_bytes = pdf.output()
 
         self.assertGreater(len(pdf_bytes), 100)

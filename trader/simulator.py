@@ -163,7 +163,8 @@ class BacktestExchangeRunner:
             print("时钟: BacktestClock")
             print(f"{'=' * 100}\n")
 
-        def schedule_order(action: str, after_bars: Optional[int] = None, after_hours: Optional[int] = None, tag: str = "") -> None:
+        def schedule_order(action: str, after_bars: Optional[int] = None,
+                           after_hours: Optional[int] = None, tag: str = "") -> None:
             if not enable_scheduled_orders:
                 raise RuntimeError("当前回测未启用预约单功能，请设置 enable_scheduled_orders=True")
             if action not in ("buy", "sell"):

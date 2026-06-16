@@ -66,7 +66,14 @@ class BaostockProvider(BaseProvider):
             raise RuntimeError("baostock: no data returned")
 
         df = pd.DataFrame(data_list, columns=rs.fields)
-        df = df.rename(columns={"date": "date", "open": "open", "high": "high", "low": "low", "close": "close", "volume": "volume"})
+        df = df.rename(
+            columns={
+                "date": "date",
+                "open": "open",
+                "high": "high",
+                "low": "low",
+                "close": "close",
+                "volume": "volume"})
         df["date"] = pd.to_datetime(df["date"])
         for c in ["open", "high", "low", "close", "volume"]:
             df[c] = pd.to_numeric(df[c], errors="coerce")

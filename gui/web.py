@@ -1,3 +1,7 @@
+from trader import persistence
+from gui.backtest_progress import get_progress_manager
+from trader.export import export_to_excel, prepare_pdf_data, generate_filename
+import trader.stocks as stocks
 import os
 import sys
 import json
@@ -11,10 +15,6 @@ from flask import Flask, render_template, request, session, jsonify, Response
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
-import trader.stocks as stocks
-from trader.export import export_to_excel, prepare_pdf_data, generate_filename
-from gui.backtest_progress import get_progress_manager
-from trader import persistence
 
 app = Flask(__name__, template_folder='templates')
 # 使用环境变量配置secret_key，开发环境使用默认值
@@ -140,7 +140,8 @@ def _restore_stock_cache(stock_code: str, cached_df: pd.DataFrame) -> None:
     cached_df.sort_values('date').to_csv(cache_file, index=False)
 
 
-def _fetch_source_df(stock_code: str, start: str, end: str, source_name: str, temp_root: str) -> tuple[dict, pd.DataFrame | None]:
+def _fetch_source_df(stock_code: str, start: str, end: str, source_name: str,
+                     temp_root: str) -> tuple[dict, pd.DataFrame | None]:
     """拉取单个数据源并返回日志和数据。"""
     started = time.time()
     source_cache_dir = os.path.join(temp_root, source_name)
@@ -437,6 +438,7 @@ def _push_recent_stock(code: str) -> None:
     recent_codes = [code] + [item for item in recent_codes if item != code]
     session['recent_stock_codes'] = recent_codes[:20]
 
+
 def _init_stock_data():
     """初始化股票数据和索引"""
     global _STOCK_LIST, _STOCK_INDEX
@@ -451,10 +453,12 @@ def _init_stock_data():
             _STOCK_INDEX[stock['code']] = stock
             _STOCK_INDEX[stock['name']] = stock
 
+
 def get_stock_list():
     """获取股票列表"""
     _init_stock_data()
     return _STOCK_LIST
+
 
 def search_stock_by_query(query: str):
     """通过代码或名称搜索标的。
@@ -532,7 +536,11 @@ def get_stock_price(stock_code):
         # 获取最新一条数据的收盘价
         latest_data = df.iloc[-1]
         latest_price = float(latest_data['close'])
-        latest_date = str(latest_data['date'].date()) if hasattr(latest_data['date'], 'date') else str(latest_data['date'])
+        latest_date = str(
+            latest_data['date'].date()) if hasattr(
+            latest_data['date'],
+            'date') else str(
+            latest_data['date'])
 
         return jsonify({
             'price': latest_price,
@@ -643,10 +651,10 @@ def select_mode():
         return _render_strategy_selection(stock_code=stock_code, stock_name=stock_name)
 
     return render_template('select_mode.html',
-                         stock_code=stock_code,
-                         stock_name=stock_name,
-                         strategy_type=strategy_type,
-                         strategy_name=strategy_name)
+                           stock_code=stock_code,
+                           stock_name=stock_name,
+                           strategy_type=strategy_type,
+                           strategy_name=strategy_name)
 
 
 @app.route('/api/select_mode', methods=['POST'])
@@ -682,16 +690,16 @@ def select_time_range():
     if not run_mode or run_mode != 'backtest':
         # 只有回测模式需要设置时间段
         return render_template('select_mode.html',
-                             stock_code=stock_code,
-                             stock_name=stock_name,
-                             strategy_type=strategy_type,
-                             strategy_name=strategy_name)
+                               stock_code=stock_code,
+                               stock_name=stock_name,
+                               strategy_type=strategy_type,
+                               strategy_name=strategy_name)
 
     return render_template('select_time_range.html',
-                         stock_code=stock_code,
-                         stock_name=stock_name,
-                         strategy_type=strategy_type,
-                         strategy_name=strategy_name)
+                           stock_code=stock_code,
+                           stock_name=stock_name,
+                           strategy_type=strategy_type,
+                           strategy_name=strategy_name)
 
 
 @app.route('/api/select_time_range', methods=['POST'])
@@ -1193,7 +1201,8 @@ def download_pdf():
             import subprocess
             try:
                 result = subprocess.run(
-                    ['fc-match', '-f', '%{file}', 'wqy-zenhei,Noto Sans CJK SC,SimHei,Microsoft YaHei,Droid Sans Fallback'],
+                    ['fc-match', '-f', '%{file}',
+                        'wqy-zenhei,Noto Sans CJK SC,SimHei,Microsoft YaHei,Droid Sans Fallback'],
                     capture_output=True, text=True, timeout=5
                 )
                 path = result.stdout.strip()
@@ -1205,7 +1214,8 @@ def download_pdf():
             for d in ['/usr/share/fonts', '/usr/local/share/fonts', os.path.expanduser('~/.fonts')]:
                 for root, _dirs, files in os.walk(d):
                     for f in files:
-                        if f.endswith(('.ttc', '.ttf')) and any(k in f.lower() for k in ['wqy', 'noto', 'simhei', 'yahei', 'droid']):
+                        if f.endswith(('.ttc', '.ttf')) and any(k in f.lower()
+                                                                for k in ['wqy', 'noto', 'simhei', 'yahei', 'droid']):
                             return os.path.join(root, f)
             return None
 
@@ -1239,9 +1249,9 @@ def download_pdf():
         pdf.cell(0, 8, 'Key Metrics', new_x='LMARGIN', new_y='NEXT')
         pdf.set_font(font_body, '', 10)
         metrics = pdf_data['metrics']
-        for k, v in [('Total Return Rate', f"{metrics['total_return_rate']*100:.2f}%"),
-                     ('Annualized Return', f"{metrics['annualized_return']*100:.2f}%"),
-                     ('Max Drawdown', f"{metrics['max_drawdown']*100:.2f}%"),
+        for k, v in [('Total Return Rate', f"{metrics['total_return_rate'] * 100:.2f}%"),
+                     ('Annualized Return', f"{metrics['annualized_return'] * 100:.2f}%"),
+                     ('Max Drawdown', f"{metrics['max_drawdown'] * 100:.2f}%"),
                      ('Sharpe Ratio', f"{metrics['sharpe_ratio']:.4f}"),
                      ('Total P/L', f"${metrics['total_pl']:,.2f}"),
                      ('Final Value', f"${metrics['final_value']:,.2f}")]:
@@ -1288,6 +1298,7 @@ def download_pdf():
         return jsonify({'error': f'导出 PDF 失败: {str(e)}'}), 500
 
 # ── 模拟盘交易 (Paper Trading) ───────────────────────────
+
 
 try:
     from trader.papertrade import engine as _paper_engine
