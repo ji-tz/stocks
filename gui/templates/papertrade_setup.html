@@ -48,11 +48,13 @@
       }
       .search-result-card h3 { margin: 0; color: #1976d2; font-size: 1.1rem; }
       .search-result-card p { margin: 0.3rem 0 0 0; color: #666; font-size: 0.9rem; }
-      .search-result-card .btn-select {
-        padding: 0.5rem 1.2rem; background: #4caf50; color: white; border: none;
-        border-radius: 4px; cursor: pointer; font-size: 0.9rem;
-      }
-      .search-result-card .btn-select:hover { background: #45a049; }
+      .btn-select { padding: 0.5rem 1.5rem; background: #4caf50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; }
+      .btn-select:hover { background: #45a049; }
+      /* 市场标签样式 */
+      .market-badge-inline.sh { background: #e3f2fd; color: #1565c0; }
+      .market-badge-inline.sz { background: #fff3e0; color: #e65100; }
+      .market-badge-inline.bj { background: #f3e5f5; color: #7b1fa2; }
+      .market-badge-inline.hk { background: #e8f5e9; color: #2e7d32; }
 
       .btn-submit {
         width: 100%; padding: 1rem; background: #1976d2; color: white; border: none;
@@ -267,6 +269,17 @@ document.addEventListener('DOMContentLoaded', function() {
     <script>
       let selectedStockCode = '';
       let selectedStockName = '';
+      let selectedStockMarket = '';
+
+      // 市场标签映射
+      function getMarketLabel(market) {
+        var labels = { 'sh': '沪', 'sz': '深', 'bj': '北', 'hk': '港' };
+        return labels[market] || '';
+      }
+      function getMarketClass(market) {
+        var classes = { 'sh': 'sh', 'sz': 'sz', 'bj': 'bj', 'hk': 'hk' };
+        return classes[market] || '';
+      }
 
       function searchStock() {
         const query = document.getElementById('stock-search').value.trim();
@@ -284,20 +297,23 @@ document.addEventListener('DOMContentLoaded', function() {
             if (data.results && Array.isArray(data.results)) {
               items = data.results;
             } else if (data.code && data.name) {
-              items = [{ code: data.code, name: data.name }];
+              items = [{ code: data.code, name: data.name, market: data.market || '' }];
             }
             if (items.length === 0) {
               resultDiv.innerHTML = '<div style="color:#d32f2f;padding:0.8rem;background:#ffebee;border-radius:4px;">未找到匹配的股票</div>';
               return;
             }
             if (items.length === 1) {
-              showStockSelected(items[0].code, items[0].name);
+              showStockSelected(items[0].code, items[0].name, items[0].market || '');
             } else {
               let html = '<div style="color:#2e7d32;padding:0.5rem 0;">✓ 找到多个匹配项，请选择：</div>';
               for (const it of items) {
+                const mLabel = getMarketLabel(it.market);
+                const mClass = getMarketClass(it.market);
+                const badge = mLabel ? '<span style="display:inline-block;font-size:0.7rem;padding:1px 6px;border-radius:3px;font-weight:bold;vertical-align:middle;margin-left:4px;" class="market-badge-inline ' + mClass + '">' + mLabel + '</span>' : '';
                 html += '<div class="search-result-card">' +
-                  '<div><h3>' + it.code + ' - ' + it.name + '</h3></div>' +
-                  '<div><button class="btn-select" onclick="showStockSelected(\'' + it.code + '\', \'' + it.name + '\')">选择</button></div>' +
+                  '<div><h3>' + it.code + badge + ' - ' + it.name + '</h3></div>' +
+                  '<div><button class="btn-select" onclick="showStockSelected(\'' + it.code + '\', \'' + it.name + '\', \'' + (it.market || '') + '\')">选择</button></div>' +
                   '</div>';
               }
               resultDiv.innerHTML = html;
@@ -308,14 +324,18 @@ document.addEventListener('DOMContentLoaded', function() {
           });
       }
 
-      function showStockSelected(code, name) {
+      function showStockSelected(code, name, market) {
         selectedStockCode = code;
         selectedStockName = name;
+        selectedStockMarket = market || '';
         document.getElementById('stock_code').value = code;
         document.getElementById('stock_name').value = name;
+        const mLabel = getMarketLabel(market);
+        const mClass = getMarketClass(market);
+        const badge = mLabel ? '<span style="display:inline-block;font-size:0.7rem;padding:1px 6px;border-radius:3px;font-weight:bold;vertical-align:middle;margin-left:4px;" class="market-badge-inline ' + mClass + '">' + mLabel + '</span>' : '';
         document.getElementById('stock-result').innerHTML =
           '<div class="search-result-card">' +
-          '<div><h3>' + code + ' - ' + name + '</h3><p>✓ 已选择</p></div>' +
+          '<div><h3>' + code + badge + ' - ' + name + '</h3><p>✓ 已选择</p></div>' +
           '<div><button class="btn-select" onclick="clearStockSelection()" style="background:#f44336;">取消选择</button></div>' +
           '</div>';
       }

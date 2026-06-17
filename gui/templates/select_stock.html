@@ -160,6 +160,36 @@
         color: #666; 
         font-size: 0.9rem;
       }
+      .stock-card .market-badge {
+        display: inline-block;
+        font-size: 0.7rem;
+        padding: 1px 6px;
+        border-radius: 3px;
+        margin-left: 4px;
+        font-weight: bold;
+        vertical-align: middle;
+      }
+      .market-badge.sh { background: #e3f2fd; color: #1565c0; }
+      .market-badge.sz { background: #fff3e0; color: #e65100; }
+      .market-badge.bj { background: #f3e5f5; color: #7b1fa2; }
+      .market-badge.hk { background: #e8f5e9; color: #2e7d32; }
+      .market-filter-bar {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+        flex-wrap: wrap;
+      }
+      .market-filter-btn {
+        padding: 0.4rem 1rem;
+        border: 1px solid #ddd;
+        border-radius: 20px;
+        background: white;
+        cursor: pointer;
+        font-size: 0.85rem;
+        transition: all 0.2s;
+      }
+      .market-filter-btn:hover { border-color: #1976d2; }
+      .market-filter-btn.active { background: #1976d2; color: white; border-color: #1976d2; }
       .section-card {
         background: white;
         border-radius: 8px;
@@ -319,43 +349,75 @@
 
     <div class="popular-stocks">
       <h3>🔥 热门股票</h3>
+      <div class="market-filter-bar" id="market-filter-bar">
+        <button class="market-filter-btn active" onclick="filterByMarket('all')">📊 全部</button>
+        <button class="market-filter-btn" onclick="filterByMarket('sh')">🏛️ 沪市</button>
+        <button class="market-filter-btn" onclick="filterByMarket('sz')">🏛️ 深市</button>
+        <button class="market-filter-btn" onclick="filterByMarket('bj')">🏛️ 北交所</button>
+        <button class="market-filter-btn" onclick="filterByMarket('hk')">🏛️ 港股</button>
+      </div>
       <div class="stock-grid" id="stock-grid">
-        <div class="stock-card" onclick="selectStock('600900', '长江电力')">
-          <div class="code">600900</div>
+        <div class="stock-card" data-market="sh" onclick="selectStock('600900', '长江电力')">
+          <div class="code">600900<span class="market-badge sh">沪</span></div>
           <div class="name">长江电力</div>
         </div>
-        <div class="stock-card" onclick="selectStock('600519', '贵州茅台')">
-          <div class="code">600519</div>
+        <div class="stock-card" data-market="sh" onclick="selectStock('600519', '贵州茅台')">
+          <div class="code">600519<span class="market-badge sh">沪</span></div>
           <div class="name">贵州茅台</div>
         </div>
-        <div class="stock-card" onclick="selectStock('601318', '中国平安')">
-          <div class="code">601318</div>
+        <div class="stock-card" data-market="sh" onclick="selectStock('601318', '中国平安')">
+          <div class="code">601318<span class="market-badge sh">沪</span></div>
           <div class="name">中国平安</div>
         </div>
-        <div class="stock-card" onclick="selectStock('000333', '美的集团')">
-          <div class="code">000333</div>
+        <div class="stock-card" data-market="sz" onclick="selectStock('000333', '美的集团')">
+          <div class="code">000333<span class="market-badge sz">深</span></div>
           <div class="name">美的集团</div>
         </div>
-        <div class="stock-card" onclick="selectStock('000651', '格力电器')">
-          <div class="code">000651</div>
+        <div class="stock-card" data-market="sz" onclick="selectStock('000651', '格力电器')">
+          <div class="code">000651<span class="market-badge sz">深</span></div>
           <div class="name">格力电器</div>
         </div>
-        <div class="stock-card" onclick="selectStock('002594', '比亚迪')">
-          <div class="code">002594</div>
+        <div class="stock-card" data-market="sz" onclick="selectStock('002594', '比亚迪')">
+          <div class="code">002594<span class="market-badge sz">深</span></div>
           <div class="name">比亚迪</div>
         </div>
-        <div class="stock-card" onclick="selectStock('300750', '宁德时代')">
-          <div class="code">300750</div>
+        <div class="stock-card" data-market="sz" onclick="selectStock('300750', '宁德时代')">
+          <div class="code">300750<span class="market-badge sz">深</span></div>
           <div class="name">宁德时代</div>
         </div>
-        <div class="stock-card" onclick="selectStock('601398', '工商银行')">
-          <div class="code">601398</div>
+        <div class="stock-card" data-market="sh" onclick="selectStock('601398', '工商银行')">
+          <div class="code">601398<span class="market-badge sh">沪</span></div>
           <div class="name">工商银行</div>
         </div>
       </div>
     </div>
 
     <script>
+      // 市场标签映射
+      function getMarketLabel(market) {
+        var labels = { 'sh': '沪', 'sz': '深', 'bj': '北', 'hk': '港' };
+        return labels[market] || '';
+      }
+      function getMarketClass(market) {
+        var classes = { 'sh': 'sh', 'sz': 'sz', 'bj': 'bj', 'hk': 'hk' };
+        return classes[market] || '';
+      }
+
+      // 按市场筛选热门股票
+      function filterByMarket(market) {
+        // 更新按钮状态
+        document.querySelectorAll('.market-filter-btn').forEach(function(btn) { btn.classList.remove('active'); });
+        event.target.classList.add('active');
+        // 显示/隐藏股票卡片
+        document.querySelectorAll('#stock-grid .stock-card').forEach(function(card) {
+          if (market === 'all' || card.dataset.market === market) {
+            card.style.display = '';
+          } else {
+            card.style.display = 'none';
+          }
+        });
+      }
+
       // 搜索表单提交
       document.getElementById('search-form').addEventListener('submit', function(e) {
         e.preventDefault();
@@ -380,7 +442,7 @@
             if (data.results && Array.isArray(data.results)) {
               items = data.results;
             } else if (data.code && data.name) {
-              items = [{ code: data.code, name: data.name }];
+              items = [{ code: data.code, name: data.name, market: data.market || '' }];
             }
 
             if (items.length === 0) {
@@ -393,10 +455,13 @@
             let html = '<div class="success-message">✓ 找到匹配的股票</div>';
             if (items.length === 1) {
               const it = items[0];
+              const mLabel = getMarketLabel(it.market);
+              const mClass = getMarketClass(it.market);
+              const badge = mLabel ? '<span class="market-badge ' + mClass + '">' + mLabel + '</span>' : '';
               html +=
                 '<div class="stock-info">' +
                   '<div class="stock-info-left">' +
-                    '<h2>' + it.code + ' - ' + it.name + '</h2>' +
+                    '<h2>' + it.code + badge + ' - ' + it.name + '</h2>' +
                     '<p>点击右侧按钮继续选择策略</p>' +
                   '</div>' +
                   '<div class="stock-info-right">' +
@@ -406,8 +471,11 @@
             } else {
               html += '<div class="search-results-list">';
               for (const it of items) {
+                const mLabel = getMarketLabel(it.market);
+                const mClass = getMarketClass(it.market);
+                const badge = mLabel ? '<span class="market-badge ' + mClass + '">' + mLabel + '</span>' : '';
                 html += '<div class="search-result-item">' +
-                          '<div class="sr-left"><strong>' + it.code + '</strong> - ' + it.name + '</div>' +
+                          '<div class="sr-left"><strong>' + it.code + '</strong>' + badge + ' - ' + it.name + '</div>' +
                           '<div class="sr-right"><button onclick="selectStock(\'' + it.code + '\', \'' + it.name + '\')">选择</button></div>' +
                         '</div>';
               }
