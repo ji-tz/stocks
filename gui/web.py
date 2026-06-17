@@ -531,13 +531,13 @@ def search_stock():
     if not matches:
         return jsonify({'error': f'未找到股票：{query}。请检查股票代码或名称是否正确。'})
 
-    # 若只有一项匹配，保持向后兼容：返回单个对象（code/name）
+    # 若只有一项匹配，保持向后兼容：返回单个对象（code/name/market）
     if len(matches) == 1:
         stock = matches[0]
-        return jsonify({'code': stock['code'], 'name': stock['name']})
+        return jsonify({'code': stock['code'], 'name': stock['name'], 'market': stock.get('market', '')})
 
     # 多项时返回 results 数组，供前端选择
-    simplified = [{'code': s['code'], 'name': s['name']} for s in matches]
+    simplified = [{'code': s['code'], 'name': s['name'], 'market': s.get('market', '')} for s in matches]
     return jsonify({'results': simplified})
 
 
