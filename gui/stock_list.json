@@ -1,502 +1,627 @@
 [
   {
     "code": "600000",
-    "name": "浦发银行"
+    "name": "浦发银行",
+    "market": "sh"
   },
   {
     "code": "600009",
-    "name": "上海机场"
+    "name": "上海机场",
+    "market": "sh"
   },
   {
     "code": "600019",
-    "name": "宝钢股份"
+    "name": "宝钢股份",
+    "market": "sh"
   },
   {
     "code": "600028",
-    "name": "中国石化"
+    "name": "中国石化",
+    "market": "sh"
   },
   {
     "code": "600030",
-    "name": "中信证券"
+    "name": "中信证券",
+    "market": "sh"
   },
   {
     "code": "600036",
-    "name": "招商银行"
+    "name": "招商银行",
+    "market": "sh"
   },
   {
     "code": "600048",
-    "name": "保利发展"
+    "name": "保利发展",
+    "market": "sh"
   },
   {
     "code": "600050",
-    "name": "中国联通"
+    "name": "中国联通",
+    "market": "sh"
   },
   {
     "code": "600104",
-    "name": "上汽集团"
+    "name": "上汽集团",
+    "market": "sh"
   },
   {
     "code": "600276",
-    "name": "恒瑞医药"
+    "name": "恒瑞医药",
+    "market": "sh"
   },
   {
     "code": "600309",
-    "name": "万华化学"
+    "name": "万华化学",
+    "market": "sh"
   },
   {
     "code": "600519",
-    "name": "贵州茅台"
+    "name": "贵州茅台",
+    "market": "sh"
   },
   {
     "code": "600585",
-    "name": "海螺水泥"
+    "name": "海螺水泥",
+    "market": "sh"
   },
   {
     "code": "600690",
-    "name": "海尔智家"
+    "name": "海尔智家",
+    "market": "sh"
   },
   {
     "code": "600900",
-    "name": "长江电力"
+    "name": "长江电力",
+    "market": "sh"
   },
   {
     "code": "601012",
-    "name": "隆基绿能"
+    "name": "隆基绿能",
+    "market": "sh"
   },
   {
     "code": "601088",
-    "name": "中国神华"
+    "name": "中国神华",
+    "market": "sh"
   },
   {
     "code": "601166",
-    "name": "兴业银行"
+    "name": "兴业银行",
+    "market": "sh"
   },
   {
     "code": "601288",
-    "name": "农业银行"
+    "name": "农业银行",
+    "market": "sh"
   },
   {
     "code": "601318",
-    "name": "中国平安"
+    "name": "中国平安",
+    "market": "sh"
   },
   {
     "code": "601398",
-    "name": "工商银行"
+    "name": "工商银行",
+    "market": "sh"
   },
   {
     "code": "601628",
-    "name": "中国人寿"
+    "name": "中国人寿",
+    "market": "sh"
   },
   {
     "code": "601668",
-    "name": "中国建筑"
+    "name": "中国建筑",
+    "market": "sh"
   },
   {
     "code": "601688",
-    "name": "华泰证券"
+    "name": "华泰证券",
+    "market": "sh"
   },
   {
     "code": "601818",
-    "name": "光大银行"
+    "name": "光大银行",
+    "market": "sh"
   },
   {
     "code": "601857",
-    "name": "中国石油"
+    "name": "中国石油",
+    "market": "sh"
   },
   {
     "code": "601888",
-    "name": "中国中免"
+    "name": "中国中免",
+    "market": "sh"
   },
   {
     "code": "601899",
-    "name": "紫金矿业"
+    "name": "紫金矿业",
+    "market": "sh"
   },
   {
     "code": "601988",
-    "name": "中国银行"
+    "name": "中国银行",
+    "market": "sh"
   },
   {
     "code": "603259",
-    "name": "药明康德"
+    "name": "药明康德",
+    "market": "sh"
   },
   {
     "code": "603288",
-    "name": "海天味业"
+    "name": "海天味业",
+    "market": "sh"
   },
   {
     "code": "603501",
-    "name": "韦尔股份"
+    "name": "韦尔股份",
+    "market": "sh"
   },
   {
     "code": "603799",
-    "name": "华友钴业"
+    "name": "华友钴业",
+    "market": "sh"
   },
   {
     "code": "603986",
-    "name": "兆易创新"
+    "name": "兆易创新",
+    "market": "sh"
   },
   {
     "code": "000001",
-    "name": "平安银行"
+    "name": "平安银行",
+    "market": "sz"
   },
   {
     "code": "000002",
-    "name": "万科A"
+    "name": "万科A",
+    "market": "sz"
   },
   {
     "code": "000063",
-    "name": "中兴通讯"
+    "name": "中兴通讯",
+    "market": "sz"
   },
   {
     "code": "000333",
-    "name": "美的集团"
+    "name": "美的集团",
+    "market": "sz"
   },
   {
     "code": "000338",
-    "name": "潍柴动力"
+    "name": "潍柴动力",
+    "market": "sz"
   },
   {
     "code": "000568",
-    "name": "泸州老窖"
+    "name": "泸州老窖",
+    "market": "sz"
   },
   {
     "code": "000625",
-    "name": "长安汽车"
+    "name": "长安汽车",
+    "market": "sz"
   },
   {
     "code": "000651",
-    "name": "格力电器"
+    "name": "格力电器",
+    "market": "sz"
   },
   {
     "code": "000858",
-    "name": "五粮液"
+    "name": "五粮液",
+    "market": "sz"
   },
   {
     "code": "000876",
-    "name": "新希望"
+    "name": "新希望",
+    "market": "sz"
   },
   {
     "code": "002027",
-    "name": "分众传媒"
+    "name": "分众传媒",
+    "market": "sz"
   },
   {
     "code": "002050",
-    "name": "三花智控"
+    "name": "三花智控",
+    "market": "sz"
   },
   {
     "code": "002142",
-    "name": "宁波银行"
+    "name": "宁波银行",
+    "market": "sz"
   },
   {
     "code": "002230",
-    "name": "科大讯飞"
+    "name": "科大讯飞",
+    "market": "sz"
   },
   {
     "code": "002241",
-    "name": "歌尔股份"
+    "name": "歌尔股份",
+    "market": "sz"
   },
   {
     "code": "002304",
-    "name": "洋河股份"
+    "name": "洋河股份",
+    "market": "sz"
   },
   {
     "code": "002415",
-    "name": "海康威视"
+    "name": "海康威视",
+    "market": "sz"
   },
   {
     "code": "002475",
-    "name": "立讯精密"
+    "name": "立讯精密",
+    "market": "sz"
   },
   {
     "code": "002594",
-    "name": "比亚迪"
+    "name": "比亚迪",
+    "market": "sz"
   },
   {
     "code": "002714",
-    "name": "牧原股份"
+    "name": "牧原股份",
+    "market": "sz"
   },
   {
     "code": "002916",
-    "name": "深南电路"
+    "name": "深南电路",
+    "market": "sz"
   },
   {
     "code": "003816",
-    "name": "中国广核"
+    "name": "中国广核",
+    "market": "sz"
   },
   {
     "code": "300014",
-    "name": "亿纬锂能"
+    "name": "亿纬锂能",
+    "market": "sz"
   },
   {
     "code": "300015",
-    "name": "爱尔眼科"
+    "name": "爱尔眼科",
+    "market": "sz"
   },
   {
     "code": "300059",
-    "name": "东方财富"
+    "name": "东方财富",
+    "market": "sz"
   },
   {
     "code": "300122",
-    "name": "智飞生物"
+    "name": "智飞生物",
+    "market": "sz"
   },
   {
     "code": "300124",
-    "name": "汇川技术"
+    "name": "汇川技术",
+    "market": "sz"
   },
   {
     "code": "300274",
-    "name": "阳光电源"
+    "name": "阳光电源",
+    "market": "sz"
   },
   {
     "code": "300750",
-    "name": "宁德时代"
+    "name": "宁德时代",
+    "market": "sz"
   },
   {
     "code": "300760",
-    "name": "迈瑞医疗"
+    "name": "迈瑞医疗",
+    "market": "sz"
   },
   {
     "code": "510300",
-    "name": "沪深300ETF"
+    "name": "沪深300ETF",
+    "market": "sh"
   },
   {
     "code": "510500",
-    "name": "中证500ETF"
+    "name": "中证500ETF",
+    "market": "sh"
   },
   {
     "code": "159915",
-    "name": "创业板ETF"
+    "name": "创业板ETF",
+    "market": "sz"
   },
   {
     "code": "159919",
-    "name": "沪深300ETF(深)"
+    "name": "沪深300ETF(深)",
+    "market": "sz"
   },
   {
     "code": "110011",
-    "name": "易方达中小盘混合"
+    "name": "易方达中小盘混合",
+    "market": "sz"
   },
   {
     "code": "161725",
-    "name": "招商中证白酒指数(LOF)"
+    "name": "招商中证白酒指数(LOF)",
+    "market": "sz"
   },
   {
     "code": "519674",
-    "name": "银河创新成长混合"
+    "name": "银河创新成长混合",
+    "market": "sh"
   },
   {
     "code": "00700.HK",
-    "name": "腾讯控股"
+    "name": "腾讯控股",
+    "market": "hk"
   },
   {
     "code": "09988.HK",
-    "name": "阿里巴巴"
+    "name": "阿里巴巴",
+    "market": "hk"
   },
   {
     "code": "09999.HK",
-    "name": "网易"
+    "name": "网易",
+    "market": "hk"
   },
   {
     "code": "03690.HK",
-    "name": "美团"
+    "name": "美团",
+    "market": "hk"
   },
   {
     "code": "01810.HK",
-    "name": "小米集团"
+    "name": "小米集团",
+    "market": "hk"
   },
   {
     "code": "09618.HK",
-    "name": "京东集团"
+    "name": "京东集团",
+    "market": "hk"
   },
   {
     "code": "09888.HK",
-    "name": "百度集团"
+    "name": "百度集团",
+    "market": "hk"
   },
   {
     "code": "01024.HK",
-    "name": "快手"
+    "name": "快手",
+    "market": "hk"
   },
   {
     "code": "02015.HK",
-    "name": "理想汽车"
+    "name": "理想汽车",
+    "market": "hk"
   },
   {
     "code": "09868.HK",
-    "name": "小鹏汽车"
+    "name": "小鹏汽车",
+    "market": "hk"
   },
   {
     "code": "00883.HK",
-    "name": "中国海洋石油"
+    "name": "中国海洋石油",
+    "market": "hk"
   },
   {
     "code": "00941.HK",
-    "name": "中国移动"
+    "name": "中国移动",
+    "market": "hk"
   },
   {
     "code": "01398.HK",
-    "name": "工商银行"
+    "name": "工商银行",
+    "market": "hk"
   },
   {
     "code": "03988.HK",
-    "name": "中国银行"
+    "name": "中国银行",
+    "market": "hk"
   },
   {
     "code": "01299.HK",
-    "name": "友邦保险"
+    "name": "友邦保险",
+    "market": "hk"
   },
   {
     "code": "00005.HK",
-    "name": "汇丰控股"
+    "name": "汇丰控股",
+    "market": "hk"
   },
   {
     "code": "00388.HK",
-    "name": "香港交易所"
+    "name": "香港交易所",
+    "market": "hk"
   },
   {
     "code": "02318.HK",
-    "name": "中国平安"
+    "name": "中国平安",
+    "market": "hk"
   },
   {
     "code": "00016.HK",
-    "name": "新鸿基地产"
+    "name": "新鸿基地产",
+    "market": "hk"
   },
   {
     "code": "00001.HK",
-    "name": "长和"
+    "name": "长和",
+    "market": "hk"
   },
   {
     "code": "06618.HK",
-    "name": "京东健康"
+    "name": "京东健康",
+    "market": "hk"
   },
   {
     "code": "09626.HK",
-    "name": "哔哩哔哩"
+    "name": "哔哩哔哩",
+    "market": "hk"
   },
   {
     "code": "06060.HK",
-    "name": "众安在线"
+    "name": "众安在线",
+    "market": "hk"
   },
   {
     "code": "00728.HK",
-    "name": "中国电信"
+    "name": "中国电信",
+    "market": "hk"
   },
   {
     "code": "00939.HK",
-    "name": "建设银行"
+    "name": "建设银行",
+    "market": "hk"
   },
   {
     "code": "830799",
-    "name": "艾融软件"
+    "name": "艾融软件",
+    "market": "bj"
   },
   {
     "code": "832491",
-    "name": "奥迪威"
+    "name": "奥迪威",
+    "market": "bj"
   },
   {
     "code": "833171",
-    "name": "国航远洋"
+    "name": "国航远洋",
+    "market": "bj"
   },
   {
     "code": "833533",
-    "name": "骏创科技"
+    "name": "骏创科技",
+    "market": "bj"
   },
   {
     "code": "834033",
-    "name": "康普化学"
+    "name": "康普化学",
+    "market": "bj"
   },
   {
     "code": "834599",
-    "name": "同力股份"
+    "name": "同力股份",
+    "market": "bj"
   },
   {
     "code": "835185",
-    "name": "贝特瑞"
+    "name": "贝特瑞",
+    "market": "bj"
   },
   {
     "code": "835640",
-    "name": "富士达"
+    "name": "富士达",
+    "market": "bj"
   },
   {
     "code": "836077",
-    "name": "吉林碳谷"
+    "name": "吉林碳谷",
+    "market": "bj"
   },
   {
     "code": "836892",
-    "name": "广咨国际"
+    "name": "广咨国际",
+    "market": "bj"
   },
   {
     "code": "837344",
-    "name": "三元基因"
+    "name": "三元基因",
+    "market": "bj"
   },
   {
     "code": "839167",
-    "name": "同享科技"
+    "name": "同享科技",
+    "market": "bj"
   },
   {
     "code": "839725",
-    "name": "惠丰钻石"
+    "name": "惠丰钻石",
+    "market": "bj"
   },
   {
     "code": "872808",
-    "name": "曙光数创"
+    "name": "曙光数创",
+    "market": "bj"
   },
   {
     "code": "000100",
-    "name": "TCL科技"
+    "name": "TCL科技",
+    "market": "sz"
   },
   {
     "code": "000301",
-    "name": "东方盛虹"
+    "name": "东方盛虹",
+    "market": "sz"
   },
   {
     "code": "000661",
-    "name": "长春高新"
+    "name": "长春高新",
+    "market": "sz"
   },
   {
     "code": "000725",
-    "name": "京东方A"
+    "name": "京东方A",
+    "market": "sz"
   },
   {
     "code": "000768",
-    "name": "中航西飞"
+    "name": "中航西飞",
+    "market": "sz"
   },
   {
     "code": "000792",
-    "name": "盐湖股份"
+    "name": "盐湖股份",
+    "market": "sz"
   },
   {
     "code": "000977",
-    "name": "浪潮信息"
+    "name": "浪潮信息",
+    "market": "sz"
   },
   {
     "code": "001979",
-    "name": "招商蛇口"
+    "name": "招商蛇口",
+    "market": "sz"
   },
   {
     "code": "002129",
-    "name": "中环股份"
+    "name": "中环股份",
+    "market": "sz"
   },
   {
     "code": "002371",
-    "name": "北方华创"
+    "name": "北方华创",
+    "market": "sz"
   },
   {
     "code": "002920",
-    "name": "德赛西威"
+    "name": "德赛西威",
+    "market": "sz"
   },
   {
     "code": "300308",
-    "name": "中际旭创"
+    "name": "中际旭创",
+    "market": "sz"
   },
   {
     "code": "300433",
-    "name": "蓝思科技"
+    "name": "蓝思科技",
+    "market": "sz"
   },
   {
     "code": "300498",
-    "name": "温氏股份"
+    "name": "温氏股份",
+    "market": "sz"
   },
   {
     "code": "300502",
-    "name": "新易盛"
+    "name": "新易盛",
+    "market": "sz"
   }
 ]
