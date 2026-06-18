@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
 from exchange.source.data_provider import get_data
+from exchange.simulated_exchange import detect_market
 from trader.clock import BacktestClock
 from exchange.backtest.exchange import BacktestExchange
 
@@ -126,7 +127,13 @@ class BacktestExchangeRunner:
             )
 
         use_verbose = verbose if verbose is not None else self.verbose
-        engine = BacktestExchange(init_cash=self.init_cash, lot_size=self.lot_size, verbose=use_verbose)
+
+        # Auto-detect market from symbol and set exchange parameters
+        market = detect_market(symbol) if symbol else "A"
+        if market == "HK":
+            enforce_t_plus_one = False
+
+        engine = BacktestExchange(init_cash=self.init_cash, lot_size=self.lot_size, verbose=use_verbose, market=market)
 
         resolved_base_position_lots = base_position_lots
         if require_base_position_for_t_plus_one_intraday and resolved_base_position_lots is None:
