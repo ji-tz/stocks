@@ -17,16 +17,44 @@ class BaostockProvider(BaseProvider):
             return value
         return f"{value[:4]}-{value[4:6]}-{value[6:8]}"
 
+    @staticmethod
+    def _resolve_code(symbol: str) -> str:
+        """Map a symbol to baostock's market-prefixed code.
+
+        Baostock uses market prefixes:
+          - Shanghai (6xxxxx)  -> sh.{symbol}
+          - Shenzhen (0xxxxx/3xxxxx) -> sz.{symbol}
+          - Beijing (8xxxxx)   -> bj.{symbol}
+          - Hong Kong (*.HK)   -> hk.{symbol_without_HK}
+        """
+        s = str(symbol).strip()
+
+        # Hong Kong: ends with .HK
+        if s.upper().endswith('.HK'):
+            return f"hk.{s[:-3]}"
+
+        # Beijing: starts with '8'
+        if s.startswith('8'):
+            return f"bj.{s}"
+
+        # Shanghai: starts with '6'
+        if s.startswith('6'):
+            return f"sh.{s}"
+
+        # Shenzhen: starts with '0' or '3' (main board / chiNext)
+        if s.startswith(('0', '3')):
+            return f"sz.{s}"
+
+        # Default to sz for unknown formats (backward compatible)
+        return f"sz.{s}"
+
     def fetch(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
         try:
             import baostock as bs
         except Exception as e:
             raise ImportError("baostock is required for BaostockProvider") from e
 
-        if symbol.startswith("6"):
-            code = f"sh.{symbol}"
-        else:
-            code = f"sz.{symbol}"
+        code = self._resolve_code(symbol)
 
         sd = self._normalize_date(start_date)
         ed = self._normalize_date(end_date)
