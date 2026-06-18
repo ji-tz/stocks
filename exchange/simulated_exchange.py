@@ -1,24 +1,109 @@
 """仿真交易所通用实现。"""
 
 from datetime import datetime
-from typing import Optional
+from typing import Dict, Optional
 
 from exchange.base_engine import TradeOrder, TradeResult
 from exchange.exchange_interface import StockExchange
 
+
+# ─── Market Detection ────────────────────────────────────────────────
+
+# Default market rules keyed by market code
+_MARKET_RULES: Dict[str, Dict] = {
+    "A": {
+        "lot_size": 100,
+        "commission_pct": 0.00025,
+        "stamp_duty_pct": 0.001,
+        "t_plus_one": True,
+    },
+    "HK": {
+        "lot_size": 100,
+        "commission_pct": 0.0003,
+        "stamp_duty_pct": 0.0013,
+        "t_plus_one": False,
+    },
+    "BJ": {
+        "lot_size": 100,
+        "commission_pct": 0.00025,
+        "stamp_duty_pct": 0.0,
+        "t_plus_one": True,
+    },
+}
+
+
+def detect_market(symbol: str) -> str:
+    """Detect the market from a stock symbol.
+
+    Args:
+        symbol: Stock symbol (e.g. '600000', '000001.SH', '00700.HK', '830001').
+
+    Returns:
+        Market code: 'A' (沪深), 'HK' (港股), or 'BJ' (北证).
+    """
+    sym = symbol.strip().upper()
+    if sym.endswith(".HK"):
+        return "HK"
+    if sym.startswith("8"):
+        return "BJ"
+    return "A"
+
+
+# ─── SimulatedExchangeBase ───────────────────────────────────────────
 
 class SimulatedExchangeBase(StockExchange):
     """仿真类交易所的通用逻辑。"""
 
     def __init__(self, init_cash: float = 100000.0, lot_size: float = 100.0, verbose: bool = False,
                  commission_pct: float = 0.00025, stamp_duty_pct: float = 0.001,
-                 slippage_pct: float = 0.0):
+                 slippage_pct: float = 0.0, market: Optional[str] = None):
+        """初始化仿真交易所。
+
+        Args:
+            init_cash: 初始资金。
+            lot_size: 默认交易手数。
+            verbose: 是否输出详细日志。
+            commission_pct: 佣金比例（如 0.00025 表示万分之二点五）。
+            stamp_duty_pct: 印花税比例（卖出时收取）。
+            slippage_pct: 滑点比例。
+            market: 市场代码（'A', 'HK', 'BJ'）。传入后将覆盖对应的默认费用/手数规则。
+                    为 None 时保留调用方传入的 commission_pct / stamp_duty_pct / lot_size。
+        """
+        # Apply market-specific defaults when market is specified
+        if market is not None:
+            rules = SimulatedExchangeBase.market_rules(market)
+            lot_size = rules["lot_size"]
+            commission_pct = rules["commission_pct"]
+            stamp_duty_pct = rules["stamp_duty_pct"]
+
         super().__init__(init_cash=init_cash, lot_size=lot_size,
                          commission_pct=commission_pct, stamp_duty_pct=stamp_duty_pct,
                          slippage_pct=slippage_pct)
+        self.market = market or "A"
         self.verbose = verbose
         self.trade_count = 0
         self.connected = False
+
+    @property
+    def t_plus_one(self) -> bool:
+        """是否实行 T+1 交易规则。"""
+        rules = self.market_rules(self.market)
+        return rules["t_plus_one"]
+
+    @staticmethod
+    def market_rules(market: str) -> Dict:
+        """获取指定市场的交易规则。
+
+        Args:
+            market: 市场代码（'A', 'HK', 'BJ'）。
+
+        Returns:
+            包含 lot_size, commission_pct, stamp_duty_pct, t_plus_one 的字典。
+        """
+        m = market.upper()
+        if m in _MARKET_RULES:
+            return dict(_MARKET_RULES[m])
+        return dict(_MARKET_RULES["A"])
 
     def connect(self) -> bool:
         self.connected = True
