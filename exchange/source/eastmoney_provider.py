@@ -9,7 +9,7 @@ class EastmoneyProvider(BaseProvider):
 
     def fetch(self, symbol: str, start_date: str, end_date: str) -> pd.DataFrame:
         s = str(symbol).strip()
-        secid = f"1.{s}" if s.startswith('6') else f"0.{s}"
+        secid = self._resolve_secid(s)
         beg = format_date_for_source(parse_date_input(start_date), 'akshare') if start_date else '19700101'
         end = format_date_for_source(parse_date_input(end_date), 'akshare') if end_date else '20500101'
         url = (
@@ -54,3 +54,40 @@ class EastmoneyProvider(BaseProvider):
         if out.empty:
             raise RuntimeError('eastmoney: no data in requested range')
         return out
+
+    @staticmethod
+    def _resolve_secid(symbol: str) -> str:
+        """Map a symbol to the Eastmoney secid format based on market.
+
+        Eastmoney secid schemes:
+          - Shanghai (6xxxxx)      -> 1.{code}
+          - Shenzhen (0xxxxx/3xxxxx) -> 0.{code}
+          - Beijing (8xxxxx)      -> 2.{code}
+          - Hong Kong (*.HK)      -> h{code_without_dot_HK}
+
+        Returns the secid string or raises RuntimeError for unknown markets
+        so the caller can gracefully fall through to the next provider.
+        """
+        s = str(symbol).strip()
+
+        # Hong Kong: symbol ends with .HK
+        if s.upper().endswith('.HK'):
+            code = s[:-3]  # strip '.HK'
+            return f"h{code}"
+
+        # Beijing: starts with '8'
+        if s.startswith('8'):
+            return f"2.{s}"
+
+        # Shanghai: starts with '6'
+        if s.startswith('6'):
+            return f"1.{s}"
+
+        # Shenzhen: starts with '0' or '3' (main board / chiNext)
+        if s.startswith(('0', '3')):
+            return f"0.{s}"
+
+        # Unknown market — let the caller fall through gracefully
+        raise RuntimeError(
+            f'eastmoney: unsupported symbol format "{symbol}"'
+        )
