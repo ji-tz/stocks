@@ -120,7 +120,10 @@ class BacktestExchangeRunner:
 
         df = df.sort_values("date").reset_index(drop=True).copy()
         if df.empty:
-            raise RuntimeError("数据为空，无法模拟")
+            raise RuntimeError(
+                "数据为空，无法模拟。可能是回测日期范围内无交易日数据，"
+                "请检查起始/结束日期是否包含节假日或周末。"
+            )
 
         use_verbose = verbose if verbose is not None else self.verbose
         engine = BacktestExchange(init_cash=self.init_cash, lot_size=self.lot_size, verbose=use_verbose)
@@ -160,6 +163,7 @@ class BacktestExchangeRunner:
                 f"数据范围: {df['date'].iloc[0].strftime('%Y-%m-%d')} 至 "
                 f"{df['date'].iloc[-1].strftime('%Y-%m-%d')}"
             )
+            print(f"数据行数: {len(df)}")
             print("时钟: BacktestClock")
             print(f"{'=' * 100}\n")
 
@@ -610,7 +614,10 @@ def simulate_sma(
 
     df = df.sort_values("date").reset_index(drop=True).copy()
     if df.empty:
-        raise RuntimeError("数据为空，无法模拟 SMA")
+        raise RuntimeError(
+            "数据为空，无法模拟 SMA。可能是回测日期范围内无交易日数据，"
+            "请检查起始/结束日期是否包含节假日或周末。"
+        )
 
     df["sma"] = df["close"].rolling(window=period, min_periods=1).mean()
 

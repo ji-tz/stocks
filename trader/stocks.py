@@ -223,6 +223,10 @@ def _fetch_data_for_backtest(symbol: str, source: object,
     若未指定日期范围，则使用数据提供者的默认行为（返回全量数据）；
     否则传入哨兵日期以覆盖完整区间。
 
+    如果指定了 start_date 但返回数据为空，会自动尝试将 end_date 扩展到
+    未来以查找第一个有数据的交易日，避免因 start_date 落在非交易日
+    （周末/节假日）导致回测无法开始。
+
     Args:
         symbol: 股票代码
         source: 数据源
@@ -232,11 +236,41 @@ def _fetch_data_for_backtest(symbol: str, source: object,
     Returns:
         包含 OHLCV 数据的 DataFrame
     """
+    import pandas as _pd
+
     if start_date is None and end_date is None:
         return get_data(symbol=symbol, source=source)
-    return get_data(symbol=symbol, source=source,
-                    start_date=start_date or "19700101",
-                    end_date=end_date or "20500101")
+
+    safe_start = start_date or "19700101"
+    safe_end = end_date or "20500101"
+
+    df = get_data(symbol=symbol, source=source,
+                  start_date=safe_start, end_date=safe_end)
+
+    # 如果数据为空且用户指定了起始日期，尝试去掉 end_date 限制查找下一个交易日
+    if df.empty and start_date is not None:
+        logger.info(
+            "回测时间范围 %s ~ %s 无交易日数据，"
+            "自动向前扩展查找下一个交易日",
+            safe_start, safe_end,
+        )
+        # 去掉 end_date 限制，只保留 start_date 约束，查找下一个交易日
+        df = get_data(symbol=symbol, source=source,
+                      start_date=safe_start, end_date="20500101")
+        if not df.empty:
+            actual_first = _pd.to_datetime(df["date"].iloc[0]).strftime("%Y-%m-%d")
+            logger.info(
+                "回测实际起始日期调整为 %s（原始起始 %s 无交易日数据）",
+                actual_first, str(start_date),
+            )
+        else:
+            logger.warning(
+                "即使在最大时间范围内也未找到 %s 的交易日数据，"
+                "请检查股票代码或数据源",
+                safe_start,
+            )
+
+    return df
 
 
 def get_data(symbol: str = "600900",
@@ -275,6 +309,15 @@ def get_data(symbol: str = "600900",
             if sd is not None:
                 sd_dt = _pd.to_datetime(sd)
                 df = df[df['date'] >= sd_dt]
+                # 如果数据不为空但第一个交易日晚于请求的起始日期，记录警告
+                if not df.empty and start_date is not None:
+                    actual_first = _pd.to_datetime(df['date'].iloc[0])
+                    if actual_first > sd_dt:
+                        diff_days = (actual_first - sd_dt).days
+                        logger.info(
+                            "起始日期 %s 为非交易日，实际回测从下一个交易日 %s 开始（延迟 %d 天）",
+                            sd, actual_first.strftime('%Y-%m-%d'), diff_days,
+                        )
             if ed is not None:
                 ed_dt = _pd.to_datetime(ed)
                 df = df[df['date'] <= ed_dt]
