@@ -4,6 +4,7 @@
 import json
 import re
 
+
 def get_market(code):
     if code.endswith('.HK'):
         return 'hk'
@@ -19,6 +20,7 @@ def get_market(code):
         return 'bj'
     else:
         return 'unknown'
+
 
 def main():
     with open('gui/stock_list.json', 'r', encoding='utf-8') as f:
@@ -40,6 +42,7 @@ def main():
         m = s['market']
         markets[m] = markets.get(m, 0) + 1
     print(f"Market distribution: {json.dumps(markets, ensure_ascii=False)}")
+
 
 if __name__ == '__main__':
     main()

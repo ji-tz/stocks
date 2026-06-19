@@ -7,9 +7,11 @@ import urllib.error
 
 TOKEN_FILE = "/tmp/ghtoken.txt"
 
+
 def get_token():
     with open(TOKEN_FILE) as f:
         return f.read().strip()
+
 
 def api(method, path, data=None):
     token = get_token()
@@ -29,17 +31,22 @@ def api(method, path, data=None):
         err = e.read().decode()
         return {"error": True, "status": e.code, "body": err}
 
+
 def post_comment(issue_num, body):
     return api("POST", f"/issues/{issue_num}/comments", {"body": body})
+
 
 def update_labels(issue_num, labels):
     return api("PUT", f"/issues/{issue_num}/labels", {"labels": labels})
 
+
 def get_labels(issue_num):
     return api("GET", f"/issues/{issue_num}/labels")
 
+
 def remove_label(issue_num, label):
     return api("DELETE", f"/issues/{issue_num}/labels/{label}")
+
 
 if __name__ == "__main__":
     cmd = sys.argv[1] if len(sys.argv) > 1 else "help"
@@ -56,7 +63,7 @@ if __name__ == "__main__":
         labels = sys.argv[3:]
         result = update_labels(num, labels)
         if isinstance(result, list):
-            names = [l["name"] for l in result]
+            names = [lb["name"] for lb in result]
             print(f"Labels set on #{num}: {names}")
         else:
             print(f"FAIL: {result}")
