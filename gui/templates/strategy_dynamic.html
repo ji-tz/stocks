@@ -61,6 +61,20 @@
       .fund-preview .preview-item .value.red { color: #c62828; }
       .fund-preview .preview-item .label { font-size: 0.8rem; color: #666; margin-top: 0.2rem; }
       .fund-preview .loading { color: #999; font-size: 0.9rem; }
+      /* Spinner animation */
+      .spinner {
+        display: inline-block;
+        width: 18px;
+        height: 18px;
+        border: 2.5px solid #e0e0e0;
+        border-top-color: #1976d2;
+        border-radius: 50%;
+        animation: spin 0.6s linear infinite;
+        vertical-align: middle;
+      }
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
     
 /* === 移动端响应式适配 === */
 @media (max-width: 640px) {
@@ -242,7 +256,7 @@
           <div class="preview-title">💰 资金预览</div>
           <div class="preview-grid">
             <div class="preview-item">
-              <div class="value" id="preview-price"><span class="loading">加载中...</span></div>
+              <div class="value" id="preview-price"><div class="spinner"></div></div>
               <div class="label">最新股价</div>
             </div>
             <div class="preview-item">
@@ -303,6 +317,8 @@
       (function() {
         const priceEl = document.getElementById('preview-price');
         if (!stockCode) { priceEl.textContent = '无股票'; return; }
+        // 显示转圈动画
+        priceEl.innerHTML = '<div class=\"spinner\"></div>';
         fetch('/api/stock_price/' + encodeURIComponent(stockCode))
           .then(function(r) { return r.json(); })
           .then(function(data) {
