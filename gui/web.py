@@ -13,6 +13,9 @@ import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from flask import Flask, render_template, request, session, jsonify, Response
 
+# 股票预缓存模块 — 选股后自动下载5年日线数据
+from exchange.prefetch import prefetch_stock_data
+
 logger = logging.getLogger(__name__)
 
 # Ensure project root is on sys.path so sibling packages (e.g. `source`) can be imported
@@ -26,6 +29,8 @@ app.secret_key = os.environ.get('SECRET_KEY', 'stocks-quantitative-backtest-secr
 # 在应用启动时加载股票列表到内存，避免重复文件IO
 _STOCK_LIST = None
 _STOCK_INDEX = None
+_FULL_STOCK_LIST = None       # 全量股票缓存（含akshare动态加载）
+_FULL_STOCK_INDEX = None      # 全量股票索引
 _DOWNLOAD_SOURCES = ('akshare', 'baostock', 'tencent', 'sina', 'sohu', 'eastmoney', 'cailianpress', 'stooq')
 
 
@@ -590,6 +595,17 @@ def select_stock():
     _push_recent_stock(code)
 
     return jsonify({'success': True})
+
+
+@app.route('/api/prefetch_stock/<symbol>', methods=['POST'])
+def prefetch_stock_api(symbol):
+    """选股后自动预缓存5年日线数据"""
+    try:
+        result = prefetch_stock_data(symbol)
+        return jsonify(result)
+    except Exception as e:
+        logger.error("预缓存 %s 异常: %s", symbol, str(e))
+        return jsonify({'success': False, 'rows': 0, 'symbol': symbol, 'error': str(e)})
 
 
 @app.route('/api/select_strategy', methods=['POST'])
