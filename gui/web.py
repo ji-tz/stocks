@@ -893,7 +893,7 @@ def run():
     else:
         end = session.get('backtest_end') or None
 
-    source = request.form.get('source', 'auto')
+    source = 'auto'
     strategy = request.form.get('strategy', 'sma')
     lot = float(request.form.get('lot') or 100.0)
     cash = float(request.form.get('cash') or 100000.0)
@@ -1046,7 +1046,7 @@ def run_multi():
     start = form_start if form_start else (session.get('backtest_start') or None)
     end = form_end if form_end else (session.get('backtest_end') or None)
 
-    source = request.form.get('source', 'auto')
+    source = 'auto'
     lot = float(request.form.get('lot') or 100.0)
     cash = float(request.form.get('cash') or 100000.0)
 

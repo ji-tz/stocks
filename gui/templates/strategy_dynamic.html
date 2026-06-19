@@ -227,15 +227,6 @@
         <p class="empty-params">该策略无额外参数，使用默认回测参数即可运行。</p>
         {% endif %}
 
-        <label>数据源
-          <select name="source">
-            <option value="auto">自动选择</option>
-            <option value="akshare">AKShare</option>
-            <option value="baostock">Baostock</option>
-          </select>
-          <div class="param-hint">数据源选择，推荐使用"自动选择"</div>
-        </label>
-
         <label>交易单位（股/份）
           <input type="number" name="lot" id="lot-input" value="100" min="0.01" step="0.01" required oninput="updateFundPreview()" />
           <div class="param-hint">股票常用 100；ETF/场外基金可设置为 1 或 0.01</div>
@@ -337,23 +328,19 @@
       function getFormData() {
         const data = {};
         data.strategy = strategyKey;
-        data.source = document.querySelector('select[name="source"]').value;
         data.lot = document.querySelector('input[name="lot"]').value;
         data.cash = document.querySelector('input[name="cash"]').value;
         document.querySelectorAll('input[name^="param_"], input[name^="period_"], input[name^="threshold_"], input[name^="ma_"], input[name^="rsi_"], input[name^="bb_"], input[name^="std_"]').forEach(function(inp) {
           data[inp.name] = inp.value;
         });
         /* Also capture any input that is a strategy parameter (all inputs inside form-section except source/lot/cash) */
-        document.querySelectorAll('.form-section input:not([name="source"]):not([name="lot"]):not([name="cash"])').forEach(function(inp) {
+        document.querySelectorAll('.form-section input:not([name="lot"]):not([name="cash"])').forEach(function(inp) {
           if (inp.name && inp.type !== 'hidden') data[inp.name] = inp.value;
         });
         return data;
       }
 
       function fillForm(data) {
-        /* Fill source */
-        const srcEl = document.querySelector('select[name="source"]');
-        if (srcEl && data.source) srcEl.value = data.source;
         /* Fill lot */
         const lotEl = document.querySelector('input[name="lot"]');
         if (lotEl && data.lot) lotEl.value = data.lot;
@@ -362,7 +349,7 @@
         if (cashEl && data.cash) cashEl.value = data.cash;
         /* Fill all other inputs by name */
         Object.keys(data).forEach(function(key) {
-          if (key === 'strategy' || key === 'source' || key === 'lot' || key === 'cash') return;
+          if (key === 'strategy' || key === 'lot' || key === 'cash') return;
           const el = document.querySelector('[name="' + key + '"]');
           if (el) el.value = data[key];
         });
