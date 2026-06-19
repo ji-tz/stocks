@@ -25,8 +25,8 @@ gui/
 │   ├── strategy_sma.html             # SMA 策略配置页面
 │   ├── strategy_mean_cost.html       # 均值成本策略配置页面
 │   ├── strategy_fixed_amount.html    # 定投策略配置页面
+│   ├── strategy_config.html          # 通用策略配置页面（所有策略共用）
 │   ├── result.html                   # 简单结果展示页面
-│   └── result_mean.html              # 详细结果展示页面
 └── static/            # 静态资源目录（CSS、JS、图片等）
 ```
 
