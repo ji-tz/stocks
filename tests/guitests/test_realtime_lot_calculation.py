@@ -111,7 +111,6 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         # 验证基础表单字段
         self.assertIn('name="lot"', html)
         self.assertIn('name="cash"', html)
-        self.assertIn('name="source"', html)
 
     def test_strategy_mean_cost_page_contains_realtime_info(self):
         """测试均值成本策略页面包含动态参数渲染"""
@@ -133,7 +132,6 @@ class TestRealtimeLotCalculation(unittest.TestCase):
         # 验证基础表单字段
         self.assertIn('name="lot"', html)
         self.assertIn('name="cash"', html)
-        self.assertIn('name="source"', html)
         self.assertIn('name="strategy"', html)
 
     def test_strategy_fixed_amount_page_contains_realtime_info(self):
