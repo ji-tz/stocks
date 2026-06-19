@@ -205,14 +205,13 @@ class TestGuiBacktestReportE2E(unittest.TestCase):
                 )
             )
 
-            page.select_option("select[name='source']", "auto")
             page.fill("input[name='lot']", "100")
             page.fill("input[name='cash']", "100000")
             expect(page.locator(".strategy-info")).to_be_visible()
             steps.append(
                 (
                     "配置策略参数",
-                    "使用自动数据源、每手 100 股、初始资金 100000 元，并确认实时计算区域正常显示。",
+                    "设置每手 100 股、初始资金 100000 元，并确认实时计算区域正常显示。",
                     self._screenshot(page, "06_strategy_params.png"),
                 )
             )
