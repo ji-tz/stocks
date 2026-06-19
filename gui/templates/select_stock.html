@@ -206,6 +206,46 @@
         color: #777;
         font-size: 0.95rem;
       }
+
+      /* 选股后预缓存加载提示 */
+      #prefetch-overlay {
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+      }
+      .prefetch-modal {
+        background: white;
+        border-radius: 12px;
+        padding: 2rem 3rem;
+        text-align: center;
+        box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        max-width: 400px;
+      }
+      .prefetch-spinner {
+        width: 40px; height: 40px;
+        margin: 0 auto 1rem;
+        border: 4px solid #e0e0e0;
+        border-top-color: #1976d2;
+        border-radius: 50%;
+        animation: prefetch-spin 0.8s linear infinite;
+      }
+      @keyframes prefetch-spin {
+        to { transform: rotate(360deg); }
+      }
+      .prefetch-text {
+        margin: 0 0 0.5rem;
+        font-size: 1rem;
+        color: #333;
+      }
+      .prefetch-hint {
+        margin: 0;
+        font-size: 0.85rem;
+        color: #999;
+      }
     
 /* === 移动端响应式适配 === */
 @media (max-width: 640px) {
@@ -493,9 +533,20 @@
           });
       });
 
-      // 选择股票
+      // 选择股票 + 预缓存日线数据
       function selectStock(code, name) {
-        // 保存选择到后端session
+        // 显示加载提示
+        const overlay = document.createElement('div');
+        overlay.id = 'prefetch-overlay';
+        overlay.innerHTML =
+          '<div class="prefetch-modal">' +
+            '<div class="prefetch-spinner"></div>' +
+            '<p class="prefetch-text">正在下载 <strong>' + name + '</strong> 近5年日线数据...</p>' +
+            '<p class="prefetch-hint">首次下载可能需要几秒钟</p>' +
+          '</div>';
+        document.body.appendChild(overlay);
+
+        // 先保存股票到session
         fetch('/api/select_stock', {
           method: 'POST',
           headers: {
@@ -505,14 +556,22 @@
         })
         .then(response => response.json())
         .then(data => {
-          if (data.success) {
-            // 跳转到策略选择页面
-            window.location.href = '/select_strategy';
-          } else {
+          if (!data.success) {
+            document.body.removeChild(overlay);
             alert('选择失败：' + (data.error || '未知错误'));
+            return;
           }
+          // 触发预缓存（后台执行，不阻塞跳转）
+          fetch('/api/prefetch_stock/' + encodeURIComponent(code), { method: 'POST' })
+            .then(function() { /* 静默完成 — 数据已缓存 */ })
+            .catch(function() { /* 预缓存失败不阻止导航 */ });
+          // 延迟一小段时间后跳转
+          setTimeout(function() {
+            window.location.href = '/select_strategy';
+          }, 800);
         })
         .catch(err => {
+          document.body.removeChild(overlay);
           alert('选择失败：' + err.message);
         });
       }
