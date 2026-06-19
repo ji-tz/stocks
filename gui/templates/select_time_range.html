@@ -198,33 +198,30 @@
         position: relative;
         min-height: 320px;
       }
-      .source-log-panel {
-        margin-top: 0.8rem;
-        border: 1px solid #e0e0e0;
-        border-radius: 8px;
-        padding: 0.7rem;
-        background: #fafafa;
+      .update-spinner {
+        display: none;
+        text-align: center;
+        padding: 1rem;
+        color: #4caf50;
+        font-weight: 600;
       }
-      .source-log-title {
-        margin: 0 0 0.5rem 0;
-        color: #2f5f35;
-        font-size: 0.95rem;
-        font-weight: 700;
+      .update-spinner.active {
+        display: block;
       }
-      .source-log-list {
-        list-style: none;
-        margin: 0;
-        padding: 0;
+      .spinner-icon {
+        display: inline-block;
+        width: 20px;
+        height: 20px;
+        border: 3px solid #e0e0e0;
+        border-top: 3px solid #4caf50;
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        vertical-align: middle;
+        margin-right: 8px;
       }
-      .source-log-item {
-        font-size: 0.9rem;
-        line-height: 1.5;
-        color: #444;
+      @keyframes spin {
+        to { transform: rotate(360deg); }
       }
-      .source-log-item.success { color: #2e7d32; }
-      .source-log-item.failed { color: #c62828; }
-      .source-log-item.pending { color: #1565c0; }
-      .source-log-item.discarded { color: #ef6c00; }
     
 /* === 移动端响应式适配 === */
 @media (max-width: 640px) {
@@ -395,9 +392,9 @@
             <button type="button" class="danger-btn" id="refresh-cache-btn">清除全部缓存并自动重下当前股票日线数据</button>
           </div>
           <div class="chart-status info" id="chart-status">正在加载走势图...</div>
-          <div class="source-log-panel">
-            <div class="source-log-title">📜 数据源下载日志</div>
-            <ul class="source-log-list" id="source-log-list"></ul>
+          <div class="update-spinner" id="update-spinner">
+            <span class="spinner-icon"></span>
+            <span>正在更新数据</span>
           </div>
           <div class="chart-canvas-wrap">
             <canvas id="time-range-chart" height="280"></canvas>
@@ -490,7 +487,6 @@
       const endInput = document.getElementById('end-date');
       const chartStatus = document.getElementById('chart-status');
       const chartMeta = document.getElementById('chart-meta');
-      const sourceLogList = document.getElementById('source-log-list');
       const refreshCacheBtn = document.getElementById('refresh-cache-btn');
       const submitBtn = document.querySelector('.submit-btn');
       let timeRangeChart = null;
@@ -506,26 +502,9 @@
         submitBtn.disabled = isBusy;
       }
 
-      function renderSourceLogs(logs) {
-        if (!sourceLogList) {
-          return;
-        }
-        sourceLogList.innerHTML = '';
-        if (!logs || !logs.length) {
-          sourceLogList.innerHTML = '<li class="source-log-item">暂无日志</li>';
-          return;
-        }
-
-        logs.forEach(item => {
-          const li = document.createElement('li');
-          const status = item.status || 'pending';
-          const statusLabel = status === 'success' ? '成功' : (status === 'failed' ? '失败' : (status === 'discarded' ? '丢弃' : '进行中'));
-          const rows = typeof item.rows === 'number' ? item.rows : 0;
-          const duration = typeof item.duration_ms === 'number' ? item.duration_ms : 0;
-          li.className = 'source-log-item ' + status;
-          li.textContent = '[' + String(item.source || '').toUpperCase() + '] ' + statusLabel + ' | rows=' + rows + ' | ' + duration + 'ms | ' + (item.message || '');
-          sourceLogList.appendChild(li);
-        });
+      function showSpinner(show) {
+        const el = document.getElementById('update-spinner');
+        if (el) el.classList.toggle('active', show);
       }
 
       function renderChart(labels, openPrices) {
@@ -649,16 +628,7 @@
 
         setBusy(true);
         setChartStatus('正在清除缓存并重新下载当前股票日线数据...', 'info');
-        renderSourceLogs([
-          { source: 'akshare', status: 'pending', message: '等待下载...' },
-          { source: 'baostock', status: 'pending', message: '等待下载...' },
-          { source: 'tencent', status: 'pending', message: '等待下载...' },
-          { source: 'sina', status: 'pending', message: '等待下载...' },
-          { source: 'sohu', status: 'pending', message: '等待下载...' },
-          { source: 'eastmoney', status: 'pending', message: '等待下载...' },
-          { source: 'cailianpress', status: 'pending', message: '等待下载...' },
-          { source: 'stooq', status: 'pending', message: '等待下载...' }
-        ]);
+        showSpinner(true);
         fetch('/api/stock_chart/' + encodeURIComponent(stockCode) + '/refresh_cache', {
           method: 'POST',
           headers: {
@@ -674,7 +644,7 @@
 
           renderChart(data.labels, data.open_prices);
           updateDateBounds(data);
-          renderSourceLogs(data.source_logs || []);
+          showSpinner(false);
           chartMeta.textContent = '已清除 ' + data.removed_cache_files + ' 个缓存文件，并重新下载当前股票日线数据。';
           setChartStatus('缓存已清除并完成重新下载。', 'success');
         })
