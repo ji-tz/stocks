@@ -160,6 +160,7 @@ class BacktestExchangeRunner:
         trades_list: List[Dict[str, Any]] = []
         pending_orders: List[PendingOrder] = []
         min_cash = engine.get_cash()
+        running_min_cash = self.init_cash
         today_bought_shares: Dict[str, float] = {}
 
         if use_verbose:
@@ -410,6 +411,13 @@ class BacktestExchangeRunner:
             engine.print_daily_status(date, price_open, price_close, action)
 
             summary = engine.get_summary(price_close)
+            running_min_cash = min(running_min_cash, summary["cash"])
+            max_capital_used_so_far = self.init_cash - running_min_cash
+            invested_capital_return_rate = (
+                (summary["total_value"] - self.init_cash) / max_capital_used_so_far
+                if max_capital_used_so_far > 0
+                else 0.0
+            )
             history.append(
                 {
                     "date": date.strftime("%Y-%m-%d"),
@@ -419,6 +427,8 @@ class BacktestExchangeRunner:
                     "last_price": round(price_close, 4),
                     "market_value": summary["market_value"],
                     "total_value": summary["total_value"],
+                    "max_capital_used_so_far": round(max_capital_used_so_far, 2),
+                    "invested_capital_return_rate": round(invested_capital_return_rate, 4),
                 }
             )
             min_cash = min(min_cash, summary["cash"])
@@ -503,6 +513,12 @@ class BacktestExchangeRunner:
             "sharpe_ratio": round(sharpe_ratio, 4),
             "total_pl": round(total_pl, 2),
             "final_value": round(final_summary["total_value"], 2),
+            "invested_capital_return_rate": round(
+                (final_summary["total_value"] - self.init_cash) / max_capital_used
+                if max_capital_used > 0
+                else 0.0,
+                4,
+            ),
         }
 
         return {

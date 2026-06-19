@@ -218,6 +218,11 @@
           {{ h.last_price if (h.last_price is not none and h.last_price == h.last_price) else 'null' }},
         {% endfor %}
       ];
+      const investedCapitalRateData = [
+        {% for h in result.history %}
+          {{ h.invested_capital_return_rate * 100 if h.invested_capital_return_rate is defined else 'null' }},
+        {% endfor %}
+      ];
 
       // 归一化处理：将股价和总资产都转换为以起点为100的指数形式
       // 这样两条曲线的起点就会在同一位置
@@ -299,6 +304,14 @@
             tension: 0.1,
             pointRadius: 0,
             yAxisID: 'y'
+          }, {
+            label: '投入资金收益率',
+            data: investedCapitalRateData,
+            borderColor: 'rgb(255, 159, 64)',
+            backgroundColor: 'rgba(255, 159, 64, 0.1)',
+            tension: 0.1,
+            pointRadius: 0,
+            yAxisID: 'y1'
           }]
         },
         options: {
@@ -339,6 +352,8 @@
                     } else {
                       return datasetLabel + ': ' + value.toFixed(2);
                     }
+                  } else if (datasetLabel.includes('投入资金')) {
+                    return datasetLabel + ': ' + value.toFixed(2) + '%';
                   } else {
                     const originalPrice = stockPriceData[index];
                     if (originalPrice !== null && originalPrice !== undefined) {
@@ -381,6 +396,18 @@
               title: {
                 display: true,
                 text: '相对变化（起点=100）'
+              }
+            },
+            y1: {
+              type: 'linear',
+              display: true,
+              position: 'right',
+              title: {
+                display: true,
+                text: '投入资金收益率 (%)'
+              },
+              grid: {
+                drawOnChartArea: false
               }
             }
           }
