@@ -63,7 +63,7 @@ class StrategySpec:
     parameters: tuple[StrategyParameter, ...] = ()
     description: str = ''
     icon: str = '📌'
-    template: str = 'strategy_dynamic.html'
+    template: str = 'strategy_config.html'
     supported_trade_prices: tuple[str, ...] = (TRADE_PRICE_OPEN,)
     module_name: Optional[str] = None
     module_interface: bool = False
@@ -198,7 +198,7 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
                 parameters=tuple(parameters),
                 description=str(raw.get('description', '')).strip(),
                 icon=str(raw.get('icon', '📌')),
-                template=str(raw.get('template', 'strategy_dynamic.html')),
+                template=str(raw.get('template', 'strategy_config.html')),
                 supported_trade_prices=supported_trade_prices if supported_trade_prices else (TRADE_PRICE_OPEN,),
                 module_name=module_name,
                 module_interface=module_interface,

@@ -10,7 +10,7 @@ AUTO_STRATEGY_SPEC = {
     "runner": "run_module_strategy_backtest",
     "module_interface": True,
     "icon": "📉",
-    "template": "strategy_dynamic.html",
+    "template": "strategy_config.html",
     "parameters": [
         {
             "name": "short_period",
