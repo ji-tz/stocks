@@ -15,6 +15,7 @@ from dataclasses import dataclass, field
 from typing import Optional, Dict, Any, Callable, Mapping
 
 from exchange.source.data_provider import get_data as _get_data
+from trader.prefetch import prefetch_backtest_data as _prefetch_backtest_data
 import logging
 
 logger = logging.getLogger(__name__)
@@ -217,7 +218,8 @@ def init(cache_dir: str = "data") -> None:
 
 
 def _fetch_data_for_backtest(symbol: str, source: object,
-                             start_date: Optional[str], end_date: Optional[str]):
+                             start_date: Optional[str], end_date: Optional[str],
+                             prefetch_cache: Optional[Dict[str, Any]] = None):
     """按日期范围获取回测所需数据的辅助函数。
 
     若未指定日期范围，则使用数据提供者的默认行为（返回全量数据）；
@@ -227,16 +229,46 @@ def _fetch_data_for_backtest(symbol: str, source: object,
     未来以查找第一个有数据的交易日，避免因 start_date 落在非交易日
     （周末/节假日）导致回测无法开始。
 
+    支持 `prefetch_cache` 参数：如果提供了预取缓存字典且包含当前 symbol，
+    则直接从缓存返回数据，跳过网络/磁盘读取。
+
     Args:
         symbol: 股票代码
         source: 数据源
         start_date: 起始日期（可为 None）
         end_date: 结束日期（可为 None）
+        prefetch_cache: 可选的预取缓存字典 {symbol: DataFrame}。
+                        建立于 prefetch_for_backtest() 的返回值。
 
     Returns:
         包含 OHLCV 数据的 DataFrame
     """
     import pandas as _pd
+
+    # 如果预取缓存中有当前 symbol 的数据，直接使用
+    if prefetch_cache is not None and symbol in prefetch_cache:
+        df = prefetch_cache[symbol]
+        logger.info(
+            "使用预取缓存: symbol=%s, rows=%d", symbol, len(df),
+        )
+        # 如果缓存中数据已包含完整范围，直接返回
+        if start_date is None and end_date is None:
+            return df
+        # 否则在缓存数据上做日期过滤（与下方逻辑一致）
+        filtered = df.copy()
+        if start_date is not None:
+            sd_dt = _pd.to_datetime(start_date)
+            filtered = filtered[filtered['date'] >= sd_dt]
+        if end_date is not None:
+            ed_dt = _pd.to_datetime(end_date)
+            filtered = filtered[filtered['date'] <= ed_dt]
+        if not filtered.empty:
+            return filtered
+        # 如果过滤后为空，回退到正常获取逻辑
+        logger.info(
+            "预取缓存过滤后为空: symbol=%s, start=%s, end=%s，回退到正常获取",
+            symbol, start_date, end_date,
+        )
 
     if start_date is None and end_date is None:
         return get_data(symbol=symbol, source=source)
@@ -283,6 +315,62 @@ def _fetch_data_for_backtest(symbol: str, source: object,
             df = df[df["date"] <= last_trade_date]
 
     return df
+
+
+def prefetch_for_backtest(
+    symbols: list[str],
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    source: object = "auto",
+) -> Dict[str, Any]:
+    """预取多个标的的回测数据，返回预取缓存字典。
+
+    对每个 symbol 调用 `prefetch_backtest_data` 将数据加载到 EXCH 缓存，
+    同时返回 {symbol: DataFrame} 字典，可直接作为 `_fetch_data_for_backtest`
+    的 `prefetch_cache` 参数使用。
+
+    如果某个标的预取失败，不会中断整个流程，日志会记录错误。
+
+    Args:
+        symbols: 股票代码列表
+        start_date: 起始日期（可选）
+        end_date: 结束日期（可选）
+        source: 数据源（默认 auto）
+
+    Returns:
+        预取缓存字典 {symbol: DataFrame}，按 symbols 输入顺序排列
+    """
+    cache: Dict[str, Any] = {}
+    if not symbols:
+        logger.warning("prefetch_for_backtest 收到空列表，返回空字典")
+        return cache
+
+    logger.info(
+        "预取回测数据: symbols=%d, range=%s~%s",
+        len(symbols),
+        start_date or "全量",
+        end_date or "全量",
+    )
+
+    for symbol in symbols:
+        try:
+            df = _prefetch_backtest_data(
+                symbol=symbol,
+                start_date=start_date,
+                end_date=end_date,
+                source=source,
+            )
+            cache[symbol] = df
+            logger.info(
+                "预取成功: symbol=%s, rows=%d", symbol, len(df),
+            )
+        except Exception as exc:
+            logger.error(
+                "预取失败: symbol=%s, error=%s", symbol, exc,
+            )
+
+    logger.info("预取完成: success=%d/%d", len(cache), len(symbols))
+    return cache
 
 
 def get_data(symbol: str = "600900",
