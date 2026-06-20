@@ -750,6 +750,20 @@
       refreshCacheBtn.addEventListener('click', refreshCacheAndReload);
 
       refreshChart();
+
+      // 页面加载后异步触发数据预取，预热缓存以加速后续回测
+      function triggerDataPrefetch() {
+        const range = getSelectedRange();
+        // 只在有实际日期时触发预取（避免首次空日期请求全量数据）
+        if (!range.start && !range.end) return;
+        fetch('/api/select_time_range', {
+          method: 'POST',
+          headers: {'Content-Type': 'application/json'},
+          body: JSON.stringify({start: range.start, end: range.end})
+        }).catch(e => console.warn('数据预取请求失败:', e));
+      }
+      // 初始加载时触发一次（如果已有预选日期）
+      setTimeout(triggerDataPrefetch, 500);
     </script>
   </body>
 </html>

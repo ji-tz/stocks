@@ -767,6 +767,37 @@ def select_time_range_api():
     session['backtest_start'] = start
     session['backtest_end'] = end
 
+    # 非阻塞后台预取回测数据到缓存，加速后续回测流程
+    stock_code = session.get('stock_code', '')
+    if stock_code:
+        def _prefetch_worker():
+            try:
+                logger.info(
+                    "后台预取回测数据: stock=%s, range=%s~%s",
+                    stock_code,
+                    start or "全量",
+                    end or "全量",
+                )
+                stocks.prefetch_for_backtest(
+                    symbols=[stock_code],
+                    start_date=start or None,
+                    end_date=end or None,
+                )
+                logger.info(
+                    "后台预取回测数据完成: stock=%s",
+                    stock_code,
+                )
+            except Exception as e:
+                logger.error(
+                    "后台预取回测数据失败: stock=%s, error=%s",
+                    stock_code, e,
+                )
+
+        t = threading.Thread(target=_prefetch_worker, daemon=True)
+        t.start()
+    else:
+        logger.warning("会话中无 stock_code，跳过后台数据预取")
+
     return jsonify({'success': True})
 
 

@@ -138,6 +138,45 @@ def _merge_into_cache(cache_file: str, df_new: pd.DataFrame) -> None:
         logger.warning("缓存合并失败: %s", cache_file)
 
 
+def _determine_missing_ranges(
+    cached_df: pd.DataFrame | None,
+    start_date: str | None,
+    end_date: str | None,
+) -> list[tuple[str | None, str | None]]:
+    """Determine which date ranges are missing from the cache.
+
+    Returns a list of (fetch_start, fetch_end) tuples for the missing portions.
+    """
+    sd = parse_date_input(start_date)
+    ed = parse_date_input(end_date)
+
+    if sd is None and ed is None:
+        # No range specified — only missing if cache is empty
+        return [(start_date, end_date)] if cached_df is None or cached_df.empty else []
+
+    if cached_df is None or cached_df.empty:
+        return [(start_date, end_date)]
+
+    cache_min = cached_df['date'].min()
+    cache_max = cached_df['date'].max()
+
+    ranges = []
+
+    # Missing at the beginning
+    if sd is not None and sd < cache_min:
+        miss_end = format_date_for_source(cache_min - pd.Timedelta(days=1), 'akshare')
+        fmt_start = format_date_for_source(sd, 'akshare')
+        ranges.append((fmt_start, miss_end))
+
+    # Missing at the end
+    if ed is not None and ed > cache_max:
+        miss_start = format_date_for_source(cache_max + pd.Timedelta(days=1), 'akshare')
+        fmt_end = format_date_for_source(ed, 'akshare')
+        ranges.append((miss_start, fmt_end))
+
+    return ranges
+
+
 _PROVIDER_FACTORIES = {
     "akshare": lambda: AkshareProvider(max_attempts=3),
     "baostock": lambda: BaostockProvider(),
@@ -170,32 +209,83 @@ def get_data(symbol: str = "600900",
              max_attempts: int = 3,
              force_refresh: bool = False,
              buffer_days: int = DEFAULT_FETCH_BUFFER_DAYS) -> pd.DataFrame:
+    """获取股票行情数据，实现 Cache-First 策略。
+
+    Cache-First 流程:
+    1. 检查 data/{symbol}.csv 缓存是否存在
+    2. 如果缓存覆盖请求范围（且不含实时今天数据），直接返回缓存（cache hit）
+    3. 如果缓存仅部分覆盖，只抓取缺失部分并合并（partial cache）
+    4. 如果 force_refresh=True 或含当天实时数据，跳过缓存直接抓取
+    """
     _ensure_cache_dir(cache_dir)
     cache_file = os.path.join(cache_dir, f"{symbol}.csv")
 
-    cached_out = _read_cache(cache_file, start_date=start_date, end_date=end_date)
-    cached_raw = _read_cache_raw(cache_file)
-    if not force_refresh and cached_out is not None:
-        try:
-            if start_date or end_date:
-                if cached_raw is not None and not cached_raw.empty:
-                    min_dt = cached_raw['date'].min()
-                    max_dt = cached_raw['date'].max()
-                    ok_start = True
-                    ok_end = True
-                    if start_date:
-                        sd = parse_date_input(start_date)
-                        ok_start = (min_dt <= sd)
-                    if end_date:
-                        ed = parse_date_input(end_date)
-                        ok_end = (max_dt >= ed)
-                    if ok_start and ok_end:
-                        return cached_out
-            else:
-                return cached_out
-        except Exception:
-            logger.debug("缓存覆盖范围检查失败")
+    today = pd.Timestamp.now().normalize()
+    sd = parse_date_input(start_date)
+    ed = parse_date_input(end_date)
 
+    # Determine if today's real-time data is needed (used both in and after cache logic)
+    needs_realtime = ed is not None and ed >= today
+
+    # --- Cache-First Strategy ---
+    if not force_refresh:
+        cached_raw = _read_cache_raw(cache_file)
+        if cached_raw is not None and not cached_raw.empty:
+            cache_min = cached_raw['date'].min()
+            cache_max = cached_raw['date'].max()
+
+            if needs_realtime:
+                # For real-time: historical portion can still come from cache
+                hist_end = today - pd.Timedelta(days=1)
+                hist_covered = True
+                if sd is not None and sd < cache_min:
+                    hist_covered = False
+                if hist_end > cache_max:
+                    hist_covered = False
+
+                if hist_covered and (sd is None or sd <= cache_max):
+                    # Historical data is cached; will fetch only today's data
+                    logger.info(
+                        "缓存命中(historical), 需补充实时数据: symbol=%s, "
+                        "cached=%s~%s, today=%s",
+                        symbol, cache_min.date(), cache_max.date(), today.date(),
+                    )
+                else:
+                    # Partial cache + realtime — log and proceed to fetch
+                    logger.info(
+                        "缓存部分命中+需实时数据: symbol=%s, "
+                        "cached=%s~%s, requested=%s~%s",
+                        symbol, cache_min.date(), cache_max.date(),
+                        start_date or "N/A", end_date or "N/A",
+                    )
+            else:
+                # Pure historical request — check if cache fully covers
+                hist_covered = True
+                if sd is not None and sd < cache_min:
+                    hist_covered = False
+                if ed is not None and ed > cache_max:
+                    hist_covered = False
+
+                if hist_covered:
+                    cached_out = _read_cache(cache_file, start_date=start_date, end_date=end_date)
+                    if cached_out is not None and not cached_out.empty:
+                        logger.info(
+                            "缓存命中: symbol=%s, range=%s~%s, rows=%d",
+                            symbol, start_date or "N/A", end_date or "N/A", len(cached_out),
+                        )
+                        return cached_out
+                else:
+                    logger.info(
+                        "缓存部分命中: symbol=%s, cached=%s~%s, requested=%s~%s",
+                        symbol, cache_min.date(), cache_max.date(),
+                        start_date or "N/A", end_date or "N/A",
+                    )
+        else:
+            logger.info("缓存未命中: symbol=%s, cache=%s", symbol, cache_file)
+    else:
+        logger.info("强制刷新缓存: symbol=%s, cache=%s", symbol, cache_file)
+
+    # --- Source resolution ---
     if not source:
         source = "auto"
 
@@ -210,41 +300,92 @@ def get_data(symbol: str = "600900",
     else:
         raise ValueError("source must be a string or list/tuple of strings")
 
+    # --- Determine what needs to be fetched ---
+    # If we have partial cache, determine missing ranges
+    if not force_refresh:
+        cached_raw = _read_cache_raw(cache_file)
+        missing_ranges = _determine_missing_ranges(cached_raw, start_date, end_date)
+    else:
+        missing_ranges = [(start_date, end_date)] if start_date or end_date else [(None, None)]
+
+    # Also need to consider real-time today data
+    if not force_refresh and needs_realtime:
+        today_str = format_date_for_source(today, 'akshare')
+        # Only add today if not already covered in missing ranges
+        already_missing_today = any(
+            (fs is None or fs <= today_str) and (fe is None or fe >= today_str)
+            for fs, fe in missing_ranges
+        )
+        if not already_missing_today:
+            missing_ranges.append((today_str, today_str))
+
     errors = []
 
-    for src in sources:
-        src = src.lower()
-        if src not in _PROVIDER_FACTORIES:
-            errors.append((src, "unsupported source"))
-            continue
-
-        try:
-            fetch_start = start_date
-            fetch_end = end_date
-            if start_date or end_date:
-                request_start, request_end = _expand_fetch_range(start_date, end_date, buffer_days)
-                fetch_start = format_date_for_source(
-                    parse_date_input(request_start),
-                    src) if request_start else request_start
-                fetch_end = format_date_for_source(parse_date_input(request_end), src) if request_end else request_end
-
-            provider = _create_provider(src, max_attempts=max_attempts)
-            df = provider.fetch(symbol=symbol, start_date=fetch_start, end_date=fetch_end)
-
-            if df is None or df.empty:
-                errors.append((src, "no data returned"))
+    for fetch_start, fetch_end in missing_ranges:
+        for src in sources:
+            src = src.lower()
+            if src not in _PROVIDER_FACTORIES:
+                errors.append((src, "unsupported source"))
                 continue
 
-            _merge_into_cache(cache_file, df)
+            try:
+                f_start = fetch_start
+                f_end = fetch_end
 
-            cached_after = _read_cache(cache_file, start_date=start_date, end_date=end_date)
-            if cached_after is not None:
-                return cached_after
-            return df
-        except Exception as e:
-            errors.append((src, str(e)))
-            continue
+                # Apply buffer only for non-realtime (today) fetches
+                if fetch_start and fetch_end:
+                    f_start_dt = parse_date_input(fetch_start)
+                    f_end_dt = parse_date_input(fetch_end)
+                    is_today_fetch = (
+                        f_end_dt is not None
+                        and f_start_dt is not None
+                        and f_start_dt == f_end_dt
+                        and f_start_dt == today
+                    )
+                    if not is_today_fetch:
+                        request_start, request_end = _expand_fetch_range(
+                            fetch_start, fetch_end, buffer_days
+                        )
+                        f_start = format_date_for_source(
+                            parse_date_input(request_start), src
+                        ) if request_start else request_start
+                        f_end = format_date_for_source(
+                            parse_date_input(request_end), src
+                        ) if request_end else request_end
+                    else:
+                        # For today's data, no buffer needed
+                        f_start = format_date_for_source(
+                            parse_date_input(fetch_start), src
+                        ) if fetch_start else fetch_start
+                        f_end = format_date_for_source(
+                            parse_date_input(fetch_end), src
+                        ) if fetch_end else fetch_end
+                else:
+                    f_start = fetch_start
+                    f_end = fetch_end
 
+                provider = _create_provider(src, max_attempts=max_attempts)
+                df = provider.fetch(
+                    symbol=symbol, start_date=f_start, end_date=f_end
+                )
+
+                if df is None or df.empty:
+                    errors.append((src, f"no data returned for {fetch_start}~{fetch_end}"))
+                    continue
+
+                _merge_into_cache(cache_file, df)
+                break  # Success with this source, move to next missing range
+
+            except Exception as e:
+                errors.append((src, str(e)))
+                continue
+
+    # --- Return result ---
+    cached_out = _read_cache(cache_file, start_date=start_date, end_date=end_date)
+    if cached_out is not None and not cached_out.empty:
+        return cached_out
+
+    # Fallback: try to return whatever is in cache
     if os.path.exists(cache_file):
         try:
             return pd.read_csv(cache_file, parse_dates=["date"]).loc[:, [
