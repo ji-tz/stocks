@@ -1,4 +1,5 @@
 import datetime
+import logging
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -6,6 +7,8 @@ from exchange.source.data_provider import get_data
 from exchange.simulated_exchange import detect_market
 from trader.clock import BacktestClock
 from exchange.backtest.exchange import BacktestExchange
+
+logger = logging.getLogger(__name__)
 
 
 SUPPORTED_TRADE_PRICE_FIELDS = ("open", "close", "high", "low")
@@ -121,9 +124,11 @@ class BacktestExchangeRunner:
 
         df = df.sort_values("date").reset_index(drop=True).copy()
         if df.empty:
+            logger.info(
+                "回测日期范围内无交易日数据，数据已为空（上层调用方应已自动调整日期范围）"
+            )
             raise RuntimeError(
-                "数据为空，无法模拟。可能是回测日期范围内无交易日数据，"
-                "请检查起始/结束日期是否包含节假日或周末。"
+                "数据为空，无法模拟。请检查股票代码或数据源。"
             )
 
         use_verbose = verbose if verbose is not None else self.verbose
@@ -600,13 +605,15 @@ def simulate_mean_cost(
     source: str = "auto",
     progress_callback: Optional[Callable[[int, int], None]] = None,
     trade_price: str = "open",
+    df=None,
 ) -> Dict[str, Any]:
     from strategy.mean_cost_strategy import MeanCostDecision
 
     if end_date is None:
         end_date = datetime.datetime.today().strftime("%Y%m%d")
 
-    df = get_data(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    if df is None:
+        df = get_data(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
     if df is None:
         raise RuntimeError("未获取到数据，无法模拟")
 
@@ -666,6 +673,7 @@ def simulate_fixed_amount(
     verbose: bool = False,
     progress_callback: Optional[Callable[[int, int], None]] = None,
     trade_price: str = "open",
+    df=None,
 ) -> Dict[str, Any]:
     """运行定投策略回测。"""
     from strategy.fixed_amount_strategy import FixedAmountDecision
@@ -673,7 +681,8 @@ def simulate_fixed_amount(
     if end_date is None:
         end_date = datetime.datetime.today().strftime("%Y%m%d")
 
-    df = get_data(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    if df is None:
+        df = get_data(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
     if df is None:
         raise RuntimeError("未获取到数据，无法模拟")
 
