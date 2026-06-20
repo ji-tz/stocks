@@ -41,14 +41,14 @@
 | 角色 | 代号 | 核心职责 |
 |------|------|---------|
 | 产品经理 | PM | 发现需求、提 Issue、**维护 README** |
-| 架构师 | ARCH | 拆解需求、设计模块、定接口 |
+| 架构师 | ARCH | 拆解需求、设计模块、定接口、开 sub-issue |
 | Web 前端 | WEB | UI/UX 设计、Flask 模板、前端交互 |
-| **交易所** | **EXCH** | 行情数据获取 + 账户管理 + 交易执行 |
-| **交易员** | **TRADER** | 驱动回测、执行买卖操作 |
-| **策略算法** | **STRAT** | 撰写策略逻辑、输出买卖信号 |
-| 集成测试 | ITEST | 单元/集成测试、维护 test.yml |
-| GUI 测试 | GTEST | Playwright 端到端测试 |
-| 研发主管 | LEAD | Review PR、质量把控 |
+| **模拟交易所开发工程师** | **EXCH** | 行情数据获取 + 账户持仓管理 + 交易执行 |
+| **模拟交易员开发工程师** | **TRADER** | 控制时间流程、驱动回测、执行买卖操作 |
+| **策略算法工程师** | **STRAT** | 撰写策略逻辑、输出买卖信号（不直接操作） |
+| 集成测试 | ITEST | 接口/集成测试、边界测试、维护 test.yml |
+| GUI 测试 | GTEST | Playwright 端到端测试、维护 testgui.yml |
+| 研发主管 | LEAD | Review PR、运行测试、仲裁修复责任 |
 | 验收测试 | QA | 端到端验收、合并 PR |
 
 整个开发流程由 `Hermes Agent` 调度，通过 GitHub Issues + Pull Requests 驱动：Issue → PM+QA 确认 → ARCH 拆解 → 链式实现 → LEAD Review → QA 验收 → 合并 → 部署。
@@ -270,7 +270,7 @@ python -m pytest tests/guitests/ -v
 
 执行后会在 `testing/` 目录下生成截图和报告。
 
-## GitHub Actions 工作流
+### 定投策略详解
 
 定投策略每天投入固定金额购买股票，无需择时，适合长期投资：
 
