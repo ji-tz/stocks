@@ -270,6 +270,18 @@ def _fetch_data_for_backtest(symbol: str, source: object,
                 safe_start,
             )
 
+    # 如果指定了结束日期但最后一个交易日早于结束日期（非交易日），截断数据
+    if end_date is not None and not df.empty:
+        last_trade_date = _pd.to_datetime(df["date"].iloc[-1])
+        end_dt = _pd.to_datetime(end_date)
+        if last_trade_date < end_dt:
+            actual_last = last_trade_date.strftime("%Y-%m-%d")
+            logger.info(
+                "回测实际结束日期调整为 %s（原始结束 %s 无交易日数据）",
+                actual_last, str(end_date),
+            )
+            df = df[df["date"] <= last_trade_date]
+
     return df
 
 
@@ -336,8 +348,9 @@ def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_
     """调用均值成本模拟（封装自 strategy.mean_cost_strategy.simulate_mean_cost）。"""
     if simulate_mean_cost is None:
         raise RuntimeError("mean_cost 模块不可用")
-    return simulate_mean_cost(symbol=symbol, start_date=start_date, end_date=end_date,
-                              lot_size=lot_size, init_cash=init_cash, source=source,
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    return simulate_mean_cost(symbol=symbol, df=df,
+                              lot_size=lot_size, init_cash=init_cash,
                               progress_callback=progress_callback, trade_price=trade_price)
 
 
@@ -367,13 +380,10 @@ def run_fixed_amount(symbol: str = "600900",
     """
     if simulate_fixed_amount is None:
         raise RuntimeError("fixed_amount 模块不可用")
-    return simulate_fixed_amount(symbol=symbol,
-                                 start_date=start_date,
-                                 end_date=end_date,
+    df = _fetch_data_for_backtest(symbol=symbol, source=source, start_date=start_date, end_date=end_date)
+    return simulate_fixed_amount(symbol=symbol, df=df,
                                  fixed_amount=fixed_amount,
-                                 lot_size=lot_size,
-                                 init_cash=init_cash,
-                                 source=source,
+                                 lot_size=lot_size, init_cash=init_cash,
                                  progress_callback=progress_callback,
                                  trade_price=trade_price)
 
