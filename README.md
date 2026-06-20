@@ -6,6 +6,57 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-orange.svg)](.github/workflows/)
 
+---
+
+## 🧬 项目缘起
+
+本项目是**完全 vibecoding 的产物**——这里没有一个字代码是由人类手工键入的。
+
+### 工具演进
+
+```
+本地 GitHub Copilot  →  在线 GitHub Copilot  →  OpenCode  →  OpenClaw  →  Hermes + DeepSeek
+（单行补全）           （多文件聊天）            （自主编码 Agent）  （多 Agent 编排）    （完整 AI 团队）
+```
+
+每一步演进都是对「AI 到底能帮人类写多少代码」的一次试探。
+
+### 设计理念
+
+**做这个项目有三个目的：**
+
+1. **探索拍脑袋想出来的量化策略到底有没有用**——那些「如果……会怎样」的假设，与其空想，不如跑一下回测验证
+2. **探索低成本、高可靠性 vibecoding 的能力边界**——一台树莓派 + 开源模型，到底能支撑多大的 AI 开发管线
+3. **技术分享与交流**——把完整的团队架构、工作流设计、工具链演进公开，供同路人参考和讨论
+
+**同时坚决拒绝：**
+- ❌ 一站式许愿机式 harness —— 工程师应该理解自己的工具链，而不是在黑盒里许愿
+- ❌ 不能保证供应的闭源模型 —— 工具链必须可控，不会被任何一家公司的定价策略绑架
+- ❌ 高成本方案 —— 如果 AI 辅助开发比传统开发还贵，那就失去了意义
+
+### 关于这个 AI 团队
+
+本项目使用一套多 Agent 团队架构（定义在 `AGENTS.md` 中）来自动化开发流程。团队成员及分工：
+
+| 角色 | 代号 | 核心职责 |
+|------|------|---------|
+| 产品经理 | PM | 发现需求、提 Issue、**维护 README** |
+| 架构师 | ARCH | 拆解需求、设计模块、定接口 |
+| Web 前端 | WEB | UI/UX 设计、Flask 模板、前端交互 |
+| **交易所** | **EXCH** | 行情数据获取 + 账户管理 + 交易执行 |
+| **交易员** | **TRADER** | 驱动回测、执行买卖操作 |
+| **策略算法** | **STRAT** | 撰写策略逻辑、输出买卖信号 |
+| 集成测试 | ITEST | 单元/集成测试、维护 test.yml |
+| GUI 测试 | GTEST | Playwright 端到端测试 |
+| 研发主管 | LEAD | Review PR、质量把控 |
+| 验收测试 | QA | 端到端验收、合并 PR |
+
+整个开发流程由 `Hermes Agent` 调度，通过 GitHub Issues + Pull Requests 驱动：Issue → PM+QA 确认 → ARCH 拆解 → 链式实现 → LEAD Review → QA 验收 → 合并 → 部署。
+
+详见项目根目录的 [`AGENTS.md`](AGENTS.md) —— 那是这份架构的完整手册。
+
+---
+
 ## ✨ 特色亮点
 
 - 🚀 **开箱即用**: 提供 Web 界面、命令行工具、Python API 三种使用方式
