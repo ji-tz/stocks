@@ -263,7 +263,7 @@ def get_data(symbol: str = "600900",
                 hist_covered = True
                 if sd is not None and sd < cache_min:
                     hist_covered = False
-                if ed is not None and ed > cache_max:
+                if ed is not None and ed > cache_max + pd.Timedelta(days=buffer_days):
                     hist_covered = False
 
                 if hist_covered:
