@@ -135,6 +135,38 @@ class BacktestProgress:
                 'error': error
             })
 
+    def push_tick_data(self, task_id: str, date: str, price: float,
+                        signal: str | None = None,
+                        position: float = 0,
+                        pnl: float = 0,
+                        cash: float = 0):
+        """推送逐笔 tick 数据到 SSE 队列，供前端实时图表消费。
+
+        Args:
+            task_id: 任务ID
+            date: 日期字符串 (YYYY-MM-DD)
+            price: 当前价格
+            signal: 信号类型 ('buy', 'sell', 或 None)
+            position: 当前持仓数量
+            pnl: 当前盈亏
+            cash: 当前剩余资金
+        """
+        with self._lock:
+            if task_id not in self._tasks:
+                return
+            task = self._tasks[task_id]
+            if task.get('cancelled'):
+                return
+            task['queue'].put({
+                'type': 'tick_data',
+                'date': date,
+                'price': price,
+                'signal': signal,
+                'position': position,
+                'pnl': pnl,
+                'cash': cash,
+            })
+
     def cancel_task(self, task_id: str):
         """取消任务并通知前端停止等待。"""
         with self._lock:

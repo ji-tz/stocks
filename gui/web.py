@@ -955,6 +955,7 @@ def run():
     lot = float(request.form.get('lot') or 100.0)
     cash = float(request.form.get('cash') or 100000.0)
     strategy_params = _collect_strategy_form_params(strategy)
+    tick_by_tick = request.form.get('tick_by_tick', '0') == '1'
     request_payload = {
         'symbol': symbol,
         'strategy': strategy,
@@ -1010,6 +1011,7 @@ def run():
         strategy=strategy,
         strategy_label=strategy_spec.label,
         back_url=f'/strategy/{strategy}',
+        tick_by_tick=tick_by_tick,
     )
 
 
@@ -1106,6 +1108,7 @@ def run_multi():
     source = 'auto'
     lot = float(request.form.get('lot') or 100.0)
     cash = float(request.form.get('cash') or 100000.0)
+    tick_by_tick = request.form.get('tick_by_tick', '0') == '1'
 
     progress_mgr = get_progress_manager()
     task_id = progress_mgr.create_task()
@@ -1149,6 +1152,7 @@ def run_multi():
         strategy_label='多策略对比',
         back_url='/select_strategies_multi',
         result_url='/view_result_compare',
+        tick_by_tick=tick_by_tick,
     )
 
 
