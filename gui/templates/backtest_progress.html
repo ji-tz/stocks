@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>回测仿真进行中 - Stocks</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -310,6 +311,26 @@
                 </div>
             </div>
         </div>
+
+        {% if tick_by_tick %}
+        <div class="chart-section" id="chart-section" style="margin-top: 20px;">
+            <div class="panel" style="width: 100%;">
+                <div class="log-panel-title">
+                    <h2>实时逐笔行情图</h2>
+                    <div class="log-hint" id="chart-hint">等待 tick 数据...</div>
+                </div>
+                <div style="position: relative; height: 380px; width: 100%;">
+                    <canvas id="tickChart"></canvas>
+                </div>
+                <div style="display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; font-size: 13px; color: #475569;">
+                    <span>🟢 <strong>买入</strong> — 绿色三角上指</span>
+                    <span>🔴 <strong>卖出</strong> — 红色三角下指</span>
+                    <span id="tick-count">Tick: 0</span>
+                    <span id="current-price-display">最新价: --</span>
+                </div>
+            </div>
+        </div>
+        {% endif %}
     </div>
 
     <script>
@@ -322,6 +343,152 @@
         let replayFinished = false;
         let skipRequested = false;
         let eventSource = new EventSource(`/api/progress/${taskId}`);
+
+        {% if tick_by_tick %}
+        // ── 逐笔实时图表（Chart.js）──
+        let tickChartInstance = null;
+        let tickLabels = [];
+        let tickPrices = [];
+        let tickSignals = [];  // 'buy', 'sell', or null
+
+        function initTickChart() {
+            const canvas = document.getElementById('tickChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            tickChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: tickLabels,
+                    datasets: [{
+                        label: '价格',
+                        data: tickPrices,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.08)',
+                        fill: true,
+                        tension: 0.2,
+                        pointRadius: 2,
+                        pointHitRadius: 6,
+                        pointHoverRadius: 5,
+                        borderWidth: 2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    const sig = tickSignals[idx];
+                                    let label = `价格: ${context.parsed.y}`;
+                                    if (sig === 'buy') label += ' 🟢 买入';
+                                    else if (sig === 'sell') label += ' 🔴 卖出';
+                                    return label;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 20,
+                                maxRotation: 45,
+                                font: { size: 10 }
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: { font: { size: 10 } },
+                            grid: { color: 'rgba(0,0,0,0.06)' }
+                        }
+                    }
+                },
+                plugins: [{
+                    id: 'signalMarkers',
+                    afterDraw: function(chart) {
+                        const chartArea = chart.chartArea;
+                        const yScale = chart.scales.y;
+                        const xScale = chart.scales.x;
+                        const ctx2 = chart.ctx;
+
+                        if (!chartArea || !yScale || !xScale) return;
+
+                        const meta = chart.getDatasetMeta(0);
+                        if (!meta || !meta.data) return;
+
+                        meta.data.forEach(function(element, index) {
+                            const signal = tickSignals[index];
+                            if (!signal) return;
+
+                            const x = element.x;
+                            const y = element.y;
+                            const size = 10;
+
+                            ctx2.save();
+
+                            if (signal === 'buy') {
+                                // Green upward-pointing triangle
+                                ctx2.fillStyle = '#22c55e';
+                                ctx2.strokeStyle = '#15803d';
+                                ctx2.lineWidth = 1.5;
+                                ctx2.beginPath();
+                                ctx2.moveTo(x, y - size - 4);
+                                ctx2.lineTo(x - size, y - 2);
+                                ctx2.lineTo(x + size, y - 2);
+                                ctx2.closePath();
+                                ctx2.fill();
+                                ctx2.stroke();
+                            } else if (signal === 'sell') {
+                                // Red downward-pointing triangle
+                                ctx2.fillStyle = '#ef4444';
+                                ctx2.strokeStyle = '#b91c1c';
+                                ctx2.lineWidth = 1.5;
+                                ctx2.beginPath();
+                                ctx2.moveTo(x, y + size + 4);
+                                ctx2.lineTo(x - size, y + 2);
+                                ctx2.lineTo(x + size, y + 2);
+                                ctx2.closePath();
+                                ctx2.fill();
+                                ctx2.stroke();
+                            }
+
+                            ctx2.restore();
+                        });
+                    }
+                }]
+            });
+        }
+
+        function addTickPoint(date, price, signal) {
+            tickLabels.push(date);
+            tickPrices.push(price);
+            tickSignals.push(signal || null);
+
+            if (!tickChartInstance) {
+                initTickChart();
+            }
+
+            tickChartInstance.update('none');
+
+            // Update info
+            document.getElementById('tick-count').textContent = `Tick: ${tickLabels.length}`;
+            document.getElementById('current-price-display').textContent = `最新价: ${price}`;
+            document.getElementById('chart-hint').textContent = `${tickLabels.length} 个 tick 已接收`;
+
+            // If signal was triggered, also show a brief marker in the chart hint
+            if (signal === 'buy') {
+                document.getElementById('chart-hint').textContent =
+                    `🟢 买入信号 @ ${date} 价格 ${price} — ${tickLabels.length} ticks`;
+            } else if (signal === 'sell') {
+                document.getElementById('chart-hint').textContent =
+                    `🔴 卖出信号 @ ${date} 价格 ${price} — ${tickLabels.length} ticks`;
+            }
+        }
+        {% endif %}
 
         function setProgress(percentage, text) {
             document.getElementById('progress-bar').style.width = percentage + '%';
@@ -433,6 +600,8 @@
 
             if (data.type === 'progress') {
                 setProgress(data.percentage, `正在处理第 ${data.current} / ${data.total} 条行情数据`);
+            } else if (data.type === 'tick_data' && typeof addTickPoint === 'function') {
+                addTickPoint(data.date, data.price, data.signal);
             } else if (data.type === 'completed') {
                 eventSource.close();
                 startReplay(data.result);
