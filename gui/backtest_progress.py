@@ -136,10 +136,10 @@ class BacktestProgress:
             })
 
     def push_tick_data(self, task_id: str, date: str, price: float,
-                        signal: str | None = None,
-                        position: float = 0,
-                        pnl: float = 0,
-                        cash: float = 0):
+                       signal: str | None = None,
+                       position: float = 0,
+                       pnl: float = 0,
+                       cash: float = 0):
         """推送逐笔 tick 数据到 SSE 队列，供前端实时图表消费。
 
         Args:
