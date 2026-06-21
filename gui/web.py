@@ -58,7 +58,16 @@ def _validate_optional_date_range(start: str, end: str) -> tuple[str, str]:
 
 
 def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', source: str = 'auto') -> dict:
-    """构造时间段页面的日线开盘价走势图数据。"""
+    """构造时间段页面的日线开盘价走势图数据。
+
+    Uses ``buffer_days=5`` to provide cache tolerance: when the user clicks a
+    preset button (e.g. "最近1年"), the cached data may end a few days before
+    the requested end date.  Without a buffer this would be treated as a cache
+    miss, triggering an unnecessary re-download of the entire range.
+    ``buffer_days=5`` allows the ``data_provider`` to reuse stale-but-sufficient
+    cached data when the gap is ≤ 5 trading days, reducing redundant downloads
+    and improving UI responsiveness (see #193).
+    """
     cache_dir = _get_cache_dir()
     df = stocks.get_data(
         symbol=stock_code,
@@ -66,6 +75,7 @@ def _build_stock_chart_payload(stock_code: str, start: str = '', end: str = '', 
         start_date=start or None,
         end_date=end or None,
         cache_dir=cache_dir,
+        buffer_days=5,
     )
 
     if df is None or df.empty:
