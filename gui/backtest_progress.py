@@ -70,6 +70,25 @@ class BacktestProgress:
                 'percentage': percentage
             })
 
+    # TODO(@WEB): 当 WEB 端更新 web.py 的 progress_callback 后，新 tick 数据流将通过
+    # push_tick() 推送到队列。目前保留 update_progress() 以确保向后兼容。
+    def push_tick(self, task_id: str, tick_data: dict):
+        """推送结构化 tick 中间态到队列（tick-by-tick 模式用）。
+
+        Args:
+            task_id: 任务ID
+            tick_data: 结构化 tick 数据字典，包含 type, date, close_price, open_price,
+                       position, account, trade, indicators, progress 等字段。
+        """
+        with self._lock:
+            if task_id not in self._tasks:
+                return
+            task = self._tasks[task_id]
+            if task.get('cancelled'):
+                return
+            tick_data['type'] = 'tick'
+            task['queue'].put(tick_data)
+
     def set_result(self, task_id: str, result: Any):
         """设置任务结果
 

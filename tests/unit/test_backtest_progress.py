@@ -125,7 +125,7 @@ class TestSimulatorProgressCallback(unittest.TestCase):
     """测试模拟器进度回调"""
 
     def test_progress_callback_in_simulator(self):
-        """测试模拟器中的进度回调"""
+        """测试模拟器中的进度回调（tick-by-tick 结构化 tick_data）"""
         from trader.simulator import Simulator
         from strategy.mean_cost_strategy import MeanCostDecision
         import pandas as pd
@@ -143,22 +143,38 @@ class TestSimulatorProgressCallback(unittest.TestCase):
             'volume': [1000000] * 50
         })
 
-        # 记录进度回调
-        progress_calls = []
+        # 记录 tick_data 回调
+        tick_calls = []
 
-        def progress_callback(current, total):
-            progress_calls.append((current, total))
+        def progress_callback(tick_data):
+            tick_calls.append(tick_data)
 
-        # 运行模拟
+        # 运行模拟（禁用 pacing 加速测试）
         sim = Simulator(lot_size=100, init_cash=100000.0)
         strategy = MeanCostDecision()
         result = sim.simulate(df=df, strategy=strategy, symbol='TEST',
-                              progress_callback=progress_callback)
+                              progress_callback=progress_callback,
+                              tick_interval=0.0)
 
-        # 验证进度回调
-        self.assertGreater(len(progress_calls), 0)
-        self.assertEqual(progress_calls[-1][0], 50)  # 最后一次应该是50/50
-        self.assertEqual(progress_calls[-1][1], 50)
+        # 验证 tick_data 回调
+        self.assertGreater(len(tick_calls), 0)
+
+        # 验证第一个 tick 结构
+        first_tick = tick_calls[0]
+        self.assertEqual(first_tick["type"], "tick")
+        self.assertIn("date", first_tick)
+        self.assertIn("close_price", first_tick)
+        self.assertIn("open_price", first_tick)
+        self.assertIn("position", first_tick)
+        self.assertIn("account", first_tick)
+        self.assertIn("progress", first_tick)
+        self.assertEqual(first_tick["progress"]["total"], 50)
+        self.assertEqual(first_tick["progress"]["current"], 1)
+
+        # 验证最后一个 tick
+        last_tick = tick_calls[-1]
+        self.assertEqual(last_tick["progress"]["current"], 50)
+        self.assertEqual(last_tick["progress"]["total"], 50)
 
         # 验证结果
         self.assertIsNotNone(result)

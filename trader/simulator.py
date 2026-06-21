@@ -1,5 +1,6 @@
 import datetime
 import logging
+import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
@@ -102,7 +103,7 @@ class BacktestExchangeRunner:
         end_date: Optional[str] = None,
         source: str = "auto",
         verbose: Optional[bool] = None,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
+        progress_callback: Optional[Callable[[dict], None]] = None,
         trade_price: str = "open",
         granularity: str = "1d",
         enable_scheduled_orders: bool = False,
@@ -110,8 +111,14 @@ class BacktestExchangeRunner:
         require_base_position_for_t_plus_one_intraday: bool = False,
         base_position_lots: Optional[int] = None,
         mode: str = "backtest",
+        tick_interval: float = 0.04,
     ) -> Dict[str, Any]:
-        """执行回测。"""
+        """执行回测（tick-by-tick 模式）。
+
+        每 tick 推进一个交易日，tick_interval 控制 ticks 之间的间隔（秒）。
+        progress_callback 接收结构化 tick_data 字典，包含：
+            type, date, close_price, open_price, position, account, trade, indicators, progress
+        """
         if mode != "backtest":
             raise RuntimeError("当前执行器仅支持 backtest 模式，其它模式不运行")
 
@@ -318,17 +325,11 @@ class BacktestExchangeRunner:
             current_idx = tick.bar_index
             row = tick.row
 
-            if progress_callback:
-                try:
-                    progress_callback(tick.bar_index, tick.total_bars)
-                except Exception as e:
-                    if use_verbose:
-                        print(f"警告: 进度回调失败 - {e}")
-
             price_open = float(row["open"])
             price_close = float(row["close"])
             execution_price = _resolve_trade_price(row, trade_price)
             date = row["date"]
+            date_str = self._date_key(date)
 
             due_orders = [o for o in pending_orders if o.due_bar_index <= current_idx]
             if due_orders:
@@ -437,6 +438,56 @@ class BacktestExchangeRunner:
                 }
             )
             min_cash = min(min_cash, summary["cash"])
+
+            # ---- Tick-by-tick: structured intermediate state push ----
+            last_trade = trades_list[-1] if trades_list else None
+
+            # Collect extra indicator columns from the row (beyond standard OHLCV)
+            indicator_fields = {}
+            standard_fields = {"date", "open", "high", "low", "close", "volume"}
+            for col in row.index:
+                col_str = str(col)
+                if col_str not in standard_fields:
+                    try:
+                        indicator_fields[col_str] = float(row[col])
+                    except (ValueError, TypeError):
+                        indicator_fields[col_str] = str(row[col])
+
+            tick_data = {
+                "type": "tick",
+                "date": date_str,
+                "close_price": round(price_close, 4),
+                "open_price": round(price_open, 4),
+                "position": {
+                    "shares": float(engine.get_position().shares),
+                    "avg_cost": round(engine.get_position().avg_cost, 4),
+                },
+                "account": {
+                    "cash": round(summary["cash"], 2),
+                    "total_value": round(summary["total_value"], 2),
+                },
+                "trade": {
+                    "action": last_trade["action"],
+                    "price": last_trade["price"],
+                    "shares": last_trade["shares"],
+                } if last_trade else None,
+                "indicators": indicator_fields,
+                "progress": {
+                    "current": tick.bar_index,
+                    "total": tick.total_bars,
+                },
+            }
+
+            if progress_callback:
+                try:
+                    progress_callback(tick_data)
+                except Exception as e:
+                    if use_verbose:
+                        print(f"警告: 进度回调失败 - {e}")
+
+            # Tick-by-tick pacing: ~40ms between ticks => ~10s for 250 trading days
+            if tick_interval > 0 and tick.bar_index < tick.total_bars:
+                time.sleep(tick_interval)
 
         last_price = float(df.iloc[-1]["close"])
         final_summary = engine.get_summary(last_price)
@@ -563,7 +614,7 @@ class BacktestExchangeRunner:
         end_date: Optional[str] = None,
         source: str = "auto",
         verbose: Optional[bool] = None,
-        progress_callback: Optional[Callable[[int, int], None]] = None,
+        progress_callback: Optional[Callable[[dict], None]] = None,
         trade_price: str = "open",
         granularity: str = "1d",
         enable_scheduled_orders: bool = False,
@@ -571,6 +622,7 @@ class BacktestExchangeRunner:
         require_base_position_for_t_plus_one_intraday: bool = False,
         base_position_lots: Optional[int] = None,
         mode: str = "backtest",
+        tick_interval: float = 0.04,
     ) -> Dict[str, Any]:
         """兼容旧命名：simulate 等价于 run。"""
         return self.run(
@@ -589,6 +641,7 @@ class BacktestExchangeRunner:
             require_base_position_for_t_plus_one_intraday=require_base_position_for_t_plus_one_intraday,
             base_position_lots=base_position_lots,
             mode=mode,
+            tick_interval=tick_interval,
         )
 
 
@@ -603,7 +656,7 @@ def simulate_mean_cost(
     lot_size: float = 100.0,
     init_cash: float = 100000.0,
     source: str = "auto",
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Optional[Callable[[dict], None]] = None,
     trade_price: str = "open",
     df=None,
 ) -> Dict[str, Any]:
@@ -634,7 +687,7 @@ def simulate_sma(
     period: int = 20,
     lot_size: float = 100.0,
     init_cash: float = 100000.0,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Optional[Callable[[dict], None]] = None,
     trade_price: str = "open",
 ):
     from strategy.sma_strategy import SmaDecision
@@ -671,7 +724,7 @@ def simulate_fixed_amount(
     init_cash: float = 100000.0,
     source: str = "auto",
     verbose: bool = False,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Optional[Callable[[dict], None]] = None,
     trade_price: str = "open",
     df=None,
 ) -> Dict[str, Any]:
@@ -703,7 +756,7 @@ def simulate_signal_template(
     strategy,
     lot_size: float = 100.0,
     init_cash: float = 100000.0,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Optional[Callable[[dict], None]] = None,
     trade_price: str = "open",
 ) -> Dict[str, Any]:
     """运行模板化信号策略回测。"""
