@@ -83,7 +83,7 @@ class BacktestRequest:
     init_cash: float = 100000.0
     trade_price: str = TRADE_PRICE_OPEN
     strategy_params: Dict[str, Any] = field(default_factory=dict)
-    progress_callback: Optional[Callable[[int, int], None]] = None
+    progress_callback: Optional[Callable[[dict], None]] = None
 
 
 def _validate_date_str(value: Optional[str]) -> Optional[str]:
@@ -431,7 +431,7 @@ def get_data(symbol: str = "600900",
 
 def run_mean_cost(symbol: str = "600900", start_date: Optional[str] = None, end_date: Optional[str] = None,
                   lot_size: float = 100.0, init_cash: float = 100000.0, source: object = "auto",
-                  progress_callback: Optional[Callable[[int, int], None]] = None,
+                  progress_callback: Optional[Callable[[dict], None]] = None,
                   trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """调用均值成本模拟（封装自 strategy.mean_cost_strategy.simulate_mean_cost）。"""
     if simulate_mean_cost is None:
@@ -449,7 +449,7 @@ def run_fixed_amount(symbol: str = "600900",
                      lot_size: float = 100.0,
                      init_cash: float = 100000.0,
                      source: object = "auto",
-                     progress_callback: Optional[Callable[[int, int], None]] = None,
+                     progress_callback: Optional[Callable[[dict], None]] = None,
                      trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """调用定投策略模拟（封装自 strategy.fixed_amount_strategy.simulate_fixed_amount）。
 
@@ -479,7 +479,7 @@ def run_fixed_amount(symbol: str = "600900",
 def run_sma_backtest(symbol: str = "600900", source: object = "auto",
                      start_date: Optional[str] = None, end_date: Optional[str] = None,
                      lot_size: float = 100.0, init_cash: float = 100000.0, period: int = 20,
-                     progress_callback: Optional[Callable[[int, int], None]] = None,
+                     progress_callback: Optional[Callable[[dict], None]] = None,
                      trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """使用统一模拟器运行 SMA 回测并返回统一的展示结果。
 
@@ -515,7 +515,7 @@ def run_sma_backtest(symbol: str = "600900", source: object = "auto",
 def run_module_strategy_backtest(symbol: str = "600900", source: object = "auto",
                                  start_date: Optional[str] = None, end_date: Optional[str] = None,
                                  lot_size: float = 100.0, init_cash: float = 100000.0,
-                                 progress_callback: Optional[Callable[[int, int], None]] = None,
+                                 progress_callback: Optional[Callable[[dict], None]] = None,
                                  trade_price: str = TRADE_PRICE_OPEN,
                                  strategy_key: str = '',
                                  **strategy_params: Any) -> Dict[str, Any]:
@@ -592,7 +592,7 @@ def run_futures_a50_prev_night(symbol: str = "600900", source: object = "auto",
                                lot_size: float = 100.0, init_cash: float = 100000.0,
                                futures_symbol: str = "CN00Y",
                                base_position_lots: int = 2,
-                               progress_callback: Optional[Callable[[int, int], None]] = None,
+                               progress_callback: Optional[Callable[[dict], None]] = None,
                                trade_price: str = TRADE_PRICE_OPEN) -> Dict[str, Any]:
     """前一晚 A50 涨跌信号策略：上涨则买入并预约1小时后卖出。"""
     try:
@@ -645,7 +645,7 @@ def run_signal_template(
     end_date: Optional[str] = None,
     lot_size: float = 100.0,
     init_cash: float = 100000.0,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Optional[Callable[[dict], None]] = None,
     trade_price: str = TRADE_PRICE_OPEN,
     buy_trigger: str = 'price_below',
     buy_price_value: float = 0.0,
@@ -785,7 +785,7 @@ def create_backtest_request(symbol: str = '600900',
                             init_cash: float = 100000.0,
                             trade_price: str = TRADE_PRICE_OPEN,
                             strategy_params: Optional[Mapping[str, Any]] = None,
-                            progress_callback: Optional[Callable[[int, int], None]] = None) -> BacktestRequest:
+                            progress_callback: Optional[Callable[[dict], None]] = None) -> BacktestRequest:
     """构造并校验统一回测请求。"""
     spec = get_strategy_spec(strategy)
     if trade_price not in SUPPORTED_TRADE_PRICE_FIELDS:
@@ -900,7 +900,7 @@ def run_multi_strategy_backtest(
     trade_price: str = TRADE_PRICE_OPEN,
     strategies: Optional[list[str]] = None,
     strategies_params: Optional[dict[str, dict[str, Any]]] = None,
-    progress_callback: Optional[Callable[[int, int], None]] = None,
+    progress_callback: Optional[Callable[[dict], None]] = None,
 ) -> Dict[str, Any]:
     """多策略对比回测：一次获取行情数据，多个策略共享运行。
 
@@ -958,7 +958,15 @@ def run_multi_strategy_backtest(
 
     for idx, strategy_key in enumerate(strategies):
         if progress_callback:
-            progress_callback(idx, total)
+            try:
+                progress_callback({
+                    "type": "multi_strategy",
+                    "current_strategy": idx + 1,
+                    "total_strategies": total,
+                    "strategy_key": strategy_key,
+                })
+            except Exception:
+                pass
 
         spec = get_strategy_spec(strategy_key)
         params = strategies_params.get(strategy_key, {})

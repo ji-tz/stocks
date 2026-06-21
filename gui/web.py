@@ -961,9 +961,9 @@ def run():
     progress_mgr = get_progress_manager()
     task_id = progress_mgr.create_task()
 
-    # 创建进度回调函数
-    def progress_callback(current, total):
-        progress_mgr.update_progress(task_id, current, total)
+    # 创建进度回调函数（tick-by-tick 模式下接收结构化 tick_data）
+    def progress_callback(tick_data):
+        progress_mgr.push_tick(task_id, tick_data)
 
     # 在后台线程执行回测
     def run_backtest():
@@ -1100,8 +1100,8 @@ def run_multi():
     progress_mgr = get_progress_manager()
     task_id = progress_mgr.create_task()
 
-    def progress_callback(current, total):
-        progress_mgr.update_progress(task_id, current, total)
+    def progress_callback(tick_data):
+        progress_mgr.push_tick(task_id, tick_data)
 
     def run_multi_backtest():
         try:
