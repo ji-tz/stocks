@@ -4,10 +4,14 @@ import pandas as pd
 import unittest
 from unittest.mock import patch
 
-from exchange.source.data_provider import get_data
+from exchange.source.data_provider import get_data, DEFAULT_FETCH_BUFFER_DAYS
 
 
 class TestDataProviderCacheFiltering(unittest.TestCase):
+    def test_default_buffer_days_is_one(self):
+        """DEFAULT_FETCH_BUFFER_DAYS should be 1 to reduce overlap on partial fetches."""
+        self.assertEqual(DEFAULT_FETCH_BUFFER_DAYS, 1)
+
     def test_cache_filtered_by_date_range(self):
         with tempfile.TemporaryDirectory() as tmp:
             cache_file = os.path.join(tmp, '600900.csv')
@@ -179,6 +183,65 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             self.assertEqual(mock_fetch.call_count, 1)
             self.assertIsNotNone(out)
             self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-07')
+
+    # ── small cache gap optimization tests ───────────────────────────
+
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
+    @patch('exchange.source.data_provider.BaostockProvider.fetch')
+    @patch('exchange.source.data_provider.TencentProvider.fetch')
+    @patch('exchange.source.data_provider.SinaProvider.fetch')
+    @patch('exchange.source.data_provider.SohuProvider.fetch')
+    @patch('exchange.source.data_provider.EastmoneyProvider.fetch')
+    @patch('exchange.source.data_provider.CailianpressProvider.fetch')
+    @patch('exchange.source.data_provider.StooqProvider.fetch')
+    def test_small_cache_gap_limits_to_fast_sources(
+        self,
+        mock_stooq, mock_cailianpress, mock_eastmoney,
+        mock_sohu, mock_sina,
+        mock_tencent, mock_baostock, mock_akshare,
+    ):
+        """When cache has a gap ≤ 3 days, only fast sources (akshare, baostock, tencent) are tried."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_file = os.path.join(tmp, '600900.csv')
+            dates = pd.date_range(start='2023-01-01', periods=5, freq='D')
+            cached_df = pd.DataFrame({
+                'date': dates,
+                'open': [10, 11, 12, 13, 14],
+                'high': [11, 12, 13, 14, 15],
+                'low': [9, 10, 11, 12, 13],
+                'close': [10, 11, 12, 13, 14],
+                'volume': [100] * 5,
+            })
+            cached_df.to_csv(cache_file, index=False)
+
+            # All fast sources return no data → they are tried but fail
+            mock_akshare.return_value = None
+            mock_baostock.return_value = None
+            mock_tencent.return_value = None
+            # Remaining sources should NOT be called when gap ≤ 3
+            mock_sina.side_effect = AssertionError("sina should not be called")
+            mock_sohu.side_effect = AssertionError("sohu should not be called")
+            mock_eastmoney.side_effect = AssertionError("eastmoney should not be called")
+            mock_cailianpress.side_effect = AssertionError("cailianpress should not be called")
+            mock_stooq.side_effect = AssertionError("stooq should not be called")
+
+            # Request 2023-01-01 to 2023-01-07 (2-day gap past cache end of 2023-01-05 = beyond buffer_days tolerance)
+            # Even though no provider returns data for the gap, cached partial data is returned
+            out = get_data(
+                symbol='600900', source='auto',
+                start_date='20230101', end_date='20230107',
+                cache_dir=tmp,
+            )
+
+            # Returned cached data (2023-01-01 to 2023-01-05) — partial result
+            self.assertIsNotNone(out)
+            self.assertEqual(len(out), 5)
+            # Verify the gap was detected — fast sources were all tried
+            mock_akshare.assert_called_once()
+            mock_baostock.assert_called_once()
+            mock_tencent.assert_called_once()
+            # Slow sources were never tried (no AssertionError raised)
+            mock_sina.assert_not_called()
 
 
 if __name__ == '__main__':
