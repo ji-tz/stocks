@@ -106,6 +106,29 @@ def prepare_backtest_data(df: pd.DataFrame, short_period: int = 5, long_period: 
     return prepared
 
 
+def prepare_backtest_data_for_tick(df_sliding: pd.DataFrame, short_period: int = 5,
+                                   long_period: int = 20, **kwargs) -> pd.DataFrame:
+    """为双均线策略补充均线指标列（基于滑动窗口计算，确保不偷看未来数据）。
+
+    与 prepare_backtest_data 的区别：
+    - 接收的 df_sliding 应当只包含当前 tick 及之前的历史数据。
+    - rolling 窗口计算仅基于已有数据，不会引用未来 tick 的信息。
+
+    Args:
+        df_sliding: 只包含 0~current_idx 历史数据的 DataFrame。
+        short_period: 短期均线窗口周期。
+        long_period: 长期均线窗口周期。
+        **kwargs: 其他参数（未使用）。
+
+    Returns:
+        补充了 ma_short/ma_long 列的 DataFrame。
+    """
+    prepared = df_sliding.copy()
+    prepared["ma_short"] = prepared["close"].rolling(window=short_period, min_periods=short_period).mean()
+    prepared["ma_long"] = prepared["close"].rolling(window=long_period, min_periods=long_period).mean()
+    return prepared
+
+
 def create_strategy(df: pd.DataFrame, short_period: int = 5, long_period: int = 20, **kwargs) -> DualMaDecision:
     """构造双均线策略决策器。"""
     return DualMaDecision(short_period=short_period, long_period=long_period, df=df)

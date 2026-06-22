@@ -64,3 +64,23 @@ def prepare_backtest_data(df: pd.DataFrame, period: int = 20, **kwargs) -> pd.Da
     prepared = df.copy()
     prepared["sma"] = prepared["close"].rolling(window=period, min_periods=1).mean()
     return prepared
+
+
+def prepare_backtest_data_for_tick(df_sliding: pd.DataFrame, period: int = 20, **kwargs) -> pd.DataFrame:
+    """为 SMA 策略补充 SMA 指标列（基于滑动窗口计算，确保不偷看未来数据）。
+
+    与 prepare_backtest_data 的区别：
+    - 接收的 df_sliding 应当只包含当前 tick 及之前的历史数据。
+    - rolling 窗口计算仅基于已有数据，不会引用未来 tick 的信息。
+
+    Args:
+        df_sliding: 只包含 0~current_idx 历史数据的 DataFrame。
+        period: SMA 窗口周期。
+        **kwargs: 其他参数（未使用）。
+
+    Returns:
+        补充了 'sma' 列的 DataFrame（仅基于历史数据计算）。
+    """
+    prepared = df_sliding.copy()
+    prepared["sma"] = prepared["close"].rolling(window=period, min_periods=1).mean()
+    return prepared

@@ -108,6 +108,34 @@ def prepare_backtest_data(df: pd.DataFrame, period: int = 14, **kwargs) -> pd.Da
     return prepared
 
 
+def prepare_backtest_data_for_tick(df_sliding: pd.DataFrame, period: int = 14, **kwargs) -> pd.DataFrame:
+    """为 RSI 策略补充 RSI 指标列（基于滑动窗口计算，确保不偷看未来数据）。
+
+    与 prepare_backtest_data 的区别：
+    - 接收的 df_sliding 应当只包含当前 tick 及之前的历史数据。
+    - 所有计算仅基于已有数据，不会引用未来 tick 的信息。
+
+    Args:
+        df_sliding: 只包含 0~current_idx 历史数据的 DataFrame。
+        period: RSI 窗口周期。
+        **kwargs: 其他参数（未使用）。
+
+    Returns:
+        补充了 'rsi' 列的 DataFrame。
+    """
+    prepared = df_sliding.copy()
+    delta = prepared["close"].diff()
+    gain = delta.clip(lower=0)
+    loss = -delta.clip(upper=0)
+    avg_gain = gain.rolling(window=period, min_periods=period).mean()
+    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    rs = avg_gain / avg_loss.where(avg_loss != 0)
+    prepared["rsi"] = 100 - (100 / (1 + rs))
+    prepared.loc[(avg_loss == 0) & (avg_gain > 0), "rsi"] = 100.0
+    prepared.loc[(avg_loss == 0) & (avg_gain == 0), "rsi"] = 50.0
+    return prepared
+
+
 def create_strategy(df: pd.DataFrame, period: int = 14,
                     oversold: float = 30.0, overbought: float = 70.0, **kwargs) -> RsiDecision:
     """构造 RSI 策略决策器。"""
