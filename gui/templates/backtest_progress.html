@@ -319,14 +319,39 @@
                     <h2>实时逐笔行情图</h2>
                     <div class="log-hint" id="chart-hint">等待 tick 数据...</div>
                 </div>
-                <div style="position: relative; height: 380px; width: 100%;">
-                    <canvas id="tickChart"></canvas>
+                <!-- Multi-panel chart layout -->
+                <div style="display: flex; flex-direction: column; gap: 2px; width: 100%;">
+                    <!-- Main chart: price + overlays -->
+                    <div style="position: relative; height: 300px; width: 100%;">
+                        <canvas id="tickChart"></canvas>
+                    </div>
+                    <!-- Sub-chart 1: Volume -->
+                    <div id="volume-chart-container" style="position: relative; height: 100px; width: 100%; border-top: 1px solid #e2e8f0;">
+                        <canvas id="volumeChart"></canvas>
+                    </div>
+                    <!-- Sub-chart 2: RSI (hidden initially, shown when RSI data arrives) -->
+                    <div id="rsi-chart-container" style="position: relative; height: 0; width: 100%; overflow: hidden; transition: height 0.3s; border-top: 1px solid #e2e8f0;">
+                        <canvas id="rsiChart" style="height: 110px;"></canvas>
+                    </div>
+                    <!-- Sub-chart 3: MACD (hidden initially, shown when MACD data arrives) -->
+                    <div id="macd-chart-container" style="position: relative; height: 0; width: 100%; overflow: hidden; transition: height 0.3s; border-top: 1px solid #e2e8f0;">
+                        <canvas id="macdChart" style="height: 110px;"></canvas>
+                    </div>
                 </div>
                 <div style="display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; font-size: 13px; color: #475569;">
                     <span>🟢 <strong>买入</strong> — 绿色三角上指</span>
                     <span>🔴 <strong>卖出</strong> — 红色三角下指</span>
                     <span id="tick-count">Tick: 0</span>
                     <span id="current-price-display">最新价: --</span>
+                </div>
+                <!-- Legend for indicator overlays -->
+                <div style="display: flex; gap: 14px; margin-top: 8px; flex-wrap: wrap; font-size: 12px; color: #475569;" id="indicator-legend">
+                    <span style="display: none;" class="legend-sma"><span style="display:inline-block;width:14px;height:3px;background:#f59e0b;vertical-align:middle;margin-right:4px;"></span><strong>SMA</strong></span>
+                    <span style="display: none;" class="legend-bb"><span style="display:inline-block;width:14px;height:3px;background:#8b5cf6;vertical-align:middle;margin-right:4px;"></span><strong>Bollinger</strong> (上/中/下)</span>
+                    <span style="display: none;" class="legend-cost"><span style="display:inline-block;width:14px;height:3px;background:#10b981;vertical-align:middle;margin-right:4px;"></span><strong>持仓成本</strong></span>
+                    <span style="display: none;" class="legend-rsi"><span style="display:inline-block;width:14px;height:3px;background:#f97316;vertical-align:middle;margin-right:4px;"></span><strong>RSI</strong></span>
+                    <span style="display: none;" class="legend-macd"><span style="display:inline-block;width:14px;height:3px;background:#ec4899;vertical-align:middle;margin-right:4px;"></span><strong>MACD</strong></span>
+                    <span style="display: none;" class="legend-vol"><span style="display:inline-block;width:14px;height:3px;background:#6366f1;vertical-align:middle;margin-right:4px;"></span><strong>成交量</strong></span>
                 </div>
             </div>
         </div>
@@ -345,11 +370,41 @@
         let eventSource = new EventSource(`/api/progress/${taskId}`);
 
         {% if tick_by_tick %}
-        // ── 逐笔实时图表（Chart.js）──
+        // ── 逐笔实时图表（多面板 Chart.js）──
+        // Main chart
         let tickChartInstance = null;
+        let volumeChartInstance = null;
+        let rsiChartInstance = null;
+        let macdChartInstance = null;
+
+        // Shared labels (dates)
         let tickLabels = [];
+
+        // Main chart data series
         let tickPrices = [];
-        let tickSignals = [];  // 'buy', 'sell', or null
+        let tickSignals = [];
+        let tickSMA = [];
+        let tickBBUpper = [];
+        let tickBBMiddle = [];
+        let tickBBLower = [];
+        let tickCost = [];
+
+        // Sub-chart data series
+        let tickVolume = [];
+        let tickRSI = [];
+        let tickMACD = [];
+        let tickMACDSignal = [];
+        let tickMACDHist = [];
+
+        // Track which indicator panels are active
+        let hasVolumeData = false;
+        let hasRSIData = false;
+        let hasMACDData = false;
+
+        // Helper: get indicator value safely
+        function getIndicator(ind, name) {
+            return ind && ind[name] !== undefined && ind[name] !== null ? ind[name] : null;
+        }
 
         function initTickChart() {
             const canvas = document.getElementById('tickChart');
@@ -370,6 +425,61 @@
                         pointHitRadius: 6,
                         pointHoverRadius: 5,
                         borderWidth: 2,
+                        order: 2,
+                    }, {
+                        label: 'SMA',
+                        data: tickSMA,
+                        borderColor: '#f59e0b',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        tension: 0.2,
+                        order: 3,
+                        spanGaps: true,
+                    }, {
+                        label: 'Bollinger 上轨',
+                        data: tickBBUpper,
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [4, 3],
+                        pointRadius: 0,
+                        tension: 0.2,
+                        order: 4,
+                        spanGaps: true,
+                    }, {
+                        label: 'Bollinger 中轨',
+                        data: tickBBMiddle,
+                        borderColor: '#a78bfa',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [4, 3],
+                        pointRadius: 0,
+                        tension: 0.2,
+                        order: 5,
+                        spanGaps: true,
+                    }, {
+                        label: 'Bollinger 下轨',
+                        data: tickBBLower,
+                        borderColor: '#8b5cf6',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [4, 3],
+                        pointRadius: 0,
+                        tension: 0.2,
+                        order: 6,
+                        spanGaps: true,
+                    }, {
+                        label: '持仓成本',
+                        data: tickCost,
+                        borderColor: '#10b981',
+                        backgroundColor: 'transparent',
+                        borderWidth: 2,
+                        borderDash: [6, 4],
+                        pointRadius: 0,
+                        tension: 0.2,
+                        order: 1,
+                        spanGaps: true,
                     }]
                 },
                 options: {
@@ -384,9 +494,9 @@
                                 label: function(context) {
                                     const idx = context.dataIndex;
                                     const sig = tickSignals[idx];
-                                    let label = `价格: ${context.parsed.y}`;
-                                    if (sig === 'buy') label += ' 🟢 买入';
-                                    else if (sig === 'sell') label += ' 🔴 卖出';
+                                    let label = context.dataset.label + ': ' + context.parsed.y;
+                                    if (context.dataset.label === '价格' && sig === 'buy') label += ' 🟢 买入';
+                                    else if (context.dataset.label === '价格' && sig === 'sell') label += ' 🔴 卖出';
                                     return label;
                                 }
                             }
@@ -395,7 +505,7 @@
                     scales: {
                         x: {
                             ticks: {
-                                maxTicksLimit: 20,
+                                maxTicksLimit: 15,
                                 maxRotation: 45,
                                 font: { size: 10 }
                             },
@@ -463,6 +573,209 @@
             });
         }
 
+        function initVolumeChart() {
+            const canvas = document.getElementById('volumeChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            volumeChartInstance = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: tickLabels,
+                    datasets: [{
+                        label: '成交量',
+                        data: tickVolume,
+                        backgroundColor: 'rgba(99, 102, 241, 0.5)',
+                        borderColor: 'rgba(99, 102, 241, 0.8)',
+                        borderWidth: 0.5,
+                        barPercentage: 0.8,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return '成交量: ' + context.parsed.y.toLocaleString();
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 10,
+                                maxRotation: 0,
+                                font: { size: 8 }
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 8 },
+                                callback: function(value) {
+                                    if (value >= 100000000) return (value / 100000000).toFixed(1) + '亿';
+                                    if (value >= 10000) return (value / 10000).toFixed(1) + '万';
+                                    return value;
+                                }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initRSIChart() {
+            const canvas = document.getElementById('rsiChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            rsiChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: tickLabels,
+                    datasets: [{
+                        label: 'RSI',
+                        data: tickRSI,
+                        borderColor: '#f97316',
+                        backgroundColor: 'rgba(249, 115, 22, 0.1)',
+                        fill: true,
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        tension: 0.2,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        annotation: undefined,
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return 'RSI: ' + context.parsed.y.toFixed(1);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 8,
+                                maxRotation: 0,
+                                font: { size: 8 }
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            min: 0,
+                            max: 100,
+                            ticks: {
+                                font: { size: 8 },
+                                stepSize: 25,
+                                callback: function(value) {
+                                    if (value === 30 || value === 70) return value + ' ⚠';
+                                    return value;
+                                }
+                            },
+                            grid: {
+                                color: function(context) {
+                                    if (context.tick.value === 30 || context.tick.value === 70) {
+                                        return 'rgba(239, 68, 68, 0.2)';
+                                    }
+                                    return 'rgba(0,0,0,0.04)';
+                                },
+                                lineWidth: function(context) {
+                                    if (context.tick.value === 30 || context.tick.value === 70) return 1;
+                                    return 0.5;
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function initMACDChart() {
+            const canvas = document.getElementById('macdChart');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            macdChartInstance = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: tickLabels,
+                    datasets: [{
+                        label: 'MACD',
+                        data: tickMACD,
+                        borderColor: '#ec4899',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        pointRadius: 0,
+                        tension: 0.2,
+                    }, {
+                        label: '信号线',
+                        data: tickMACDSignal,
+                        borderColor: '#6366f1',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1.5,
+                        borderDash: [4, 3],
+                        pointRadius: 0,
+                        tension: 0.2,
+                    }, {
+                        label: '柱状线',
+                        type: 'bar',
+                        data: tickMACDHist,
+                        backgroundColor: function(context) {
+                            const value = context.dataset.data[context.dataIndex];
+                            return value >= 0 ? 'rgba(236, 72, 153, 0.4)' : 'rgba(99, 102, 241, 0.4)';
+                        },
+                        borderWidth: 0,
+                        barPercentage: 0.6,
+                        order: 0,
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    animation: { duration: 200 },
+                    interaction: { intersect: false, mode: 'index' },
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y.toFixed(3);
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: {
+                            ticks: {
+                                maxTicksLimit: 8,
+                                maxRotation: 0,
+                                font: { size: 8 }
+                            },
+                            grid: { display: false }
+                        },
+                        y: {
+                            ticks: {
+                                font: { size: 8 }
+                            },
+                            grid: { color: 'rgba(0,0,0,0.04)' }
+                        }
+                    }
+                }
+            });
+        }
+
         function addTickPoint(date, price, signal) {
             tickLabels.push(date);
             tickPrices.push(price);
@@ -471,21 +784,125 @@
             if (!tickChartInstance) {
                 initTickChart();
             }
-
             tickChartInstance.update('none');
 
             // Update info
-            document.getElementById('tick-count').textContent = `Tick: ${tickLabels.length}`;
-            document.getElementById('current-price-display').textContent = `最新价: ${price}`;
-            document.getElementById('chart-hint').textContent = `${tickLabels.length} 个 tick 已接收`;
+            document.getElementById('tick-count').textContent = 'Tick: ' + tickLabels.length;
+            document.getElementById('current-price-display').textContent = '最新价: ' + price;
+            document.getElementById('chart-hint').textContent = tickLabels.length + ' 个 tick 已接收';
 
-            // If signal was triggered, also show a brief marker in the chart hint
             if (signal === 'buy') {
                 document.getElementById('chart-hint').textContent =
                     `🟢 买入信号 @ ${date} 价格 ${price} — ${tickLabels.length} ticks`;
             } else if (signal === 'sell') {
                 document.getElementById('chart-hint').textContent =
                     `🔴 卖出信号 @ ${date} 价格 ${price} — ${tickLabels.length} ticks`;
+            }
+        }
+
+        function addTickFull(tick) {
+            // Handle both rich tick format (from simulator) and simple tick_data format
+            const date = tick.date;
+            const price = tick.close_price !== undefined ? tick.close_price : tick.price;
+            const signal = (tick.trade && tick.trade.action) ? tick.trade.action : (tick.signal || null);
+
+            // Add base data
+            addTickPoint(date, price, signal);
+
+            // Extract indicators (may be empty for simple tick_data format)
+            const ind = tick.indicators || {};
+            const pos = tick.position || {};
+
+            // --- Main chart indicators ---
+            // SMA (strategy: sma)
+            const sma = getIndicator(ind, 'sma');
+            tickSMA.push(sma);
+            if (sma !== null) {
+                document.querySelector('.legend-sma').style.display = '';
+            } else if (tickSMA.length < tickLabels.length) {
+                // Ensure arrays stay in sync if no SMA data
+                tickSMA[tickSMA.length - 1] = null;
+            }
+
+            // Bollinger bands (strategy: bollinger)
+            const bbUpper = getIndicator(ind, 'bollinger_upper') || getIndicator(ind, 'bb_upper');
+            const bbMid = getIndicator(ind, 'bollinger_mid') || getIndicator(ind, 'bb_middle');
+            const bbLower = getIndicator(ind, 'bollinger_lower') || getIndicator(ind, 'bb_lower');
+            tickBBUpper.push(bbUpper);
+            tickBBMiddle.push(bbMid);
+            tickBBLower.push(bbLower);
+            if (bbUpper !== null || bbMid !== null || bbLower !== null) {
+                document.querySelector('.legend-bb').style.display = '';
+            }
+
+            // Cost line (from position avg_cost)
+            const cost = pos.avg_cost !== undefined && pos.avg_cost !== null ? pos.avg_cost : null;
+            tickCost.push(cost);
+            if (cost !== null && cost > 0) {
+                document.querySelector('.legend-cost').style.display = '';
+            }
+
+            // --- Volume sub-chart ---
+            const vol = getIndicator(ind, 'volume') !== null ? getIndicator(ind, 'volume') :
+                        (tick.volume !== undefined ? tick.volume : null);
+            // Ensure alignment
+            while (tickVolume.length < tickLabels.length - 1) tickVolume.push(null);
+            tickVolume.push(vol);
+            if (vol !== null && !hasVolumeData) {
+                hasVolumeData = true;
+                document.querySelector('.legend-vol').style.display = '';
+                const container = document.getElementById('volume-chart-container');
+                container.style.height = '100px';
+                if (!volumeChartInstance) {
+                    initVolumeChart();
+                }
+            }
+
+            // --- RSI sub-chart ---
+            const rsi = getIndicator(ind, 'rsi');
+            while (tickRSI.length < tickLabels.length - 1) tickRSI.push(null);
+            tickRSI.push(rsi !== null ? rsi : null);
+            if (rsi !== null && !hasRSIData) {
+                hasRSIData = true;
+                document.querySelector('.legend-rsi').style.display = '';
+                const container = document.getElementById('rsi-chart-container');
+                container.style.height = '110px';
+                if (!rsiChartInstance) {
+                    initRSIChart();
+                }
+            }
+
+            // --- MACD sub-chart ---
+            const macd = getIndicator(ind, 'macd');
+            const macdSignal = getIndicator(ind, 'macd_signal');
+            const macdHist = getIndicator(ind, 'macd_hist');
+            while (tickMACD.length < tickLabels.length - 1) { tickMACD.push(null); tickMACDSignal.push(null); tickMACDHist.push(null); }
+            tickMACD.push(macd !== null ? macd : null);
+            tickMACDSignal.push(macdSignal !== null ? macdSignal : null);
+            tickMACDHist.push(macdHist !== null ? macdHist : null);
+            if ((macd !== null || macdSignal !== null || macdHist !== null) && !hasMACDData) {
+                hasMACDData = true;
+                document.querySelector('.legend-macd').style.display = '';
+                const container = document.getElementById('macd-chart-container');
+                container.style.height = '110px';
+                if (!macdChartInstance) {
+                    initMACDChart();
+                }
+            }
+
+            // Update all chart instances that have been initialized
+            // Main chart already updated via addTickPoint -> tickChartInstance.update('none')
+            if (tickChartInstance) {
+                tickChartInstance.update('none');
+            }
+            if (volumeChartInstance) {
+                volumeChartInstance.update('none');
+            }
+            if (rsiChartInstance) {
+                rsiChartInstance.update('none');
+            }
+            if (macdChartInstance) {
+                macdChartInstance.update('none');
             }
         }
         {% endif %}
@@ -600,6 +1017,10 @@
 
             if (data.type === 'progress') {
                 setProgress(data.percentage, `正在处理第 ${data.current} / ${data.total} 条行情数据`);
+            } else if (typeof addTickFull === 'function' && data.type === 'tick') {
+                addTickFull(data);
+            } else if (data.type === 'tick_data' && typeof addTickFull === 'function') {
+                addTickFull(data);
             } else if (data.type === 'tick_data' && typeof addTickPoint === 'function') {
                 addTickPoint(data.date, data.price, data.signal);
             } else if (data.type === 'completed') {
