@@ -40,6 +40,37 @@ _parse_jsonp = parse_jsonp
 _filter_by_optional_range = filter_by_optional_range
 
 
+def get_sliding_window(df: pd.DataFrame, current_idx: int,
+                       window_size: int | None = None) -> pd.DataFrame:
+    """返回从 0 到 current_idx 的滑动窗口数据（不含未来数据）。
+
+    供 tick-by-tick 模式使用，确保策略在计算指标时不会偷看未来数据。
+
+    Args:
+        df: 全量 DataFrame（已按时间排序）。
+        current_idx: 当前 tick 的索引（0-based，包含在内）。
+        window_size: 可选的最大窗口大小。若指定，则返回
+                     [max(0, current_idx - window_size + 1), current_idx] 范围。
+                     若为 None，则返回 [0, current_idx] 范围。
+
+    Returns:
+        不含未来数据的 DataFrame 切片。
+    """
+    if df is None or df.empty:
+        return df
+    if current_idx < 0:
+        current_idx = 0
+    if current_idx >= len(df):
+        current_idx = len(df) - 1
+
+    if window_size is not None and window_size > 0:
+        start = max(0, current_idx - window_size + 1)
+    else:
+        start = 0
+
+    return df.iloc[start:current_idx + 1].copy()
+
+
 DEFAULT_FETCH_BUFFER_DAYS = 5
 
 

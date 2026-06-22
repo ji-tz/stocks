@@ -4,7 +4,7 @@ import time
 from dataclasses import dataclass
 from typing import Any, Callable, Dict, List, Optional
 
-from exchange.source.data_provider import get_data
+from exchange.source.data_provider import get_data, get_sliding_window
 from exchange.simulated_exchange import detect_market
 from trader.clock import BacktestClock
 from exchange.backtest.exchange import BacktestExchange
@@ -112,12 +112,19 @@ class BacktestExchangeRunner:
         base_position_lots: Optional[int] = None,
         mode: str = "backtest",
         tick_interval: float = 0.04,
+        tick_by_tick: bool = False,
+        strategy_module: Optional[Any] = None,
+        strategy_params: Optional[Dict[str, Any]] = None,
+        sliding_window_size: Optional[int] = None,
     ) -> Dict[str, Any]:
         """执行回测（tick-by-tick 模式）。
 
         每 tick 推进一个交易日，tick_interval 控制 ticks 之间的间隔（秒）。
         progress_callback 接收结构化 tick_data 字典，包含：
             type, date, close_price, open_price, position, account, trade, indicators, progress
+
+        当 tick_by_tick=True 时，策略的指标计算基于滑动窗口（不含未来数据）。
+        需传入 strategy_module（策略模块引用）和可选的 sliding_window_size。
         """
         if mode != "backtest":
             raise RuntimeError("当前执行器仅支持 backtest 模式，其它模式不运行")
@@ -130,6 +137,8 @@ class BacktestExchangeRunner:
         granularity = self._normalize_granularity(granularity)
 
         df = df.sort_values("date").reset_index(drop=True).copy()
+        # 在 tick-by-tick 模式下，保留原始数据的副本用于滑动窗口计算
+        raw_df = df.copy() if tick_by_tick else None
         if df.empty:
             logger.info(
                 "回测日期范围内无交易日数据，数据已为空（上层调用方应已自动调整日期范围）"
@@ -344,6 +353,23 @@ class BacktestExchangeRunner:
 
             pos = engine.get_position()
             avg_cost = pos.avg_cost
+
+            # ---- Tick-by-tick: 基于滑动窗口重新计算指标，防止未来数据泄露 ----
+            if tick_by_tick and strategy_module is not None and raw_df is not None:
+                sliding_df = get_sliding_window(raw_df, current_idx - 1,
+                                                window_size=sliding_window_size)
+                prepare_tick = getattr(strategy_module, 'prepare_backtest_data_for_tick', None)
+                tick_params = dict(strategy_params or {})
+                if callable(prepare_tick):
+                    enhanced_sliding = prepare_tick(df_sliding=sliding_df, **tick_params)
+                else:
+                    enhanced_sliding = sliding_df
+                # 如果策略决策器持有 df 引用，更新它
+                if hasattr(strategy, 'df'):
+                    strategy.df = enhanced_sliding
+
+            # ---- Feed tick to exchange ----
+            engine.feed_tick(row)
 
             action = None
             decision_kwargs_chain = [
@@ -623,6 +649,10 @@ class BacktestExchangeRunner:
         base_position_lots: Optional[int] = None,
         mode: str = "backtest",
         tick_interval: float = 0.04,
+        tick_by_tick: bool = False,
+        strategy_module: Optional[Any] = None,
+        strategy_params: Optional[Dict[str, Any]] = None,
+        sliding_window_size: Optional[int] = None,
     ) -> Dict[str, Any]:
         """兼容旧命名：simulate 等价于 run。"""
         return self.run(
@@ -642,6 +672,10 @@ class BacktestExchangeRunner:
             base_position_lots=base_position_lots,
             mode=mode,
             tick_interval=tick_interval,
+            tick_by_tick=tick_by_tick,
+            strategy_module=strategy_module,
+            strategy_params=strategy_params,
+            sliding_window_size=sliding_window_size,
         )
 
 

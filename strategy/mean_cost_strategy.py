@@ -28,3 +28,16 @@ class MeanCostDecision:
         if open_price > avg_cost:
             return 'sell'
         return None
+
+
+def prepare_backtest_data_for_tick(df_sliding, **kwargs):
+    """均值成本策略不需要技术指标，直接返回原始数据（接口一致性）。
+
+    Args:
+        df_sliding: 滑动窗口 DataFrame。
+        **kwargs: 其他参数（未使用）。
+
+    Returns:
+        原样返回输入的 df_sliding。
+    """
+    return df_sliding.copy() if hasattr(df_sliding, 'copy') else df_sliding
