@@ -139,7 +139,8 @@ class BacktestProgress:
                        signal: str | None = None,
                        position: float = 0,
                        pnl: float = 0,
-                       cash: float = 0):
+                       cash: float = 0,
+                       indicators: dict | None = None):
         """推送逐笔 tick 数据到 SSE 队列，供前端实时图表消费。
 
         Args:
@@ -150,6 +151,7 @@ class BacktestProgress:
             position: 当前持仓数量
             pnl: 当前盈亏
             cash: 当前剩余资金
+            indicators: 策略指标字典，包含 sma, bollinger_*, rsi, macd, macd_signal, macd_hist, volume 等
         """
         with self._lock:
             if task_id not in self._tasks:
@@ -157,7 +159,7 @@ class BacktestProgress:
             task = self._tasks[task_id]
             if task.get('cancelled'):
                 return
-            task['queue'].put({
+            payload = {
                 'type': 'tick_data',
                 'date': date,
                 'price': price,
@@ -165,7 +167,10 @@ class BacktestProgress:
                 'position': position,
                 'pnl': pnl,
                 'cash': cash,
-            })
+            }
+            if indicators:
+                payload['indicators'] = indicators
+            task['queue'].put(payload)
 
     def cancel_task(self, task_id: str):
         """取消任务并通知前端停止等待。"""
