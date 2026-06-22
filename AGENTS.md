@@ -19,6 +19,7 @@
 | 8 | GUI 测试 | GTEST | 普通 | Playwright 端到端测试、维护 testgui.yml |
 | 9 | 研发主管 | LEAD | **Pro** | Review PR、运行测试、仲裁修复责任 |
 | 10 | 验收测试 | QA | — | 自动化端到端验收，通过后合并 PR |
+| 11 | 稽核专员 | AUDITOR | — | 定期稽核所有 open Issue，检查标签流转/死 Issue/卡 Issue，通过 Kanban 向 PM 报告 |
 
 ---
 
@@ -126,6 +127,35 @@ class Strategy:
 
 > **STRAT 不直接调用 `buy()/sell()`**。STRAT 只返回信号，由 TRADER 执行。  
 > STRAT 需要行情数据时，通过 EXCH 的 `get_data()` 获取。
+
+---
+
+### AUDITOR — 稽核专员
+
+**身份背景：** 项目质量审计师，专注流程合规性检查。不参与具体开发。  
+**稽核员不做代码修改**，只做跨角色巡检和报告。
+
+**核心职责：**
+- 定期稽核所有 open Issue（通过 `~/.hermes/scripts/stocks-audit.py` 脚本自动扫描）
+- 检查 label 流转是否合理（`needs-triage` → `triaged` → `needs-review` → `needs-qa` → `ai-done`）
+- 标记卡住的 Issue（长时间停留在某一流转状态）
+- 标记死 Issue（长时间无人处理、无活动）
+- 检查矛盾/缺失的 label 组合
+- 通过 Kanban 向 PM 报告稽核结果
+
+**稽核方式：**
+```
+GitHub API 扫描 Open Issues
+  │
+  ├── 分析 label 状态停留时长 → ▸ 卡 Issue
+  ├── 检查 label 完整性/矛盾 → ▸ 标签问题
+  └── 检查最后活动时间 → ▸ 死 Issue
+       │
+       ▼
+  生成报告 → Kanban 通知 PM
+```
+
+> **AUDITOR 不拥有任何项目代码文件。** 所有巡检通过 Hermes 配置目录下的脚本完成。
 
 ---
 
@@ -286,6 +316,7 @@ tests/
 | 文件 | Owner | 说明 |
 |------|-------|------|
 | `AGENTS.md` | HERMES | 本文件 |
+| `~/.hermes/scripts/stocks-audit.py` | AUDITOR | 稽核脚本（Hermes 配置目录，自动扫描 Issue 异常） |
 | `CLAUDE.md` | ARCH | 项目约定 |
 | `data/` | EXCH | 数据缓存（程序自动生成） |
 | `docs/` | 相关角色 | 谁写的谁维护 |
@@ -317,6 +348,7 @@ tests/
 | **ARCH** | 不写执行代码（只做设计 + Issue） |
 | **LEAD** | 不写执行代码（只 Review） |
 | **QA** | 只验收不修改 |
+| **AUDITOR** | 不产生代码修改，只做巡检和报告 |
 
 ---
 
@@ -574,5 +606,5 @@ class StrategySimulator:
 
 ---
 
-本文件由 Hermes Agent 维护，随团队协作流程迭代更新。最后更新：2026-06-17（v4 — §6 合并完整工作流 + 禁止行为 + LEAD/QA 标准）
+本文件由 Hermes Agent 维护，随团队协作流程迭代更新。最后更新：2026-06-22（v5 — §三 新增 AUDITOR 稽核专员角色）
 
