@@ -38,6 +38,8 @@ _format_symbol_for_tencent = format_symbol_for_tencent
 _format_symbol_for_stooq = format_symbol_for_stooq
 _parse_jsonp = parse_jsonp
 _filter_by_optional_range = filter_by_optional_range
+
+
 def get_sliding_window(df: pd.DataFrame, current_idx: int,
                        window_size: int | None = None) -> pd.DataFrame:
     """返回从 0 到 current_idx 的滑动窗口数据（不含未来数据）。
@@ -67,7 +69,6 @@ def get_sliding_window(df: pd.DataFrame, current_idx: int,
         start = 0
 
     return df.iloc[start:current_idx + 1].copy()
-
 
 
 DEFAULT_FETCH_BUFFER_DAYS = 1
