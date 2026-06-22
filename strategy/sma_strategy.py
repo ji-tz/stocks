@@ -65,6 +65,7 @@ def prepare_backtest_data(df: pd.DataFrame, period: int = 20, **kwargs) -> pd.Da
     prepared["sma"] = prepared["close"].rolling(window=period, min_periods=1).mean()
     return prepared
 
+
 def prepare_backtest_data_for_tick(df_sliding: pd.DataFrame, period: int = 20, **kwargs) -> pd.DataFrame:
     """为 SMA 策略补充 SMA 指标列（基于滑动窗口计算，确保不偷看未来数据）。
 
