@@ -1,0 +1,212 @@
+name: AI Progress Watchdog
+
+# Scheduled workflow that monitors issues in ai-in-progress state.
+# - >22h without PR → post warning, tag needs-review
+# - >24h without PR → close issue, clean up branch
+
+on:
+  schedule:
+    # Every 30 minutes to catch ~22h and ~24h thresholds promptly
+    - cron: '*/30 * * * *'
+  # Manual trigger for debugging
+  workflow_dispatch:
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: ai-progress-watchdog
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/github-script@v9
+        id: watchdog
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const NOW = Date.now();
+            const DAY_MS = 24 * 3600 * 1000;
+            const HOUR_MS = 3600 * 1000;
+            const WARN_THRESHOLD = 22 * HOUR_MS;   // 22h → warning
+            const CLOSE_THRESHOLD = 24 * HOUR_MS + 30 * 60 * 1000;  // 24h30m → close (buffer for schedule)
+
+            const repo = context.repo;
+            const results = [];
+
+            // Fetch all open issues with ai-in-progress label
+            let page = 1;
+            let allIssues = [];
+            while (true) {
+              const { data: issues } = await github.rest.issues.listForRepo({
+                ...repo,
+                state: 'open',
+                labels: 'ai-in-progress',
+                per_page: 100,
+                page: page,
+              });
+              allIssues = allIssues.concat(issues);
+              if (issues.length < 100) break;
+              page++;
+            }
+
+            // Filter out PRs (GitHub API returns both)
+            const issues = allIssues.filter(i => !i.pull_request);
+            core.info(`Found ${issues.length} open issues with ai-in-progress`);
+
+            for (const issue of issues) {
+              const num = issue.number;
+              const title = issue.title;
+              const lastUpdated = new Date(issue.updated_at + 'Z').getTime();
+              const ageMs = NOW - lastUpdated;
+              const ageHours = (ageMs / HOUR_MS).toFixed(1);
+              const createdAt = new Date(issue.created_at + 'Z').getTime();
+              const totalAgeHours = ((NOW - createdAt) / HOUR_MS).toFixed(1);
+
+              // Check if there's a PR for this issue
+              let hasPR = false;
+              let prUrl = null;
+              try {
+                const { data: prs } = await github.rest.pulls.list({
+                  ...repo,
+                  state: 'all',
+                  head: `feat/issue-${num}`,
+                  per_page: 5,
+                });
+                if (prs.length > 0) {
+                  hasPR = true;
+                  prUrl = prs[0].html_url;
+                }
+              } catch (e) {
+                core.warning(`Could not check PR for #${num}: ${e.message}`);
+              }
+
+              core.info(`#${num}: age=${ageHours}h total=${totalAgeHours}h hasPR=${hasPR}`);
+
+              const issueLabels = issue.labels.map(l => l.name);
+              const isClosed = issue.state === 'closed';
+
+              // --- Case 1: >24h without PR → auto-close ---
+              if (ageMs > CLOSE_THRESHOLD && !hasPR && !isClosed) {
+                const closeComment = [
+                  `## ⏰ 自动关闭 — ai-in-progress 超时`,
+                  ``,
+                  `此 Issue 在 **ai-in-progress** 状态停留超过 **24 小时**（实际 ${ageHours}h），且未检测到关联 PR，已自动关闭。`,
+                  ``,
+                  `**统计：**`,
+                  `- 🕒 最后更新：${new Date(lastUpdated).toISOString()}`,
+                  `- ⏳ 超时时间：${ageHours} 小时`,
+                  `- 📊 Issue 总存活时间（从创建起）：${totalAgeHours} 小时`,
+                  `- 🔍 关联 PR：未找到`,
+                  ``,
+                  `> 如需重新打开，请先确认问题已解决或重新路由。`,
+                ].join('\n');
+
+                await github.rest.issues.createComment({
+                  ...repo,
+                  issue_number: num,
+                  body: closeComment,
+                });
+
+                await github.rest.issues.update({
+                  ...repo,
+                  issue_number: num,
+                  state: 'closed',
+                  state_reason: 'not_planned',
+                });
+
+                results.push(`🔴 #${num} CLOSED — ai-in-progress ${ageHours}h without PR (${title.slice(0,50)})`);
+                core.info(`Closed #${num} — stale ${ageHours}h`);
+
+                // Try to delete the associated branch
+                const branchName = `feat/issue-${num}`;
+                try {
+                  const { data: ref } = await github.rest.git.getRef({
+                    ...repo,
+                    ref: `heads/${branchName}`,
+                  });
+                  if (ref) {
+                    await github.rest.git.deleteRef({
+                      ...repo,
+                      ref: `heads/${branchName}`,
+                    });
+                    results.push(`  🗑️ Deleted branch ${branchName}`);
+                    core.info(`Deleted branch ${branchName} for closed #${num}`);
+                  }
+                } catch (e) {
+                  // Branch doesn't exist — that's fine
+                  core.info(`No branch ${branchName} to delete for #${num}`);
+                }
+                continue;
+              }
+
+              // --- Case 2: >22h without PR → post warning ---
+              if (ageMs > WARN_THRESHOLD && !hasPR && !isClosed) {
+                // Check if we already posted a warning (look for recent watchdog comments)
+                const { data: comments } = await github.rest.issues.listComments({
+                  ...repo,
+                  issue_number: num,
+                  per_page: 5,
+                  sort: 'created',
+                  direction: 'desc',
+                });
+
+                const alreadyWarned = comments.some(c =>
+                  c.body && c.body.includes('⏰ 超时警告') && c.user.type === 'Bot'
+                );
+
+                if (!alreadyWarned) {
+                  const warnComment = [
+                    `## ⏰ 超时警告 — ai-in-progress 超 ${ageHours}h`,
+                    ``,
+                    `此 Issue 已进入 **ai-in-progress** 状态 **${ageHours} 小时**，但尚未检测到关联 PR。`,
+                    ``,
+                    `**状态：**`,
+                    `- 🕒 最后更新：${new Date(lastUpdated).toISOString()}`,
+                    `- ⏳ 当前超时：${ageHours} / 24h`,
+                    `- 🔍 关联 PR：未找到`,
+                    ``,
+                    `> ⚠️ 如果 **24 小时**内仍无 PR，此 Issue 将被自动关闭。`,
+                  ].join('\n');
+
+                  await github.rest.issues.createComment({
+                    ...repo,
+                    issue_number: num,
+                    body: warnComment,
+                  });
+
+                  results.push(`🟠 #${num} WARNING — ai-in-progress ${ageHours}h without PR (${title.slice(0,50)})`);
+                  core.info(`Posted warning on #${num} — stale ${ageHours}h`);
+                } else {
+                  core.info(`Already warned on #${num}, skipping`);
+                  results.push(`🟡 #${num} Still stale ${ageHours}h — warning already posted`);
+                }
+                continue;
+              }
+
+              // --- Healthy: in-progress but within threshold ---
+              if (hasPR) {
+                results.push(`✅ #${num} OK — has PR ${prUrl} (${ageHours}h in progress)`);
+              } else {
+                results.push(`✅ #${num} OK — ${ageHours}h in progress (under 22h threshold)`);
+              }
+            }
+
+            // Log summary
+            core.info('=== Watchdog Summary ===');
+            results.forEach(r => core.info(r));
+
+            // Set output for workflow_dispatch feedback
+            const summary = results.join('\n');
+            core.setOutput('summary', summary);
+            core.setOutput('issues_checked', issues.length.toString());
+            core.setOutput('issues_closed', results.filter(r => r.startsWith('🔴')).length.toString());

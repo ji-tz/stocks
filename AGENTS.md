@@ -310,6 +310,8 @@ tests/
 | `lint.yml` | LEAD | 代码风格检查 |
 | `package.yml` | TRADER | 打包发布 |
 | `opencode.yml` | HERMES | （备用） |
+| `issue-auto-routing.yml` | ARCH | 自动路由：子 Issue 打角色标签后自动 assign + 标 ai-in-progress |
+| `ai-progress-watchdog.yml` | AUDITOR | 超时监控：ai-in-progress 超 22h 警告、24h 关闭 |
 
 ### 4.9 其他
 
@@ -368,11 +370,23 @@ tests/
 | `bug` | 缺陷报告 | 任何人 |
 | `needs-triage` | 待架构师拆解 | 提 Issue 时自动打 |
 | `triaged` | 已拆解完成 | ARCH |
-| `ai-in-progress` | AI 正在处理中 | Hermes 自动 |
+| `ai-in-progress` | AI 正在处理中 | 自动（role label 打上时自动） |
 | `needs-review` | 待 LEAD Review | 开发完成时自动 |
 | `needs-qa` | 待 QA 测试 | LEAD |
 | `ai-done` | AI 已完成 | QA |
 | `ai-routed` | 已进入流程 | Hermes 自动 |
+| `sub-issue` | 子 Issue（ARCH 拆解产出） | ARCH |
+
+> **自动路由机制（`issue-auto-routing.yml`）：**
+> 当 Issue 被打上角色标签（exchange/trader/strategy/gui/test/ci 等）时，自动：
+> - 分配 Assignee 到仓库所有者
+> - 在 Issue 评论中标明对应 Agent
+> - 自动添加 `ai-in-progress` 标签
+
+> **超时自动处理机制（`ai-progress-watchdog.yml`）：**
+> 每 30 分钟扫描所有 `ai-in-progress` 的 Issue：
+> - **>22h 无 PR** → 在 Issue 评论中发布超时警告
+> - **>24h 无 PR** → 自动关闭 Issue（state_reason: not_planned），并尝试删除关联分支 `feat/issue-<num>`
 
 ### 6.2 全流程 9 步（不可跳过）
 
