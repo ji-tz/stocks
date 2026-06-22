@@ -80,7 +80,6 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
             self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
-
     # ── buffer_days tolerance cache-hit tests ──────────────────────────
 
     @patch('exchange.source.data_provider.AkshareProvider.fetch')
