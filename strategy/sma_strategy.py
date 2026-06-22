@@ -1,5 +1,7 @@
 from typing import Any
 
+import pandas as pd
+
 
 class SmaDecision:
     """决策器：用于 pandas 模拟的 SMA 决策逻辑。
@@ -7,7 +9,11 @@ class SmaDecision:
     - 当没有持仓且当日收盘价 > SMA(period) 时返回 'buy'
     - 当持仓且当日收盘价 < SMA(period) 时返回 'sell'
     - 否则返回 None
+
+    This strategy is tick-safe (works with partial data slices).
     """
+
+    __tick_safe__ = True
 
     def __init__(self, period: int = 20, df=None):
         self.period = period
@@ -47,3 +53,14 @@ class SmaDecision:
         if shares > 0 and close_price < sma:
             return 'sell'
         return None
+
+
+def prepare_backtest_data(df: pd.DataFrame, period: int = 20, **kwargs) -> pd.DataFrame:
+    """为 SMA 策略补充 SMA 指标列。
+
+    Uses min_periods=1 so early rows get valid SMA values from partial data,
+    making this safe for tick-by-tick progression mode.
+    """
+    prepared = df.copy()
+    prepared["sma"] = prepared["close"].rolling(window=period, min_periods=1).mean()
+    return prepared

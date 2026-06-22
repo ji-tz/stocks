@@ -11,7 +11,11 @@ class MeanCostDecision:
     - 否则若开盘价 < 平均成本：返回 'buy'
     - 否则若开盘价 > 平均成本：返回 'sell'
     - 否则返回 None
+
+    This strategy is tick-safe (works with partial data slices).
     """
+
+    __tick_safe__ = True
 
     def decide(self, open_price: float, close_price: float | None = None,
                avg_cost: float = 0.0, shares: float = 0.0, date: Any = None) -> str | None:

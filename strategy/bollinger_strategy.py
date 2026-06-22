@@ -34,7 +34,12 @@ AUTO_STRATEGY_SPEC = {
 
 @dataclasses.dataclass
 class BollingerDecision:
-    """布林带低频策略。"""
+    """布林带低频策略。
+
+    This strategy is tick-safe (works with partial data slices).
+    """
+
+    __tick_safe__ = True
 
     period: int = 20
     std_multiplier: float = 2.0
@@ -78,9 +83,13 @@ def validate_strategy_parameters(period: int = 20, std_multiplier: float = 2.0, 
 
 
 def prepare_backtest_data(df: pd.DataFrame, period: int = 20, std_multiplier: float = 2.0, **kwargs) -> pd.DataFrame:
-    """为布林带策略补充上下轨指标列。"""
+    """为布林带策略补充上下轨指标列。
+
+    Uses min_periods=1 so early rows get valid indicators from partial data,
+    making this safe for tick-by-tick progression mode.
+    """
     prepared = df.copy()
-    rolling = prepared["close"].rolling(window=period, min_periods=period)
+    rolling = prepared["close"].rolling(window=period, min_periods=1)
     prepared["bollinger_mid"] = rolling.mean()
     prepared["bollinger_std"] = rolling.std(ddof=0)  # 使用固定的总体标准差实现，保持当前回测计算结果稳定
     prepared["bollinger_upper"] = prepared["bollinger_mid"] + std_multiplier * prepared["bollinger_std"]
