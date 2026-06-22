@@ -34,7 +34,12 @@ AUTO_STRATEGY_SPEC = {
 
 @dataclasses.dataclass
 class DualMaDecision:
-    """双均线交叉策略。"""
+    """双均线交叉策略。
+
+    This strategy is tick-safe (works with partial data slices).
+    """
+
+    __tick_safe__ = True
 
     short_period: int = 5
     long_period: int = 20
@@ -90,10 +95,14 @@ def validate_strategy_parameters(short_period: int = 5, long_period: int = 20, *
 
 
 def prepare_backtest_data(df: pd.DataFrame, short_period: int = 5, long_period: int = 20, **kwargs) -> pd.DataFrame:
-    """为双均线策略补充均线指标列。"""
+    """为双均线策略补充均线指标列。
+
+    Uses min_periods=1 so early rows get valid indicators from partial data,
+    making this safe for tick-by-tick progression mode.
+    """
     prepared = df.copy()
-    prepared["ma_short"] = prepared["close"].rolling(window=short_period, min_periods=short_period).mean()
-    prepared["ma_long"] = prepared["close"].rolling(window=long_period, min_periods=long_period).mean()
+    prepared["ma_short"] = prepared["close"].rolling(window=short_period, min_periods=1).mean()
+    prepared["ma_long"] = prepared["close"].rolling(window=long_period, min_periods=1).mean()
     return prepared
 
 

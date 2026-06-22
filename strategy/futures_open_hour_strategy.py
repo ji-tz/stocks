@@ -36,7 +36,12 @@ AUTO_STRATEGY_SPEC = {
 
 @dataclasses.dataclass
 class FuturesOpenHourDecision:
-    """根据前一晚富时A50期货涨跌决定是否买入，并预约1小时后卖出。"""
+    """根据前一晚富时A50期货涨跌决定是否买入，并预约1小时后卖出。
+
+    This strategy is tick-safe (works with partial data slices).
+    """
+
+    __tick_safe__ = True
 
     futures_symbol: str = "CN00Y"
     source: object = "auto"

@@ -41,7 +41,12 @@ AUTO_STRATEGY_SPEC = {
 
 @dataclasses.dataclass
 class RsiDecision:
-    """RSI 超买超卖策略。"""
+    """RSI 超买超卖策略。
+
+    This strategy is tick-safe (works with partial data slices).
+    """
+
+    __tick_safe__ = True
 
     period: int = 14
     oversold: float = 30.0
@@ -84,13 +89,18 @@ def validate_strategy_parameters(period: int = 14, oversold: float = 30.0, overb
 
 
 def prepare_backtest_data(df: pd.DataFrame, period: int = 14, **kwargs) -> pd.DataFrame:
-    """为 RSI 策略补充 RSI 指标列。"""
+    """为 RSI 策略补充 RSI 指标列。
+
+    Uses min_periods=1 in rolling calculations so early rows get valid
+    indicators from partial data, making this safe for tick-by-tick
+    progression mode.
+    """
     prepared = df.copy()
     delta = prepared["close"].diff()
     gain = delta.clip(lower=0)
     loss = -delta.clip(upper=0)
-    avg_gain = gain.rolling(window=period, min_periods=period).mean()
-    avg_loss = loss.rolling(window=period, min_periods=period).mean()
+    avg_gain = gain.rolling(window=period, min_periods=1).mean()
+    avg_loss = loss.rolling(window=period, min_periods=1).mean()
     rs = avg_gain / avg_loss.where(avg_loss != 0)
     prepared["rsi"] = 100 - (100 / (1 + rs))
     prepared.loc[(avg_loss == 0) & (avg_gain > 0), "rsi"] = 100.0
