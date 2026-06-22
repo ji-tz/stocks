@@ -32,12 +32,13 @@ jobs:
         run: |
           TITLE="${{ github.event.pull_request.title }}"
           BODY="${{ github.event.pull_request.body }}"
-          if echo "$TITLE" | grep -qE '#[0-9]+'; then
-            echo "✅ 标题关联: $(echo "$TITLE" | grep -oE '#[0-9]+')"
-          elif echo "$BODY" | grep -qE '#[0-9]+'; then
-            echo "✅ Body 关联: $(echo "$BODY" | grep -oE '#[0-9]+')"
+          KEYWORD_PATTERN='(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[[:space:]]+#[0-9]+'
+          if echo "$BODY" | grep -qiE "$KEYWORD_PATTERN"; then
+            echo "✅ Body 关联: $(echo "$BODY" | grep -oiE "$KEYWORD_PATTERN")"
+          elif echo "$TITLE" | grep -qiE "$KEYWORD_PATTERN"; then
+            echo "✅ 标题关联: $(echo "$TITLE" | grep -oiE "$KEYWORD_PATTERN")"
           else
-            echo "❌ 未关联 Issue（请在标题或 body 中含 #编号）"
+            echo "❌ 未关联 Issue（请在标题或 body 中含 close/fix/resolve #编号）"
             exit 1
           fi
 
