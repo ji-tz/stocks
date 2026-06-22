@@ -491,6 +491,9 @@
       const submitBtn = document.querySelector('.submit-btn');
       let timeRangeChart = null;
       let refreshChartTimer = null;
+      let cachedChartData = null;
+      let cachedRequestedStart = null;
+      let cachedRequestedEnd = null;
 
       function setChartStatus(message, type) {
         chartStatus.textContent = message;
@@ -579,6 +582,26 @@
         };
       }
 
+      function filterCachedLabels(cachedLabels, requestedStart, requestedEnd) {
+        const startStr = requestedStart.slice(0, 4) + '-' + requestedStart.slice(4, 6) + '-' + requestedStart.slice(6, 8);
+        const endStr = requestedEnd.slice(0, 4) + '-' + requestedEnd.slice(4, 6) + '-' + requestedEnd.slice(6, 8);
+        const indices = [];
+        const filteredLabels = [];
+        for (let i = 0; i < cachedLabels.length; i++) {
+          if (cachedLabels[i] >= startStr && cachedLabels[i] <= endStr) {
+            filteredLabels.push(cachedLabels[i]);
+            indices.push(i);
+          }
+        }
+        return { labels: filteredLabels, indices };
+      }
+
+      function clearChartCache() {
+        cachedChartData = null;
+        cachedRequestedStart = null;
+        cachedRequestedEnd = null;
+      }
+
       function refreshChart(showLoading = true) {
         if (!validateDates()) {
           return Promise.resolve();
@@ -592,8 +615,24 @@
             timeRangeChart.destroy();
             timeRangeChart = null;
           }
+          clearChartCache();
           return Promise.resolve();
         }
+
+        // Check if requested range is fully within cached data
+        if (cachedChartData !== null &&
+            cachedRequestedStart !== null &&
+            cachedRequestedEnd !== null &&
+            range.start >= cachedRequestedStart &&
+            range.end <= cachedRequestedEnd) {
+          const filtered = filterCachedLabels(cachedChartData.labels, range.start, range.end);
+          const filteredPrices = filtered.indices.map(i => cachedChartData.open_prices[i]);
+          renderChart(filtered.labels, filteredPrices);
+          chartMeta.textContent = '显示 ' + cachedChartData.available_start + ' 至 ' + cachedChartData.available_end + ' 的日线开盘价，共 ' + cachedChartData.points + ' 个交易日。';
+          setChartStatus('走势图已更新（缓存）。', 'success');
+          return Promise.resolve();
+        }
+
         const params = new URLSearchParams(range);
         if (showLoading) {
           setChartStatus('正在加载走势图...', 'info');
@@ -605,6 +644,11 @@
             if (!ok) {
               throw new Error(data.error || '走势图加载失败');
             }
+
+            // Store response in frontend cache
+            cachedChartData = data;
+            cachedRequestedStart = range.start;
+            cachedRequestedEnd = range.end;
 
             renderChart(data.labels, data.open_prices);
             updateDateBounds(data);
@@ -625,6 +669,8 @@
           clearTimeout(refreshChartTimer);
           refreshChartTimer = null;
         }
+
+        clearChartCache();
 
         setBusy(true);
         setChartStatus('正在清除缓存并重新下载当前股票日线数据...', 'info');

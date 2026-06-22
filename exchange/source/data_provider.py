@@ -38,8 +38,6 @@ _format_symbol_for_tencent = format_symbol_for_tencent
 _format_symbol_for_stooq = format_symbol_for_stooq
 _parse_jsonp = parse_jsonp
 _filter_by_optional_range = filter_by_optional_range
-
-
 def get_sliding_window(df: pd.DataFrame, current_idx: int,
                        window_size: int | None = None) -> pd.DataFrame:
     """返回从 0 到 current_idx 的滑动窗口数据（不含未来数据）。
@@ -71,7 +69,8 @@ def get_sliding_window(df: pd.DataFrame, current_idx: int,
     return df.iloc[start:current_idx + 1].copy()
 
 
-DEFAULT_FETCH_BUFFER_DAYS = 5
+
+DEFAULT_FETCH_BUFFER_DAYS = 1
 
 
 def _ensure_cache_dir(cache_dir: str):
@@ -221,6 +220,11 @@ _PROVIDER_FACTORIES = {
 
 ALL_SOURCES = list(_PROVIDER_FACTORIES.keys())
 
+# When cache is mostly present and only a small date gap (< 3 days) needs filling,
+# only try the fastest sources instead of the full 8-source auto traversal.
+# This avoids timeout stacking from slow/specialized sources.
+_CACHE_GAP_FAST_SOURCES = ALL_SOURCES[:3]  # akshare, baostock, tencent
+
 
 def _create_provider(source_name: str, max_attempts: int = 3):
     src = source_name.lower()
@@ -349,6 +353,27 @@ def get_data(symbol: str = "600900",
         )
         if not already_missing_today:
             missing_ranges.append((today_str, today_str))
+
+    # --- Optimize: for small cache gaps, limit source fallback ---
+    # When cache exists and only a few days are missing, don't traverse all 8 sources.
+    # Try the top-3 fastest sources only (akshare, baostock, tencent).
+    if (not force_refresh
+            and cached_raw is not None
+            and not cached_raw.empty
+            and len(sources) >= 4):
+        total_gap_days = 0
+        for fs, fe in missing_ranges:
+            if fs and fe:
+                fs_dt = parse_date_input(fs)
+                fe_dt = parse_date_input(fe)
+                if fs_dt is not None and fe_dt is not None:
+                    total_gap_days += (fe_dt - fs_dt).days
+        if 0 <= total_gap_days <= 3:
+            logger.info(
+                "缓存小缺口(%d天), 限制源为快速源: symbol=%s, %s",
+                total_gap_days, symbol, _CACHE_GAP_FAST_SOURCES,
+            )
+            sources = _CACHE_GAP_FAST_SOURCES
 
     errors = []
 
