@@ -1,0 +1,133 @@
+name: Auto-route issues
+
+# When ARCH creates a sub-issue with a role label (exchange/trader/strategy/gui/test/ci
+# etc.), this workflow auto-assigns it and sets ai-in-progress. Also handles label
+# corrections via the synchronize action when labels are added/removed.
+
+on:
+  issues:
+    types: [opened, reopened, labeled]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: issue-routing-${{ github.event.issue.number }}
+  cancel-in-progress: true
+
+jobs:
+  route:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const issue = context.payload.issue;
+            const num = issue.number;
+            const labels = (issue.labels || []).map(l => l.name);
+
+            // Role labels that map to agent assignments
+            const ROLE_LABEL_PATTERNS = {
+              'exchange':  'EXCH – 交易所Agent',
+              'exch':      'EXCH – 交易所Agent',
+              'trader':    'TRADER – 交易员Agent',
+              'strategy':  'STRAT – 策略算法Agent',
+              'strat':     'STRAT – 策略算法Agent',
+              'gui':       'WEB – Web前端Agent',
+              'web':       'WEB – Web前端Agent',
+              'test':      'ITEST – 集成测试Agent',
+              'itest':     'ITEST – 集成测试Agent',
+              'gtest':     'GTEST – GUI测试Agent',
+              'ci':        'ITEST – 集成测试Agent',
+              'arch':      'ARCH – 架构师',
+            };
+
+            // Check if event is a new label being added
+            const isNewLabel = context.payload.action === 'labeled';
+            const addedLabel = context.payload.label ? context.payload.label.name : null;
+
+            // Find which role label(s) are present
+            const matchedRoles = [];
+            for (const l of labels) {
+              if (ROLE_LABEL_PATTERNS[l]) {
+                matchedRoles.push(ROLE_LABEL_PATTERNS[l]);
+              }
+            }
+
+            if (matchedRoles.length === 0) {
+              core.info(`No role labels found on #${num}, skipping`);
+              return;
+            }
+
+            // --- Step 1: Assign to repo owner if no assignee ---
+            const currentAssignees = issue.assignees || [];
+            if (currentAssignees.length === 0) {
+              // Try to assign to the repo owner for tracking
+              try {
+                const owner = context.repo.owner;
+                await github.rest.issues.addAssignees({
+                  ...context.repo,
+                  issue_number: num,
+                  assignees: [owner],
+                });
+                core.info(`Assigned #${num} to ${owner}`);
+              } catch (e) {
+                core.warning(`Could not assign: ${e.message}`);
+              }
+            }
+
+            // --- Step 2: Post role assignment comment (only if new label triggered this) ---
+            const commentNeeded = isNewLabel && addedLabel && ROLE_LABEL_PATTERNS[addedLabel];
+            const roleSummary = matchedRoles.join(', ');
+
+            if (commentNeeded) {
+              const agentLabel = ROLE_LABEL_PATTERNS[addedLabel];
+              const comment = [
+                `## 🤖 自动路由`,
+                ``,
+                `**识别到角色标签：** \`${addedLabel}\``,
+                `**对应Agent：** ${agentLabel}`,
+                ``,
+                `> 该 Issue 已自动加入 ai-in-progress 状态，Agent 将在下一个 tick 开始处理。`,
+                `> 如需更改指派，请移除/替换角色标签。`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: num,
+                body: comment,
+              });
+              core.info(`Posted routing comment on #${num}`);
+            }
+
+            // --- Step 3: Auto-set ai-in-progress for sub-issues with role labels ---
+            const hasSubIssue = labels.includes('sub-issue');
+            const hasInProgress = labels.includes('ai-in-progress');
+
+            // Set ai-in-progress when:
+            // 1. A role label is newly added AND issue doesn't have ai-in-progress yet, OR
+            // 2. It's a sub-issue with role labels but no ai-in-progress
+            const shouldSetInProgress =
+              !hasInProgress && (
+                (commentNeeded) ||
+                (hasSubIssue && matchedRoles.length > 0 && context.payload.action === 'opened')
+              );
+
+            if (shouldSetInProgress) {
+              try {
+                await github.rest.issues.addLabels({
+                  ...context.repo,
+                  issue_number: num,
+                  labels: ['ai-in-progress'],
+                });
+                core.info(`Added ai-in-progress label to #${num}`);
+              } catch (e) {
+                core.warning(`Could not add ai-in-progress: ${e.message}`);
+              }
+            }
+
+            // --- Step 4: Log summary ---
+            core.info(`Routing summary for #${num}: roles=[${matchedRoles.length}] sub-issue=${hasSubIssue} in-progress=${hasInProgress || shouldSetInProgress}`);

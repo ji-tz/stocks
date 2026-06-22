@@ -84,6 +84,108 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-03')
             self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
 
+    # ── buffer_days tolerance cache-hit tests ──────────────────────────
+
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
+    def test_cache_hit_within_buffer_days(self, mock_fetch):
+        """Request end_date slightly beyond cache_max but within buffer_days → cache hit (no fetch)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_file = os.path.join(tmp, '600900.csv')
+            dates = pd.date_range(start='2023-01-01', periods=5, freq='D')
+            df = pd.DataFrame({
+                'date': dates,
+                'open': [100 + i for i in range(5)],
+                'high': [101 + i for i in range(5)],
+                'low': [99 + i for i in range(5)],
+                'close': [100 + i for i in range(5)],
+                'volume': [1000 + i * 10 for i in range(5)],
+            })
+            df.to_csv(cache_file, index=False)
+
+            out = get_data(
+                symbol='600900', source='akshare',
+                start_date='20230101', end_date='20230108',
+                cache_dir=tmp, buffer_days=5,
+            )
+            self.assertEqual(mock_fetch.call_count, 0)
+            self.assertIsNotNone(out)
+            self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-01')
+            self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-05')
+
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
+    def test_cache_miss_beyond_buffer_days(self, mock_fetch):
+        """Request end_date far beyond cache_max + buffer_days → cache miss (fetch needed)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_file = os.path.join(tmp, '600900.csv')
+            dates = pd.date_range(start='2023-01-01', periods=5, freq='D')
+            df = pd.DataFrame({
+                'date': dates,
+                'open': [100 + i for i in range(5)],
+                'high': [101 + i for i in range(5)],
+                'low': [99 + i for i in range(5)],
+                'close': [100 + i for i in range(5)],
+                'volume': [1000 + i * 10 for i in range(5)],
+            })
+            df.to_csv(cache_file, index=False)
+
+            mock_fetch.return_value = pd.DataFrame({
+                'date': pd.to_datetime([
+                    '2023-01-06', '2023-01-07', '2023-01-08',
+                    '2023-01-09', '2023-01-10', '2023-01-15',
+                ]),
+                'open': [105, 106, 107, 108, 109, 110],
+                'high': [106, 107, 108, 109, 110, 111],
+                'low': [104, 105, 106, 107, 108, 109],
+                'close': [105, 106, 107, 108, 109, 110],
+                'volume': [1100] * 6,
+            })
+
+            out = get_data(
+                symbol='600900', source='akshare',
+                start_date='20230101', end_date='20230115',
+                cache_dir=tmp, buffer_days=5,
+            )
+            self.assertEqual(mock_fetch.call_count, 1)
+            self.assertIsNotNone(out)
+            self.assertEqual(out['date'].min().strftime('%Y-%m-%d'), '2023-01-01')
+            self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-15')
+
+    @patch('exchange.source.data_provider.AkshareProvider.fetch')
+    def test_cache_hit_buffer_days_zero(self, mock_fetch):
+        """buffer_days=0 → no tolerance; any request beyond cache_max is a miss (preserve existing behavior)."""
+        with tempfile.TemporaryDirectory() as tmp:
+            cache_file = os.path.join(tmp, '600900.csv')
+            dates = pd.date_range(start='2023-01-01', periods=5, freq='D')
+            df = pd.DataFrame({
+                'date': dates,
+                'open': [100 + i for i in range(5)],
+                'high': [101 + i for i in range(5)],
+                'low': [99 + i for i in range(5)],
+                'close': [100 + i for i in range(5)],
+                'volume': [1000 + i * 10 for i in range(5)],
+            })
+            df.to_csv(cache_file, index=False)
+
+            mock_fetch.return_value = pd.DataFrame({
+                'date': pd.to_datetime(['2023-01-06', '2023-01-07', '2023-01-08']),
+                'open': [105, 106, 107],
+                'high': [106, 107, 108],
+                'low': [104, 105, 106],
+                'close': [105, 106, 107],
+                'volume': [1100] * 3,
+            })
+
+            out = get_data(
+                symbol='600900', source='akshare',
+                start_date='20230101', end_date='20230107',
+                cache_dir=tmp, buffer_days=0,
+            )
+            self.assertEqual(mock_fetch.call_count, 1)
+            self.assertIsNotNone(out)
+            self.assertEqual(out['date'].max().strftime('%Y-%m-%d'), '2023-01-07')
+
+    # ── small cache gap optimization tests ───────────────────────────
+
     @patch('exchange.source.data_provider.AkshareProvider.fetch')
     @patch('exchange.source.data_provider.BaostockProvider.fetch')
     @patch('exchange.source.data_provider.TencentProvider.fetch')
@@ -123,11 +225,11 @@ class TestDataProviderCacheFiltering(unittest.TestCase):
             mock_cailianpress.side_effect = AssertionError("cailianpress should not be called")
             mock_stooq.side_effect = AssertionError("stooq should not be called")
 
-            # Request 2023-01-01 to 2023-01-06 (1-day gap past cache end of 2023-01-05)
+            # Request 2023-01-01 to 2023-01-07 (2-day gap past cache end of 2023-01-05 = beyond buffer_days tolerance)
             # Even though no provider returns data for the gap, cached partial data is returned
             out = get_data(
                 symbol='600900', source='auto',
-                start_date='20230101', end_date='20230106',
+                start_date='20230101', end_date='20230107',
                 cache_dir=tmp,
             )
 
