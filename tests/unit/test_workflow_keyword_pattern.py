@@ -40,7 +40,7 @@ def has_keyword_match(text: str) -> bool:
 def check_pr_issue_association(body: str, title: str) -> tuple[bool, str, list[str]]:
     """
     Simulate the workflow-enforcer step 2 logic.
-    
+
     Returns (matched, source, matches):
         matched: True if any match found
         source: 'body', 'title', or ''
@@ -49,11 +49,11 @@ def check_pr_issue_association(body: str, title: str) -> tuple[bool, str, list[s
     body_matches = _re_extract.findall(body)
     if body_matches:
         return (True, 'body', [m[0] + ' #...' for m in body_matches])
-    
+
     title_matches = _re_extract.findall(title)
     if title_matches:
         return (True, 'title', [m[0] + ' #...' for m in title_matches])
-    
+
     return (False, '', [])
 
 
