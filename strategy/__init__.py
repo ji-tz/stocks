@@ -12,6 +12,7 @@ from strategy.dual_ma_strategy import DualMaDecision
 from strategy.rsi_strategy import RsiDecision
 from strategy.futures_open_hour_strategy import FuturesOpenHourDecision
 from strategy.signal_template_strategy import SignalTemplateDecision
+from strategy.close_reversal_strategy import CloseReversalDecision
 
 # ── 注册表：所有策略的完整元数据 ──────────────────────────────────
 # 该注册表被 gui/web.py 和 trader/stocks.py 引用，
@@ -73,11 +74,19 @@ STRATEGY_REGISTRY: dict = {
         "icon": "🔧",
         "template": "strategy_config.html",
     },
+    "close_reversal": {
+        "key": "close_reversal",
+        "name": "收盘反转",
+        "description": "每日收盘反转策略：当日上涨则卖出，当日下跌则买入。基于均值回归逻辑。",
+        "icon": "🔁",
+        "template": "strategy_config.html",
+    },
 }
 
 __all__ = [
     "SmaDecision", "MeanCostDecision", "FixedAmountDecision",
     "BollingerDecision", "DualMaDecision", "RsiDecision",
     "FuturesOpenHourDecision", "SignalTemplateDecision",
+    "CloseReversalDecision",
     "STRATEGY_REGISTRY",
 ]
