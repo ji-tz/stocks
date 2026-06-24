@@ -312,6 +312,7 @@ tests/
 | `opencode.yml` | HERMES | （备用） |
 | `issue-auto-routing.yml` | ARCH | 自动路由：子 Issue 打角色标签后自动 assign + 标 ai-in-progress |
 | `ai-progress-watchdog.yml` | AUDITOR | 超时监控：ai-in-progress 超 22h 警告、24h 关闭 |
+| `pr-merge-cleanup.yml` | AUDITOR | 合并后清理：PR merge 后自动关闭 Issue + 清理流程标签 + 删除分支 |
 
 ### 4.9 其他
 
