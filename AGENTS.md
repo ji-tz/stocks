@@ -365,7 +365,7 @@ tests/
 | `issue-rejected` | QA+LEAD 拒绝时 | PM 关 Issue | 父 Issue 审核不通过 |
 | `exchange` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 交易所层任务 |
 | `trader` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 交易员层任务 |
-| `strategy` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 策略算法层任务 |
+| `strat` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 策略算法层任务 |
 | `gui` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | Web 前端任务 |
 | `guitest` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | GUI 端到端测试任务 |
 | `itest` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 集成/单元测试任务 |
@@ -374,10 +374,10 @@ tests/
 | `sub-issue` | ARCH 建子 Issue 时 | 子 Issue 关闭时 | 标识子 Issue |
 | `bug` | 任何人 | 修复后 | 缺陷报告 |
 
-> **重要规则：** 角色标签（exchange/trader/strategy/gui/guitest/itest）由 vicePM 在拆解时分派，**各角色完成开发后必须主动移除自己的角色标签**，以便 LEAD 知道所有工作已完成。
+> **重要规则：** 角色标签（exchange/trader/strat/gui/guitest/itest）由 vicePM 在拆解时分派，**各角色完成开发后必须主动移除自己的角色标签**，以便 LEAD 知道所有工作已完成。
 
 > **自动路由机制（`issue-auto-routing.yml`）：**
-> 当 Issue 被打上角色标签（exchange/trader/strategy/gui 等）时，自动：
+> 当 Issue 被打上角色标签（exchange/trader/strat/gui 等）时，自动：
 > - 分配 Assignee 到仓库所有者
 > - 在 Issue 评论中标明对应 Agent
 > - 自动添加 `ai-in-progress` 标签
