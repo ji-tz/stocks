@@ -391,6 +391,7 @@ def _build_strategy_parameter_view(strategy_key: str) -> list[dict]:
                 'required': parameter.required,
                 'input_type': input_type,
                 'input_step': input_step,
+                'options': parameter.options,
             }
         )
     return items

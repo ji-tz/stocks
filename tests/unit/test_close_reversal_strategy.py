@@ -201,6 +201,21 @@ class TestCloseReversalValidateParameters(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_strategy_parameters(min_change_pct=-1.0)
 
+    def test_valid_fund_types(self):
+        """合法的基金类型不应抛出异常。"""
+        validate_strategy_parameters(fund_type='on_exchange')
+        validate_strategy_parameters(fund_type='off_exchange')
+
+    def test_invalid_fund_type_raises(self):
+        """非法的基金类型应抛出异常。"""
+        with self.assertRaises(ValueError):
+            validate_strategy_parameters(fund_type='invalid_type')
+
+    def test_invalid_fund_type_raises_with_default_message(self):
+        """非法基金类型的错误信息应包含支持的类型。"""
+        with self.assertRaisesRegex(ValueError, "on_exchange|off_exchange"):
+            validate_strategy_parameters(fund_type='unknown')
+
 
 if __name__ == "__main__":
     unittest.main()
