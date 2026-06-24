@@ -956,6 +956,8 @@ def run():
     cash = float(request.form.get('cash') or 100000.0)
     strategy_params = _collect_strategy_form_params(strategy)
     tick_by_tick = request.form.get('tick_by_tick', '0') == '1'
+    # 根据策略支持的交易价格字段动态选择，避免硬编码 open 导致收盘策略报错
+    _spec = stocks.get_strategy_spec(strategy)
     request_payload = {
         'symbol': symbol,
         'strategy': strategy,
@@ -964,7 +966,7 @@ def run():
         'end_date': end,
         'lot_size': lot,
         'init_cash': cash,
-        'trade_price': stocks.TRADE_PRICE_OPEN,
+        'trade_price': _spec.supported_trade_prices[0],
         'strategy_params': strategy_params,
     }
 

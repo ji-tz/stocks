@@ -266,6 +266,30 @@ class TestStocksModule(unittest.TestCase):
             sell_ratio_pct=50.0,
         )
 
+    # ── close_reversal 策略的 trade_price 约束 ─────────────────────
+
+    def test_close_reversal_trade_price_is_close(self):
+        """收盘反转策略仅支持 close 交易价格"""
+        specs = {spec.key: spec for spec in stocks.list_strategy_specs()}
+        self.assertIn('close_reversal', specs)
+        self.assertEqual(specs['close_reversal'].supported_trade_prices, ('close',))
+
+    def test_close_reversal_accepts_close_price(self):
+        """收盘反转策略使用 trade_price='close' 创建回测请求应通过"""
+        request = stocks.create_backtest_request(
+            strategy='close_reversal',
+            trade_price='close',
+        )
+        self.assertEqual(request.trade_price, 'close')
+
+    def test_close_reversal_rejects_open_price(self):
+        """收盘反转策略使用 trade_price='open' 应抛出 ValueError"""
+        with self.assertRaises(ValueError):
+            stocks.create_backtest_request(
+                strategy='close_reversal',
+                trade_price='open',
+            )
+
 
 if __name__ == '__main__':
     unittest.main()
