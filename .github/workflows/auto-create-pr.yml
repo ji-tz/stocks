@@ -45,6 +45,11 @@ jobs:
           # Manual workflow_dispatch may not have the branch in ref
           BRANCH_NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref_name }}
         with:
+          # Use a PAT instead of the default GITHUB_TOKEN for PR creation,
+          # because GitHub Actions security prevents events triggered by
+          # GITHUB_TOKEN from cascading to other workflow runs.
+          # Without this, the PR creation doesn't trigger CI (test/lint/package/gui).
+          github-token: ${{ secrets.IMAGES_REPO_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             const branch = process.env.BRANCH_NAME;
             const repo = context.repo;
