@@ -1,9 +1,13 @@
 """每日收盘反转策略（Close Reversal Strategy）
 
-在每日 15:00 收盘时，根据当日涨跌幅生成反转信号：
+在接近收盘（14:58）时根据当日涨跌幅生成反转信号，区分场内/场外基金成交方式：
 - 当日上涨（收盘价 > 前一日收盘价）→ 卖出信号（卖出持仓）
 - 当日下跌（收盘价 < 前一日收盘价）→ 买入信号（买入开仓）
 - 当日持平（收盘价 == 前一日收盘价）→ 无操作
+
+基金类型区别：
+- 场内基金（on_exchange）：14:58 判断信号，即时市价成交（日线近似用 close 价）
+- 场外基金（off_exchange）：14:58 判断信号，按 15:00 收盘净值（close 价）成交
 """
 import dataclasses
 from typing import Any, Optional
@@ -26,8 +30,19 @@ AUTO_STRATEGY_SPEC = {
             "default": 0.0,
             "description": "涨跌幅绝对值低于该值时视为持平，不产生信号。例：0.1 表示±0.1%以内视为持平。",
         },
+        {
+            "name": "fund_type",
+            "label": "基金类型",
+            "caster": "str",
+            "default": "off_exchange",
+            "description": "场内基金（ETF）按14:58即时市价成交；场外基金按15:00收盘净值成交。日线回测均使用close价近似。",
+            "options": [
+                ["on_exchange", "场内基金（ETF，14:58即时价）"],
+                ["off_exchange", "场外基金（15:00收盘净值）"],
+            ],
+        },
     ],
-    "description": "每日收盘反转策略：当日上涨则卖出，当日下跌则买入。基于均值回归逻辑。",
+    "description": "每日收盘反转策略：当日上涨则卖出，当日下跌则买入。基于均值回归逻辑。支持场内/场外基金区分。",
     "supported_trade_prices": ["close"],
 }
 
@@ -41,6 +56,11 @@ class CloseReversalDecision:
     - 若涨幅超过 min_change_pct：返回 'sell'（卖出持仓）
     - 若跌幅超过 min_change_pct：返回 'buy'（买入开仓）
     - 若涨跌幅在 ±min_change_pct 范围内：返回 None（无操作）
+
+    基金类型（fund_type）：
+    - on_exchange（场内基金）：14:58 信号 + 即时市价成交
+    - off_exchange（场外基金，默认）：14:58 信号 + 15:00 收盘净值成交
+    日线回测下两者均使用 close 价近似计算。
 
     该策略是 tick-safe 的（仅依赖当前行与上一行数据）。
     """
@@ -109,10 +129,12 @@ class CloseReversalDecision:
         return None
 
 
-def validate_strategy_parameters(min_change_pct: float = 0.0, **kwargs) -> None:
+def validate_strategy_parameters(min_change_pct: float = 0.0, fund_type: str = 'off_exchange', **kwargs) -> None:
     """校验收盘反转策略参数。"""
     if min_change_pct < 0:
         raise ValueError("最小变动百分比不能为负数")
+    if fund_type not in ('on_exchange', 'off_exchange'):
+        raise ValueError(f"不支持的基金类型: {fund_type}，仅支持 on_exchange 和 off_exchange")
 
 
 def prepare_backtest_data(df: pd.DataFrame, **kwargs) -> pd.DataFrame:
@@ -144,6 +166,7 @@ def prepare_backtest_data_for_tick(df_sliding: pd.DataFrame, **kwargs) -> pd.Dat
 def create_strategy(
     df: pd.DataFrame,
     min_change_pct: float = 0.0,
+    fund_type: str = 'off_exchange',
     **kwargs,
 ) -> CloseReversalDecision:
     """构造收盘反转策略决策器。"""

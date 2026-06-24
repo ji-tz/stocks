@@ -44,6 +44,7 @@ class StrategyParameter:
     default: Any
     description: str = ''
     required: bool = False
+    options: tuple = ()  # (value, label) 二元组列表，用于渲染下拉框
 
     def parse(self, raw_value: Any) -> Any:
         """将表单或外部输入转换为策略内部参数。"""
@@ -178,6 +179,11 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
                 caster = caster_map.get(caster_name)
                 if caster is None:
                     continue
+                options_raw = item.get('options', []) or []
+                options = tuple(
+                    (str(v), str(l)) for v, l in options_raw
+                ) if options_raw else ()
+
                 parameters.append(
                     StrategyParameter(
                         name=str(item.get('name', '')).strip(),
@@ -186,6 +192,7 @@ def _discover_auto_strategy_specs() -> Dict[str, StrategySpec]:
                         default=item.get('default'),
                         description=str(item.get('description', '')).strip(),
                         required=bool(item.get('required', False)),
+                        options=options,
                     )
                 )
 

@@ -224,6 +224,13 @@
 
         {% for parameter in parameters %}
         <label>{{ parameter.label }}
+          {% if parameter.options %}
+          <select name="{{ parameter.name }}">
+            {% for opt_value, opt_label in parameter.options %}
+            <option value="{{ opt_value }}"{% if parameter.default == opt_value %} selected{% endif %}>{{ opt_label }}</option>
+            {% endfor %}
+          </select>
+          {% else %}
           <input
             type="{{ parameter.input_type }}"
             name="{{ parameter.name }}"
@@ -231,6 +238,7 @@
             {% if parameter.required %}required{% endif %}
             {% if parameter.input_step %}step="{{ parameter.input_step }}"{% endif %}
           />
+          {% endif %}
           {% if parameter.description %}
           <div class="param-hint">{{ parameter.description }}</div>
           {% endif %}
