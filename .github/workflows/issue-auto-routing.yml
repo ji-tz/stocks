@@ -58,7 +58,17 @@ jobs:
             }
 
             if (matchedRoles.length === 0) {
-              core.info(`No role labels found on #${num}, skipping`);
+              core.warning(`No role labels on #${num}, adding needs-triage`);
+              try {
+                await github.rest.issues.addLabels({
+                  ...context.repo,
+                  issue_number: num,
+                  labels: ['needs-triage'],
+                });
+                core.info(`Added needs-triage label to #${num}`);
+              } catch (e) {
+                core.warning(`Could not add needs-triage: ${e.message}`);
+              }
               return;
             }
 
