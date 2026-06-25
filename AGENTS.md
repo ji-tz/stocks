@@ -429,10 +429,11 @@ tests/
    · 全部 sub-issue 的 Assignee 设为 ARCH
   │
   ▼
-[步骤5] ── ARCH 建空白 PR + 分配
+[步骤5] ── ARCH 建空白 PR + 分配（含执行顺序编排）
    · 为每个 sub-issue 创建对应分支
    · 建空白 PR（从 main）
    · PR body 贴拆解方案 + 每个子任务一个 checkbox
+   · 执行顺序标识：[R1(EXCH)] → [R2(STRAT)] → [R3(TRADER)] → [R4(GUI)]
    · 按角色标签分配 Assignee → 指给各角色
 ```
 
