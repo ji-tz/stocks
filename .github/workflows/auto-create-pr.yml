@@ -1,0 +1,130 @@
+name: Auto-create PR on push
+
+# When code is pushed to a feature branch, automatically create a PR if one
+# doesn't already exist. This catches the case where ARCH or the developer
+# agent completes the code but forgets to create the PR.
+#
+# Expected workflow:
+#   1. Agent pushes code to feat/issue-* branch
+#   2. This action runs
+#   3. Checks if a PR already exists for the branch
+#   4. If no PR exists, creates one with issue link extracted from branch name
+#   5. workflow-enforcer then validates the PR for compliance
+
+on:
+  push:
+    branches:
+      - 'feat/issue-*'
+      - 'fix/*'
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch name to create PR for'
+        required: true
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: read
+
+concurrency:
+  group: auto-create-pr-${{ github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  create-pr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref }}
+
+      - uses: actions/github-script@v9
+        env:
+          # Manual workflow_dispatch may not have the branch in ref
+          BRANCH_NAME: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.branch || github.ref_name }}
+        with:
+          # Use a PAT instead of the default GITHUB_TOKEN for PR creation,
+          # because GitHub Actions security prevents events triggered by
+          # GITHUB_TOKEN from cascading to other workflow runs.
+          # Without this, the PR creation doesn't trigger CI (test/lint/package/gui).
+          github-token: ${{ secrets.IMAGES_REPO_TOKEN || secrets.GITHUB_TOKEN }}
+          script: |
+            const branch = process.env.BRANCH_NAME;
+            const repo = context.repo;
+            core.info(`Checking if PR exists for branch: ${branch}`);
+
+            // Check if an open PR already exists for this branch
+            const { data: existingPRs } = await github.rest.pulls.list({
+              ...repo,
+              head: `${repo.owner}:${branch}`,
+              state: 'open',
+            });
+
+            if (existingPRs.length > 0) {
+              core.info(`✅ PR #${existingPRs[0].number} already exists for ${branch}, skipping`);
+              return;
+            }
+
+            // Try closed PRs too (in case the PR was already merged/closed on this branch)
+            const { data: allPRs } = await github.rest.pulls.list({
+              ...repo,
+              head: `${repo.owner}:${branch}`,
+              state: 'all',
+              per_page: 3,
+            });
+
+            if (allPRs.length > 0) {
+              const existing = allPRs[0];
+              core.info(`⏭️ PR #${existing.number} already exists (state=${existing.state}) for ${branch}, skipping`);
+              // If closed, we could re-open, but that's an unusual edge case — skip for now.
+              return;
+            }
+
+            // Build PR title and body from branch name
+            const issueMatch = branch.match(/issue-(\d+)/);
+            let prTitle, prBody;
+
+            if (issueMatch) {
+              const issueNum = parseInt(issueMatch[1]);
+              const cleanDesc = branch
+                .replace(/^feat\/|^fix\//, '')
+                .replace(/issue-\d+-?/, '')
+                .replace(/-/g, ' ')
+                .trim();
+
+              prTitle = `feat: ${cleanDesc} (#${issueNum})`;
+              prBody = [
+                `## 📋 Issue 关联`,
+                ``,
+                `Closes #${issueNum}`,
+                ``,
+                `---`,
+                `_PR 由 auto-create-pr workflow 自动创建。请根据实际实现更新描述和 checkbox。_`,
+              ].join('\n');
+            } else {
+              // No issue number — generic title
+              const label = branch.startsWith('fix/') ? 'fix' : 'feat';
+              const desc = branch.replace(/^feat\/|^fix\//, '').replace(/-/g, ' ');
+              prTitle = `${label}: ${desc}`;
+              prBody = [
+                `## 📋 描述`,
+                ``,
+                `来自分支: \`${branch}\``,
+                ``,
+                `---`,
+                `_PR 由 auto-create-pr workflow 自动创建。_`,
+              ].join('\n');
+            }
+
+            // Create the PR
+            const { data: pr } = await github.rest.pulls.create({
+              ...repo,
+              title: prTitle,
+              head: branch,
+              base: 'main',
+              body: prBody,
+            });
+
+            core.info(`✅ Created PR #${pr.number}: ${pr.html_url}`);
