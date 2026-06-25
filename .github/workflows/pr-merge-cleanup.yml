@@ -1,0 +1,239 @@
+name: PR Merge Cleanup
+
+# When a PR is merged, this workflow automatically:
+# 1. Finds the associated Issue (via branch name or PR body reference)
+# 2. Closes the Issue with state_reason: 'completed'
+# 3. Cleans up flow labels (whitelist mode — keeps role/priority/type labels)
+# 4. Cleans up the merged branch
+#
+# Design: Issue #230 — P0 implementation
+
+on:
+  pull_request_target:
+    types: [closed]
+
+permissions:
+  issues: write
+  contents: write
+  pull-requests: read
+
+concurrency:
+  group: pr-merge-cleanup-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    # Only run on merged PRs
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        id: cleanup
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const repo = context.repo;
+            const results = [];
+
+            // ============================================================
+            // Step 1: Find the associated Issue number
+            // ============================================================
+            let issueNumber = null;
+
+            // Method A: Extract from branch name (feat/issue-N-slug or fix/issue-N-slug)
+            const branchName = pr.head.ref;
+            const branchIssueMatch = branchName.match(
+              /(?:feat|fix|chore)\/issue[_-](\d+)/i
+            );
+            if (branchIssueMatch) {
+              issueNumber = parseInt(branchIssueMatch[1], 10);
+              core.info(`Found issue #${issueNumber} from branch name: ${branchName}`);
+            }
+
+            // Method B: Extract from PR body (Closes/Fixes/Resolves #N)
+            if (!issueNumber && pr.body) {
+              const bodyRefMatch = pr.body.match(
+                /(?:close[s]?|fix(?:es)?|resolve[s]?)\s+#(\d+)/i
+              );
+              if (bodyRefMatch) {
+                issueNumber = parseInt(bodyRefMatch[1], 10);
+                core.info(`Found issue #${issueNumber} from PR body reference`);
+              }
+
+              // Method B2: parenthetical reference (#N) in PR body
+              if (!issueNumber) {
+                const parenMatch = pr.body.match(/#(\d+)\b/);
+                if (parenMatch) {
+                  issueNumber = parseInt(parenMatch[1], 10);
+                  core.info(`Found issue #${issueNumber} from PR body #ref`);
+                }
+              }
+            }
+
+            // Method C: Extract from PR title
+            if (!issueNumber && pr.title) {
+              const titleMatch = pr.title.match(/#(\d+)\b/);
+              if (titleMatch) {
+                issueNumber = parseInt(titleMatch[1], 10);
+                core.info(`Found issue #${issueNumber} from PR title`);
+              }
+            }
+
+            if (!issueNumber) {
+              core.warning(
+                `Could not determine associated issue for PR #${pr.number} (branch: ${branchName})`
+              );
+              core.setOutput('summary', 'No issue found — nothing to clean up');
+              return;
+            }
+
+            // Validate the issue exists
+            let issue = null;
+            try {
+              const { data } = await github.rest.issues.get({
+                ...repo,
+                issue_number: issueNumber,
+              });
+              issue = data;
+              core.info(`Found issue #${issueNumber}: "${issue.title}"`);
+            } catch (e) {
+              core.warning(`Issue #${issueNumber} not found: ${e.message}`);
+              core.setOutput(
+                'summary',
+                `Issue #${issueNumber} not found — skipping cleanup`
+              );
+              return;
+            }
+
+            // ============================================================
+            // Step 2: Close the Issue with state_reason: 'completed'
+            // ============================================================
+            // Only close if the issue is currently open
+            if (issue.state === 'open') {
+              // Add a comment explaining why it's being closed
+              const closeComment = [
+                `## ✅ 自动关闭 — ${pr.head.label} 已合并至 ${pr.base.label}`,
+                ``,
+                `关联 PR [#${pr.number}](${pr.html_url}) 已合并，此 Issue 自动关闭。`,
+                ``,
+                `**合并信息：**`,
+                `- 🆔 PR: #${pr.number}`,
+                `- 📦 分支: \`${branchName}\``,
+                `- 🎯 合并目标: ${pr.base.ref}`,
+                `- 👤 合并者: ${pr.merged_by ? pr.merged_by.login : '自动'}`,
+                `- 🕐 合并时间: ${pr.merged_at}`,
+                ``,
+                `> 由 \`pr-merge-cleanup.yml\` 自动处理。`,
+                `> 如需重新打开，请注明原因后手动 reopen。`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                ...repo,
+                issue_number: issueNumber,
+                body: closeComment,
+              });
+
+              // Close the issue
+              await github.rest.issues.update({
+                ...repo,
+                issue_number: issueNumber,
+                state: 'closed',
+                state_reason: 'completed',
+              });
+
+              results.push(
+                `✅ Issue #${issueNumber} closed (completed)`
+              );
+              core.info(`Closed issue #${issueNumber} with state_reason=completed`);
+            } else {
+              core.info(
+                `Issue #${issueNumber} is already ${issue.state} — skipping close`
+              );
+              results.push(
+                `ℹ️ Issue #${issueNumber} already ${issue.state} — no close needed`
+              );
+            }
+
+            // ============================================================
+            // Step 3: Clean up flow labels (whitelist mode)
+            // ============================================================
+            // Flow labels to REMOVE on merge:
+            const FLOW_LABELS = new Set([
+              'ai-done',
+              'ai-in-progress',
+              'needs-triage',
+              'triaged',
+              'needs-review',
+              'needs-qa',
+              'ai-routed',
+            ]);
+
+            const currentLabels = (issue.labels || []).map((l) =>
+              typeof l === 'string' ? l : l.name
+            );
+            const labelsToRemove = currentLabels.filter((l) =>
+              FLOW_LABELS.has(l)
+            );
+
+            if (labelsToRemove.length > 0) {
+              core.info(
+                `Removing flow labels: ${labelsToRemove.join(', ')}`
+              );
+
+              // GitHub API: remove each label
+              for (const label of labelsToRemove) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    ...repo,
+                    issue_number: issueNumber,
+                    name: label,
+                  });
+                  core.info(`Removed label "${label}" from #${issueNumber}`);
+                } catch (e) {
+                  // Label might already be gone — that's fine
+                  core.warning(
+                    `Could not remove label "${label}": ${e.message}`
+                  );
+                }
+              }
+
+              results.push(
+                `🧹 Removed flow labels: ${labelsToRemove.join(', ')}`
+              );
+            } else {
+              core.info('No flow labels to remove');
+              results.push('ℹ️ No flow labels to remove');
+            }
+
+            // ============================================================
+            // Step 4: Clean up the merged branch
+            // ============================================================
+            if (branchName !== pr.base.ref) {
+              try {
+                await github.rest.git.deleteRef({
+                  ...repo,
+                  ref: `heads/${branchName}`,
+                });
+                results.push(`🗑️ Deleted branch: ${branchName}`);
+                core.info(`Deleted branch ${branchName}`);
+              } catch (e) {
+                // Branch might already be deleted or protected
+                core.warning(
+                  `Could not delete branch ${branchName}: ${e.message}`
+                );
+                results.push(
+                  `ℹ️ Branch ${branchName} not deleted (may already be gone or protected)`
+                );
+              }
+            }
+
+            // ============================================================
+            // Summary
+            // ============================================================
+            const summary = results.join(' | ');
+            core.info(`Cleanup summary: ${summary}`);
+            core.setOutput('summary', summary);
+            core.setOutput('issue_number', issueNumber.toString());
+            core.setOutput('labels_removed', labelsToRemove.length.toString());
