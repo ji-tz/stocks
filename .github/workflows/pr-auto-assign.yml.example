@@ -1,0 +1,67 @@
+name: PR Auto-Assign Reviewer
+
+on:
+  pull_request:
+    types: [opened, reopened]
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Auto-assign reviewer based on changed files
+        uses: actions/github-script@v9
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const pr = context.payload.pull_request;
+            const prNumber = pr.number;
+
+            // 获取变更文件列表
+            const { data: files } = await github.rest.pulls.listFiles({
+              ...context.repo,
+              pull_number: prNumber,
+            });
+
+            const filePaths = files.map(f => f.filename);
+
+            // 文件所有权限映射（与 AGENTS.md 一致）
+            const DOMAIN_OWNERS = {
+              'exchange/':           'EXCH',
+              'trader/':             'TRADER',
+              'strategy/':           'STRAT',
+              'gui/':                'WEB',
+              'tests/unit/':         'ITEST',
+              'tests/integration/':  'ITEST',
+              'tests/guitests/':     'GTEST',
+            };
+
+            // 收集涉及的角色（去重）
+            const roles = new Set();
+            for (const f of filePaths) {
+              for (const [prefix, role] of Object.entries(DOMAIN_OWNERS)) {
+                if (f.startsWith(prefix)) {
+                  roles.add(role);
+                  break;
+                }
+              }
+            }
+
+            // 默认审核人（当前为单人维护）
+            const reviewers = ['183965983'];
+
+            // 提交审核人指派
+            const result = await github.rest.pulls.requestReviewers({
+              ...context.repo,
+              pull_number: prNumber,
+              reviewers: reviewers,
+            });
+
+            core.info(`✅ PR #${prNumber}: Assigned reviewers ${reviewers.join(', ')}`);
+            core.info(`📁 Files changed: ${filePaths.length}`);
+            core.info(`🏷️ Domains affected: ${[...roles].join(', ') || 'unknown'}`);

@@ -2,7 +2,7 @@ name: Package
 
 on:
   push:
-    branches: [ main ]
+    branches: [ main, 'feat/*', 'fix/*' ]
     tags:
       - 'v*'
   pull_request:
