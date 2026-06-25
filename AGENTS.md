@@ -360,27 +360,26 @@ tests/
 
 ### 6.1 标签体系
 
-| 标签 | 用途 | 谁打 |
-|------|------|------|
-| `requirements` | 新需求/功能请求 | PM / 用户 / 任何人 |
-| `exchange` | 交易所层任务 | ARCH |
-| `trader` | 交易员层任务 | ARCH |
-| `strategy` | 策略算法层任务 | ARCH |
-| `gui` | Web 前端任务 | ARCH |
-| `test` | 测试相关任务 | ARCH |
-| `ci` | CI/CD 配置任务 | ARCH |
-| `bug` | 缺陷报告 | 任何人 |
-| `needs-triage` | 待架构师拆解 | 提 Issue 时自动打 |
-| `triaged` | 已拆解完成 | ARCH |
-| `ai-in-progress` | AI 正在处理中 | 自动（role label 打上时自动） |
-| `needs-review` | 待 LEAD Review | 开发完成时自动 |
-| `needs-qa` | 待 QA 测试 | LEAD |
-| `ai-done` | AI 已完成 | QA |
-| `ai-routed` | 已进入流程 | Hermes 自动 |
-| `sub-issue` | 子 Issue（ARCH 拆解产出） | ARCH |
+| 标签 | 打标人 | 谁移除 | 说明 |
+|------|--------|--------|------|
+| `issue-needs-review` | PM 开 Issue 时 | QA+LEAD 改 `issue-reviewed` | 父 Issue 待审核 |
+| `issue-reviewed` | QA+LEAD 确认后 | vicePM 接手后 | 父 Issue 审核通过 |
+| `issue-rejected` | QA+LEAD 拒绝时 | PM 关 Issue | 父 Issue 审核不通过 |
+| `exchange` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 交易所层任务 |
+| `trader` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 交易员层任务 |
+| `strat` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 策略算法层任务 |
+| `gui` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | Web 前端任务 |
+| `guitest` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | GUI 端到端测试任务 |
+| `itest` （角色） | vicePM 拆解时 | **各角色干完活自己清掉** | 集成/单元测试任务 |
+| `needs-qa` | LEAD 确认代码可查时 | QA 合并后 | 待 QA 验收 |
+| `ai-done` | QA 合并前打 | QA 合并时关掉 | AI 已完成，可合并 |
+| `sub-issue` | ARCH 建子 Issue 时 | 子 Issue 关闭时 | 标识子 Issue |
+| `bug` | 任何人 | 修复后 | 缺陷报告 |
+
+> **重要规则：** 角色标签（exchange/trader/strat/gui/guitest/itest）由 vicePM 在拆解时分派，**各角色完成开发后必须主动移除自己的角色标签**，以便 LEAD 知道所有工作已完成。
 
 > **自动路由机制（`issue-auto-routing.yml`）：**
-> 当 Issue 被打上角色标签（exchange/trader/strategy/gui/test/ci 等）时，自动：
+> 当 Issue 被打上角色标签（exchange/trader/strat/gui 等）时，自动：
 > - 分配 Assignee 到仓库所有者
 > - 在 Issue 评论中标明对应 Agent
 > - 自动添加 `ai-in-progress` 标签
@@ -390,134 +389,107 @@ tests/
 > - **>22h 无 PR** → 在 Issue 评论中发布超时警告
 > - **>24h 无 PR** → 自动关闭 Issue（state_reason: not_planned），并尝试删除关联分支 `feat/issue-<num>`
 
-### 6.2 全流程 9 步（不可跳过）
+### 6.2 全流程（5 阶段 10 步，不可跳过）
 
 > **每一条 Issue，无论大小，都必须走完这个完整流程。** 没有"小改动快车道"，没有"直接改"。
 
+#### 阶段一：需求确认（父 Issue）
+
 ```
-用户提需求
+[步骤1] ── PM 开 Issue
+   · PM 在 GitHub 创建 Issue
+   · 打标签：issue-needs-review
+   · 指定 Assignee：QA + LEAD
   │
   ▼
- [步骤1] ── 建 Issue
-   Hermes 在 GitHub 创建 Issue
-   · 标题带优先级前缀（P0/P1/P2）
-   · 写清需求描述、现状、改动范围
-   · 打标签（enhancement/bug/exchange/trader 等）
-   · 自动补打：needs-triage
+[步骤2] ── QA + LEAD 审查
+   · 确认 OK → 改标签 issue-reviewed
+   · 拒绝 → 打 issue-rejected + 写明原因 → 指回 PM
   │
   ▼
- [步骤2] ── ARCH 拆解（Pro 模型）
-   架构师在 Issue 评论中发布拆解方案：
-   · 分析需求 → 判断范围
-   · 识别涉及哪些角色（EXCH/STRAT/TRADER/GUI/ITEST/GTEST）
-   · 每个角色分配具体任务（文件路径、改动内容）
-   · 标注执行顺序：[R1] → [R2] → [R3]
-   · 打角色标签（exchange/trader/strategy/gui/test/ci）
+[步骤3] ── PM 指给 vicePM
+   · PM 将 Issue 的 Assignee 改为 vicePM
+```
+
+#### 阶段二：拆解分配（sub-issue）
+
+```
+[步骤4] ── vicePM 拆解
+   · 将父 Issue 拆成多个 sub-issue
+   · 每个 sub-issue 打上对应的角色标签（gui/strat/trader/exchange/guitest/itest）
+   · 全部 sub-issue 的 Assignee 设为 ARCH
   │
   ▼
- [步骤3] ── 建分支 + PR
-   · git checkout -b feat/issue-<num>-<slug>
-   · 先做第一个角色的最小改动（不必空 commit）
-   · git push + 创建 PR（从 main）
-   · PR 标题关联 Issue #<num>
+[步骤5] ── ARCH 建空白 PR + 分配
+   · 为每个 sub-issue 创建对应分支
+   · 建空白 PR（从 main）
    · PR body 贴拆解方案 + 每个子任务一个 checkbox
-   · 打标签：triaged，移除 needs-triage
-  │
-  ▼
- [步骤4] ── 各角色实现（链式执行）
-   > 串行执行，一次只做一个角色
+   · 按角色标签分配 Assignee → 指给各角色
+```
 
-   每个角色独立做：
-   1. git fetch origin + git checkout feat/issue-<num>-<slug>
-   2. 仅修改自己角色目录下的文件（见§四文件所有权）
-   3. 运行 pytest tests/ -q 确认无回归
-   4. git commit + git push → 自动触发 CI
-   5. 在 Issue 评论报告完成 + 修改要点
-   6. 更新 PR body 中对应的 checkbox
+#### 阶段三：开发
 
-   角色与目录对应：
-   · STRAT → strategy/
-   · EXCH  → exchange/
-   · TRADER→ trader/
-   · GUI   → gui/
-   · ITEST → tests/unit/ + tests/integration/
-   · GTEST → tests/guitests/
+```
+[步骤6] ── 各角色开发
+   · 各角色在自己的分支上开发
+   · 角色与目录对应：
+     · STRAT → strategy/
+     · EXCH  → exchange/
+     · TRADER→ trader/
+     · GUI   → gui/
+     · ITEST → tests/unit/ + tests/integration/
+     · GTEST → tests/guitests/
+   · 开发完成 → **主动清除自己的角色标签**
+```
 
-   链式调度策略：
-   · 本 tick 未超时（< 300s）→ 继续做下一个角色
-   · 本 tick 超时 → 等下一个 cron tick 继续（自动检测）
-   · 跳过所有标签 API 调用（同一 tick 内标签无意义）
+#### 阶段四：审核合并（sub-issue）
+
+```
+[步骤7] ── LEAD 打 needs-qa
+   · 所有角色标签清空后，LEAD 确认代码可查
+   · 打标签：needs-qa
+   · 指定 Assignee：QA
   │
   ▼
- [步骤5] ── CI 自动运行
-   GitHub Actions 运行 4 个 required checks：
-   · 自动化测试 (Automated Testing)
-   · 代码检视 (Code Linting)
-   · GUI 截图测试
-   · 自动化打包 (Automated Packaging)
-   非 required checks 失败不影响合并。
-  │
-  ▼
- [步骤6] ── LEAD 审查
-   研发主管审查 PR diff（逐文件评审表）：
-   · 文件所有权合规——不跨角色
-   · 代码质量——无硬编码、无 except:pass、有类型提示
-   · 测试覆盖——新增功能有对应测试
-   · 然后检查 CI 状态：
-     ├── ✅ 全部通过 + 代码 OK → 打 needs-qa
-     ├── ⏳ 仍在运行 → 保留 needs-review，下个 tick
-     └── ❌ 有 required check 失败 → 仲裁（步骤 6a）
-  │
-  ▼
- [步骤6a] CI 失败仲裁（按需）
+[步骤8] ── CI 失败仲裁（按需）
    LEAD 判断失败原因：
-   · dev-bug → @对应角色修复，保留 needs-review
+   · dev-bug → 改回对应角色标签 → 指回对应角色或 ARCH
    · test-needs-update → LEAD 直接修测试并 push
-   · flaky → 忽略，打 needs-qa 继续推进
+   · flaky → 忽略，继续推进
   │
   ▼
- [步骤7] ── QA 验收
+[步骤9] ── QA 验收
    · checkout PR 分支
    · 运行全部测试：单元 + 集成 + GUI
    · 逐条核对 Issue 中的验收标准
-   · 手动验证 UI 改动（如需）
-   · 发布 QA 报告到 PR 评论
-   · 通过 → 打 ai-done
-   · 不通过 → 评论 @对应角色修复
-  │
-  ▼
- [步骤8] ── 合并
-   · 确认 CI 全部通过（4/4 required checks）
-   · squash-merge PR 到 main
-   · GitHub 自动关闭关联 Issue（#N 在标题中）
-  │
-  ▼
- [步骤9] ── 部署
-   · stock-nightly/ 每天 18:00 自动拉 main（cron）
-   · 自动重启服务
-   · 非紧急情况不等，等次日 18:00 自动更新
+   · QA 报告发 PR 评论
+   · 通过 → 打 ai-done + 合并 PR + 关闭 sub-issue（最后合并的 PR 负责 close 父 Issue）
+   · 不通过 → 指回 LEAD
+```
+
+#### 阶段五：收尾
+
+```
+[步骤10] ── PM 确认关闭父 Issue
+   · PM 确认所有 sub-issue 已关闭
+   · 关闭父 Issue
 ```
 
 ### 6.3 标签流转规则
 
 ```
-提 Issue → [needs-triage] → ARCH 拆解 + 建 PR → [triaged]
-                                    → 子任务打角色标签
-                                                ↓
-                        Hermes 链式执行 → 串行 push 到同一 PR 分支
-                                                ↓
-                        每个角色完成 → 更新 Issue 评论 + 勾 PR checkbox
-                                                ↓
-                        最后一个子任务完成 → [needs-review]
-                                                ↓
-                        LEAD Review:
-                          ├── CI 全过 + 代码 OK → [needs-qa] → QA 验收
-                          │                                    ↓
-                          │                           QA 通过 → [ai-done] → 合并 PR
-                          │                                    ↓          ↓
-                          │                           QA 不通过 → @Agent 修复  关闭 Issue
-                          │
-                          └── CI 失败 / 代码问题 → @Agent 修复（仲裁见步骤 6a）
+父 Issue: PM 开 → [issue-needs-review] → QA+LEAD 审查
+                              ├── 通过 → [issue-reviewed] → vicePM 拆解
+                              └── 拒绝 → [issue-rejected] → PM 关闭
+
+sub-issue: vicePM 拆解 → 打角色标签（每种一个或几个）
+                               ↓
+                   各角色开发完成 → **主动清除自己的角色标签**
+                               ↓
+                   所有标签清空 → LEAD 打 [needs-qa] → QA 验收
+                               ↓
+                   QA 通过 → [ai-done] → 合并 PR → 关 sub-issue
+                   QA 不通过 → 指回 LEAD（改回角色标签 → 指回对应角色）
 ```
 
 ### 6.4 串行执行规则
@@ -559,6 +531,18 @@ tests/
 | 无回归 | 已有测试全部通过 |
 | 需求核对 | 逐条核对 Issue 中的验收标准 |
 | CI 状态 | 合并前确认 required checks 全部通过 |
+
+### 6.8 父 Issue 与子 PR 关联规则
+
+当 Issue 拆出多个 sub-issue，每个 sub-issue 有一个独立 PR 时：
+
+| 规则 | 说明 |
+|------|------|
+| **每个子 PR body** | 写 `close #子Issue`（只 close 自己对应的 sub-issue，不写父 Issue） |
+| **最后一个合并的 PR** | 额外加上 `close #父Issue`，负责关闭父 Issue |
+| **中间合并的 PR** | 即使被 squash-merge，也只关闭自己的 sub-issue |
+
+> 这样确保父 Issue 只有最后一个子任务完成时才关闭，不会提前误关。
 
 ---
 
@@ -622,5 +606,5 @@ class StrategySimulator:
 
 ---
 
-本文件由 Hermes Agent 维护，随团队协作流程迭代更新。最后更新：2026-06-22（v5 — §三 新增 AUDITOR 稽核专员角色）
+本文件由 Hermes Agent 维护，随团队协作流程迭代更新。最后更新：2026-06-24（v6 — §6 全面更新为 5 阶段 10 步完整工作流与新标签体系）
 
