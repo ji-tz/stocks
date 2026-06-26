@@ -65,7 +65,8 @@ jobs:
           retention-days: 30
 
       - name: Publish GUI screenshots to branch
-        if: always()
+        # Skip on PR events — GITHUB_TOKEN lacks push permission for guitest-assets branch
+        if: github.event_name == 'push'
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}

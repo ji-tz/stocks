@@ -4,7 +4,7 @@ import os
 import sys
 import json
 
-token = open('/tmp/ghtoken.txt').read().strip()
+token = open('/tmp/ghtoken.txt', encoding='utf-8').read().strip()
 owner, repo = '183965983', 'stocks'
 
 api = GhApi(owner=owner, repo=repo, token=token)
