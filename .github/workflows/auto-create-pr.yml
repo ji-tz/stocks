@@ -24,6 +24,7 @@ on:
         type: string
 
 permissions:
+  actions: write
   pull-requests: write
   contents: read
 
@@ -128,3 +129,22 @@ jobs:
             });
 
             core.info(`✅ Created PR #${pr.number}: ${pr.html_url}`);
+
+            // After creating the PR, dispatch CI workflows so they run even though
+            // GITHUB_TOKEN-created PRs don't trigger pull_request events.
+            // This is a code-level workaround for the GITHUB_TOKEN event cascade limitation.
+            const ciWorkflows = ['test.yml', 'lint.yml', 'package.yml', 'testgui.yml'];
+            const prBranch = pr.head.ref;
+            for (const wf of ciWorkflows) {
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  ...repo,
+                  workflow_id: wf,
+                  ref: prBranch,
+                });
+                core.info(`  ✅ Dispatched ${wf} on ${prBranch}`);
+              } catch (err) {
+                core.warning(`  ⚠️ Failed to dispatch ${wf}: ${err.message}`);
+              }
+            }
+            core.info('✅ CI workflows dispatched for PR #' + pr.number);
