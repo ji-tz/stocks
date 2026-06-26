@@ -64,6 +64,13 @@ jobs:
         echo "=== Verifying SMA Strategy ===" 2>&1 | tee -a test_output.log
         python -c "from trader.simulator import Simulator, simulate_sma; from strategy.sma_strategy import SmaDecision; print('✓ SMA Strategy loaded successfully')" 2>&1 | tee -a test_output.log || exit 1
         echo "verify_exit_code=0" >> $GITHUB_OUTPUT
+
+    - name: Run watchdog routing check test
+      id: watchdog_test
+      run: |
+        echo "=== Running Watchdog Routing Check Tests ===" 2>&1 | tee -a test_output.log
+        bash .github/scripts/test-watchdog-routing-check.sh 2>&1 | tee -a test_output.log
+        echo "watchdog_exit_code=${PIPESTATUS[0]}" >> $GITHUB_OUTPUT
     
     - name: Run Stock Integration Test (Random Selection)
       run: |
@@ -184,6 +191,7 @@ jobs:
         TEST_EXIT="${{ steps.run_tests.outputs.test_exit_code }}"
         SIMULATOR_EXIT="${{ steps.run_simulator_tests.outputs.simulator_exit_code }}"
         VERIFY_EXIT="${{ steps.verify_simulator.outputs.verify_exit_code }}"
+        WATCHDOG_EXIT="${{ steps.watchdog_test.outputs.watchdog_exit_code }}"
         
         # 如果输出为空，表示步骤可能被跳过或失败，也视为测试失败
         if [ -z "$TEST_EXIT" ] || [ "$TEST_EXIT" != "0" ]; then
@@ -196,6 +204,10 @@ jobs:
         fi
         if [ -z "$VERIFY_EXIT" ] || [ "$VERIFY_EXIT" != "0" ]; then
           echo "❌ 模拟器功能验证失败 (退出代码: ${VERIFY_EXIT:-未设置})"
+          exit 1
+        fi
+        if [ -z "$WATCHDOG_EXIT" ] || [ "$WATCHDOG_EXIT" != "0" ]; then
+          echo "❌ 看门狗路由检测测试失败 (退出代码: ${WATCHDOG_EXIT:-未设置})"
           exit 1
         fi
         echo "✅ 所有测试通过"
