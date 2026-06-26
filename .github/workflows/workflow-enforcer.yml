@@ -62,15 +62,9 @@ jobs:
           LABELS='${{ toJSON(github.event.pull_request.labels) }}'
           if echo "$LABELS" | grep -qE '"needs-qa"|"ai-done"'; then
             PR_NUM=${{ github.event.pull_request.number }}
-            COMMENTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            COMMENTS=$(curl -s -H "Authorization: token *** secrets.GITHUB_TOKEN }}" \
               "${{ github.api_url }}/repos/${{ github.repository }}/issues/$PR_NUM/comments")
-            if echo "$COMMENTS" | python3 -c "
-import json,sys
-for c in json.load(sys.stdin):
-    b=c.get('body','')
-    if 'LEAD' in b or '审查' in b: print('OK'); sys.exit(0)
-sys.exit(1)
-"; then
+            if echo "$COMMENTS" | python3 -c 'import json,sys; [print("OK") or sys.exit(0) for c in json.load(sys.stdin) if "LEAD" in c.get("body","") or "\u5ba1\u67e5" in c.get("body","")]; sys.exit(1)'; then
               echo "✅ LEAD Review 通过"
             else
               echo "❌ 未找到 LEAD Review 评论"
@@ -86,15 +80,9 @@ sys.exit(1)
           LABELS='${{ toJSON(github.event.pull_request.labels) }}'
           if echo "$LABELS" | grep -qE '"ai-done"'; then
             PR_NUM=${{ github.event.pull_request.number }}
-            COMMENTS=$(curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            COMMENTS=$(curl -s -H "Authorization: token *** secrets.GITHUB_TOKEN }}" \
               "${{ github.api_url }}/repos/${{ github.repository }}/issues/$PR_NUM/comments")
-            if echo "$COMMENTS" | python3 -c "
-import json,sys
-for c in json.load(sys.stdin):
-    b=c.get('body','')
-    if ('QA' in b or '验收' in b) and ('通过' in b or 'PASS' in b): print('OK'); sys.exit(0)
-sys.exit(1)
-"; then
+            if echo "$COMMENTS" | python3 -c 'import json,sys; [print("OK") or sys.exit(0) for c in json.load(sys.stdin) if ("QA" in c.get("body","") or "\u9a8c\u6536" in c.get("body","")) and ("\u901a\u8fc7" in c.get("body","") or "PASS" in c.get("body",""))]; sys.exit(1)'; then
               echo "✅ QA 验收通过"
             else
               echo "❌ 未找到 QA 验收评论"
