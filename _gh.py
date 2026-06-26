@@ -9,7 +9,7 @@ TOKEN_FILE = "/tmp/ghtoken.txt"
 
 
 def get_token():
-    with open(TOKEN_FILE) as f:
+    with open(TOKEN_FILE, encoding='utf-8') as f:
         return f.read().strip()
 
 
@@ -25,10 +25,10 @@ def api(method, path, data=None):
     req = urllib.request.Request(url, data=body, headers=headers, method=method)
     try:
         with urllib.request.urlopen(req) as resp:
-            result = resp.read().decode()
+            result = resp.read().decode('utf-8')
             return json.loads(result)
     except urllib.error.HTTPError as e:
-        err = e.read().decode()
+        err = e.read().decode('utf-8')
         return {"error": True, "status": e.code, "body": err}
 
 
