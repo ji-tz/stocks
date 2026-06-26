@@ -314,6 +314,7 @@ tests/
 | `ai-progress-watchdog.yml` | AUDITOR | 超时监控：ai-in-progress 超 22h 警告、24h 关闭 |
 | `auto-create-pr.yml` | HERMES | push 到 feat/issue-* 分支时自动创建 PR（兜底，防止 Agent 遗漏 PR 创建步骤） |
 | `pr-merge-cleanup.yml` | AUDITOR | 合并后清理：PR merge 后自动关闭 Issue + 清理流程标签 + 删除分支 |
+| `issue-label-sync.yml` | AUDITOR | PR 创建时同步 Issue 标签：移除 ai-in-progress，添加 needs-review，添加评论 |
 
 ### 4.9 其他
 

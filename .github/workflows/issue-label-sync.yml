@@ -1,0 +1,184 @@
+name: Issue Label Sync on PR Creation
+
+# When a PR is opened or reopened, sync the associated Issue's flow labels:
+# 1. Extract Issue number from branch name (feat/issue-N-*)
+# 2. Remove ai-in-progress label
+# 3. Add needs-review label
+# 4. Add a comment noting the PR was created
+#
+# This bridges the gap between Issue routing (issue-auto-routing.yml → ai-in-progress)
+# and PR review (needs-review / needs-qa).
+# Design: Issue #248 — P1 implementation
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+permissions:
+  issues: write
+  pull-requests: read
+
+concurrency:
+  group: issue-label-sync-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  sync-labels:
+    # Only run on branches that follow the feat/issue-N-* or fix/issue-N-* pattern
+    if: github.event.pull_request.head.ref != github.event.pull_request.base.ref
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v9
+        id: sync
+        env:
+          GH_TOKEN: ${{ github.token }}
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            const repo = context.repo;
+            const results = [];
+
+            // ============================================================
+            // Step 1: Find the associated Issue number
+            // ============================================================
+            let issueNumber = null;
+
+            // Method A: Extract from branch name (feat/issue-N-slug or fix/issue-N-slug)
+            const branchName = pr.head.ref;
+            const branchIssueMatch = branchName.match(
+              /(?:feat|fix|chore)\/issue[_-](\d+)/i
+            );
+            if (branchIssueMatch) {
+              issueNumber = parseInt(branchIssueMatch[1], 10);
+              core.info(`Found issue #${issueNumber} from branch name: ${branchName}`);
+            }
+
+            // Method B: Extract from PR body (Closes/Fixes/Resolves #N)
+            if (!issueNumber && pr.body) {
+              const bodyRefMatch = pr.body.match(
+                /(?:close[s]?|fix(?:es)?|resolve[s]?)\s+#(\d+)/i
+              );
+              if (bodyRefMatch) {
+                issueNumber = parseInt(bodyRefMatch[1], 10);
+                core.info(`Found issue #${issueNumber} from PR body reference`);
+              }
+
+              // Method B2: parenthetical reference (#N) in PR body
+              if (!issueNumber) {
+                const parenMatch = pr.body.match(/#(\d+)\b/);
+                if (parenMatch) {
+                  issueNumber = parseInt(parenMatch[1], 10);
+                  core.info(`Found issue #${issueNumber} from PR body #ref`);
+                }
+              }
+            }
+
+            // Method C: Extract from PR title
+            if (!issueNumber && pr.title) {
+              const titleMatch = pr.title.match(/#(\d+)\b/);
+              if (titleMatch) {
+                issueNumber = parseInt(titleMatch[1], 10);
+                core.info(`Found issue #${issueNumber} from PR title`);
+              }
+            }
+
+            if (!issueNumber) {
+              core.warning(
+                `Could not determine associated issue for PR #${pr.number} (branch: ${branchName}) — skipping label sync`
+              );
+              core.setOutput('summary', 'No issue found — nothing to sync');
+              return;
+            }
+
+            // ============================================================
+            // Step 2: Validate the issue exists and has ai-in-progress label
+            // ============================================================
+            let issue = null;
+            try {
+              const { data } = await github.rest.issues.get({
+                ...repo,
+                issue_number: issueNumber,
+              });
+              issue = data;
+              core.info(`Found issue #${issueNumber}: "${issue.title}"`);
+            } catch (e) {
+              core.warning(`Issue #${issueNumber} not found: ${e.message}`);
+              core.setOutput('summary', `Issue #${issueNumber} not found — skipping label sync`);
+              return;
+            }
+
+            const currentLabels = (issue.labels || []).map((l) =>
+              typeof l === 'string' ? l : l.name
+            );
+            const hasAiInProgress = currentLabels.includes('ai-in-progress');
+
+            if (!hasAiInProgress) {
+              core.info(
+                `Issue #${issueNumber} does not have ai-in-progress label — no label change needed`
+              );
+              results.push(`ℹ️ Issue #${issueNumber} has no ai-in-progress — label unchanged`);
+            } else {
+              // ============================================================
+              // Step 3: Remove ai-in-progress, add needs-review
+              // ============================================================
+              try {
+                await github.rest.issues.removeLabel({
+                  ...repo,
+                  issue_number: issueNumber,
+                  name: 'ai-in-progress',
+                });
+                core.info(`Removed ai-in-progress from #${issueNumber}`);
+                results.push(`✅ Removed ai-in-progress from #${issueNumber}`);
+              } catch (e) {
+                core.warning(`Could not remove ai-in-progress: ${e.message}`);
+                results.push(`⚠️ Failed to remove ai-in-progress from #${issueNumber}`);
+              }
+
+              try {
+                await github.rest.issues.addLabels({
+                  ...repo,
+                  issue_number: issueNumber,
+                  labels: ['needs-review'],
+                });
+                core.info(`Added needs-review to #${issueNumber}`);
+                results.push(`✅ Added needs-review to #${issueNumber}`);
+              } catch (e) {
+                core.warning(`Could not add needs-review: ${e.message}`);
+                results.push(`⚠️ Failed to add needs-review to #${issueNumber}`);
+              }
+
+              // ============================================================
+              // Step 4: Add a comment noting the PR was created
+              // ============================================================
+              const syncComment = [
+                `## 📝 PR 已创建 — 推进 Issue 标签`,
+                ``,
+                `关联 PR [#${pr.number}](${pr.html_url}) 已创建，此 Issue 从 \`ai-in-progress\` 推进至 \`needs-review\`。`,
+                ``,
+                `**PR 信息：**`,
+                `- 🆔 PR: #${pr.number}`,
+                `- 📦 分支: \`${branchName}\``,
+                `- 🎯 目标分支: ${pr.base.ref}`,
+                `- 👤 创建者: ${pr.user ? pr.user.login : '自动'}`,
+                ``,
+                `> 由 \`issue-label-sync.yml\` 自动处理。`,
+                `> 请研发主管 (LEAD) 进行 Review。`,
+              ].join('\n');
+
+              await github.rest.issues.createComment({
+                ...repo,
+                issue_number: issueNumber,
+                body: syncComment,
+              });
+
+              results.push(`💬 Added comment to #${issueNumber}`);
+              core.info(`Added PR creation comment to #${issueNumber}`);
+            }
+
+            // ============================================================
+            // Summary
+            // ============================================================
+            const summary = results.join(' | ');
+            core.info(`Label sync summary: ${summary}`);
+            core.setOutput('summary', summary);
+            core.setOutput('issue_number', issueNumber.toString());
