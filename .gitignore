@@ -13,4 +13,6 @@ build/
 data/*.csv
 data/backtest_records.json
 data/hermes.db
+data/hermes.db-shm
+data/hermes.db-wal
 testing
