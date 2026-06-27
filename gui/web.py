@@ -1652,6 +1652,23 @@ def result_detail_route(result_id: int):
 
 
 if __name__ == '__main__':
+    # 显示版本信息
+    import subprocess as _sp
+    try:
+        _repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _commit = _sp.check_output(['git', 'rev-parse', '--short', 'HEAD'],
+                                   cwd=_repo, stderr=_sp.DEVNULL).decode().strip()
+        _date = _sp.check_output(['git', 'log', '-1', '--format=%ci'],
+                                 cwd=_repo, stderr=_sp.DEVNULL).decode().strip()
+        _ver = _sp.check_output(['git', 'describe', '--tags', '--always'],
+                                cwd=_repo, stderr=_sp.DEVNULL).decode().strip()
+        if _ver == _commit:
+            print(f"\n=== Version: {_commit} ({_date[:10]}) ===\n")
+        else:
+            print(f"\n=== Version: {_ver} (commit {_commit}, {_date[:10]}) ===\n")
+    except Exception:
+        print("\n=== Version: unknown ===\n")
+
     # 支持通过环境变量自定义主机和端口，方便测试使用非默认端口
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', '5001'))

@@ -1,4 +1,5 @@
 import logging
+import subprocess
 from gui import web
 from trader import persistence
 import trader.stocks as stocks
@@ -11,7 +12,33 @@ logger = logging.getLogger(__name__)
 sys.path.insert(0, os.path.dirname(__file__))
 
 
+def get_version_info() -> str:
+    """从 git 自动读取当前 commit 和提交时间，返回版本信息字符串。"""
+    try:
+        repo_dir = os.path.dirname(os.path.abspath(__file__))
+        commit = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=repo_dir, stderr=subprocess.DEVNULL
+        ).decode().strip()
+        date = subprocess.check_output(
+            ['git', 'log', '-1', '--format=%ci'],
+            cwd=repo_dir, stderr=subprocess.DEVNULL
+        ).decode().strip()
+        # 尝试获取 tag 版本号
+        version = subprocess.check_output(
+            ['git', 'describe', '--tags', '--always'],
+            cwd=repo_dir, stderr=subprocess.DEVNULL
+        ).decode().strip()
+        if version == commit:
+            return f"Version: {commit} ({date[:10]})"
+        return f"Version: {version} (commit {commit}, {date[:10]})"
+    except Exception:
+        return "Version: unknown (not a git repository)"
+
+
 def main():
+    print(f"\n=== {get_version_info()} ===\n")
+
     # 初始化持久化层（参数预设 + 回测结果历史）
     persistence.init_db()
 
