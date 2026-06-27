@@ -12,6 +12,8 @@ permissions:
 jobs:
   enforce:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -32,7 +34,9 @@ jobs:
         name: 2️⃣ Issue 关联
         run: |
           TITLE="${{ github.event.pull_request.title }}"
-          BODY="${{ github.event.pull_request.body }}"
+          # 通过 gh api 获取 body（避免 shell 插值导致 backtick/括号作为命令替换）
+          BODY=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
+            --jq '.body // ""')
           KEYWORD_PATTERN='(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[[:space:]]+([Ii]ssue[[:space:]]+)?#[0-9]+'
           if echo "$BODY" | grep -qiE "$KEYWORD_PATTERN"; then
             echo "✅ Body 关联: $(echo "$BODY" | grep -oiE "$KEYWORD_PATTERN")"
@@ -55,15 +59,17 @@ jobs:
 
       - name: 4️⃣ PR 主体完整性
         run: |
-          bash .github/scripts/check-pr-body.sh "${{ github.event.pull_request.body }}"
+          BODY=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
+            --jq '.body // ""')
+          bash .github/scripts/check-pr-body.sh "$BODY"
 
-      - name: 5️⃣ LEAD Review（需有 needs-qa / ai-done 标签时检查）
+      - id: lead_check
+        name: 5️⃣ LEAD Review（需有 needs-qa / ai-done 标签时检查）
         run: |
           LABELS='${{ toJSON(github.event.pull_request.labels) }}'
           if echo "$LABELS" | grep -qE '"needs-qa"|"ai-done"'; then
             PR_NUM=${{ github.event.pull_request.number }}
-            COMMENTS=$(curl -s -H "Authorization: token *** secrets.GITHUB_TOKEN }}" \
-              "${{ github.api_url }}/repos/${{ github.repository }}/issues/$PR_NUM/comments")
+            COMMENTS=$(gh api "repos/${{ github.repository }}/issues/$PR_NUM/comments" --jq '.')
             if echo "$COMMENTS" | python3 -c 'import json,sys; [print("OK") or sys.exit(0) for c in json.load(sys.stdin) if "LEAD" in c.get("body","") or "\u5ba1\u67e5" in c.get("body","")]; sys.exit(1)'; then
               echo "✅ LEAD Review 通过"
             else
@@ -75,13 +81,13 @@ jobs:
             echo "⏳ 跳过（未到 QA 阶段）"
           fi
 
-      - name: 6️⃣ QA 验收（需有 ai-done 标签时检查）
+      - id: qa_check
+        name: 6️⃣ QA 验收（需有 ai-done 标签时检查）
         run: |
           LABELS='${{ toJSON(github.event.pull_request.labels) }}'
           if echo "$LABELS" | grep -qE '"ai-done"'; then
             PR_NUM=${{ github.event.pull_request.number }}
-            COMMENTS=$(curl -s -H "Authorization: token *** secrets.GITHUB_TOKEN }}" \
-              "${{ github.api_url }}/repos/${{ github.repository }}/issues/$PR_NUM/comments")
+            COMMENTS=$(gh api "repos/${{ github.repository }}/issues/$PR_NUM/comments" --jq '.')
             if echo "$COMMENTS" | python3 -c 'import json,sys; [print("OK") or sys.exit(0) for c in json.load(sys.stdin) if ("QA" in c.get("body","") or "\u9a8c\u6536" in c.get("body","")) and ("\u901a\u8fc7" in c.get("body","") or "PASS" in c.get("body",""))]; sys.exit(1)'; then
               echo "✅ QA 验收通过"
             else

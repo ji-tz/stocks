@@ -11,6 +11,7 @@ import pandas as pd
 import time
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import subprocess
 from flask import Flask, render_template, request, session, jsonify, Response
 
 # 股票预缓存模块 — 选股后自动下载5年日线数据
@@ -25,6 +26,33 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 app = Flask(__name__, template_folder='templates')
 # 使用环境变量配置secret_key，开发环境使用默认值
 app.secret_key = os.environ.get('SECRET_KEY', 'stocks-quantitative-backtest-secret-key-2024')
+
+
+@app.context_processor
+def inject_version_info():
+    """向所有模板注入 version_info 变量，用于在 GUI 底部显示版本号和 commit 时间。"""
+    try:
+        repo_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        commit = subprocess.check_output(
+            ['git', 'rev-parse', '--short', 'HEAD'],
+            cwd=repo_dir, stderr=subprocess.DEVNULL
+        ).decode().strip()
+        date = subprocess.check_output(
+            ['git', 'log', '-1', '--format=%ci'],
+            cwd=repo_dir, stderr=subprocess.DEVNULL
+        ).decode().strip()
+        version = subprocess.check_output(
+            ['git', 'describe', '--tags', '--always'],
+            cwd=repo_dir, stderr=subprocess.DEVNULL
+        ).decode().strip()
+        if version == commit:
+            version_info = f"Version: {commit} ({date[:10]})"
+        else:
+            version_info = f"Version: {version} (commit {commit}, {date[:10]})"
+        return dict(version_info=version_info)
+    except Exception:
+        return dict(version_info="Version: unknown")
+
 
 # 在应用启动时加载股票列表到内存，避免重复文件IO
 _STOCK_LIST = None
@@ -1652,6 +1680,23 @@ def result_detail_route(result_id: int):
 
 
 if __name__ == '__main__':
+    # 显示版本信息
+    import subprocess as _sp
+    try:
+        _repo = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        _commit = _sp.check_output(['git', 'rev-parse', '--short', 'HEAD'],
+                                   cwd=_repo, stderr=_sp.DEVNULL).decode().strip()
+        _date = _sp.check_output(['git', 'log', '-1', '--format=%ci'],
+                                 cwd=_repo, stderr=_sp.DEVNULL).decode().strip()
+        _ver = _sp.check_output(['git', 'describe', '--tags', '--always'],
+                                cwd=_repo, stderr=_sp.DEVNULL).decode().strip()
+        if _ver == _commit:
+            print(f"\n=== Version: {_commit} ({_date[:10]}) ===\n")
+        else:
+            print(f"\n=== Version: {_ver} (commit {_commit}, {_date[:10]}) ===\n")
+    except Exception:
+        print("\n=== Version: unknown ===\n")
+
     # 支持通过环境变量自定义主机和端口，方便测试使用非默认端口
     host = os.environ.get('HOST', '127.0.0.1')
     port = int(os.environ.get('PORT', '5001'))
