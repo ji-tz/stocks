@@ -12,6 +12,8 @@ permissions:
 jobs:
   enforce:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -57,7 +59,9 @@ jobs:
 
       - name: 4️⃣ PR 主体完整性
         run: |
-          bash .github/scripts/check-pr-body.sh "${{ github.event.pull_request.body }}"
+          BODY=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
+            --jq '.body // ""')
+          bash .github/scripts/check-pr-body.sh "$BODY"
 
       - name: 5️⃣ LEAD Review（需有 needs-qa / ai-done 标签时检查）
         run: |
