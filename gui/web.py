@@ -11,6 +11,7 @@ import pandas as pd
 import time
 import tempfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
+import subprocess
 from flask import Flask, render_template, request, session, jsonify, Response
 
 # 股票预缓存模块 — 选股后自动下载5年日线数据
@@ -51,6 +52,7 @@ def inject_version_info():
         return dict(version_info=version_info)
     except Exception:
         return dict(version_info="Version: unknown")
+
 
 # 在应用启动时加载股票列表到内存，避免重复文件IO
 _STOCK_LIST = None
