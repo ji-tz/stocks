@@ -32,7 +32,9 @@ jobs:
         name: 2️⃣ Issue 关联
         run: |
           TITLE="${{ github.event.pull_request.title }}"
-          BODY="${{ github.event.pull_request.body }}"
+          # 通过 gh api 获取 body（避免 shell 插值导致 backtick/括号作为命令替换）
+          BODY=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
+            --jq '.body // ""')
           KEYWORD_PATTERN='(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[[:space:]]+([Ii]ssue[[:space:]]+)?#[0-9]+'
           if echo "$BODY" | grep -qiE "$KEYWORD_PATTERN"; then
             echo "✅ Body 关联: $(echo "$BODY" | grep -oiE "$KEYWORD_PATTERN")"
