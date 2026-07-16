@@ -123,6 +123,71 @@ result = simulate_fixed_amount(
 - 不想写代码、只想快速组合“条件 + 执行方式”的通用回测
 - 用于策略原型验证和信号组合实验
 
+### 8. 价格阈值策略（Price Threshold Strategy）
+文件：`price_threshold_strategy.py`
+
+**策略逻辑：**
+- 当前价格低于买入阈值（buy_threshold）时买入
+- 当前价格高于卖出阈值（sell_threshold）时卖出
+- 价格在阈值之间时不操作（持有区间）
+- 支持配置每日执行时间（decision_hour / decision_minute）
+
+**可配置参数：**
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| buy_threshold | float | 8.0 | 低于此价格时买入（需 > 0） |
+| sell_threshold | float | 12.0 | 高于此价格时卖出（需 > 0） |
+| decision_hour | int | 10 | 每日执行决策的小时（24小时制） |
+| decision_minute | int | 0 | 每日执行决策的分钟 |
+
+**时间过滤说明：**
+- 日线回测下，每个 bar 只有一个日期不含具体时间，视为时间条件自动满足
+- 分钟线回测下，仅在匹配 decision_hour:decision_minute 的 bar 上执行决策
+- 实盘场景可配合外部 cron 按指定时间触发
+
+**边界行为：**
+- 价格等于阈值时不会触发（严格小于才买、严格大于才卖）
+- 当 buy_threshold > sell_threshold 时（阈值区间重叠），优先返回 buy 信号
+- close_price 为 None 时返回 None（无信号）
+
+**使用方法（Python）：**
+```python
+from trader.stocks import run_module_strategy_backtest
+
+# 执行价格阈值策略回测
+result = run_module_strategy_backtest(
+    symbol="600900",
+    start_date="20230101",
+    end_date="20231231",
+    strategy_key="price_threshold",
+    lot_size=100,
+    init_cash=100000.0,
+    # 策略参数
+    buy_threshold=8.0,
+    sell_threshold=12.0,
+    decision_hour=10,
+    decision_minute=0,
+)
+```
+
+**使用方法（YAML 配置）：**
+```yaml
+backtest:
+  symbol: "600900"
+  start_date: "20230101"
+  end_date: "20231231"
+  strategy: price_threshold
+  lot_size: 100
+  init_cash: 100000.0
+  params:
+    buy_threshold: 8.0
+    sell_threshold: 12.0
+    decision_hour: 10
+    decision_minute: 0
+```
+
+**自动注册标识：** `key: "price_threshold"`（参见自动接入章节）
+
 ## 策略接口规范
 
 每个策略都应实现 `decide()` 方法：
