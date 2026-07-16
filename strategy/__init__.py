@@ -13,6 +13,7 @@ from strategy.rsi_strategy import RsiDecision
 from strategy.futures_open_hour_strategy import FuturesOpenHourDecision
 from strategy.signal_template_strategy import SignalTemplateDecision
 from strategy.close_reversal_strategy import CloseReversalDecision
+from strategy.price_threshold_strategy import PriceThresholdDecision
 
 # ── 注册表：所有策略的完整元数据 ──────────────────────────────────
 # 该注册表被 gui/web.py 和 trader/stocks.py 引用，
@@ -81,6 +82,13 @@ STRATEGY_REGISTRY: dict = {
         "icon": "🔁",
         "template": "strategy_config.html",
     },
+    "price_threshold": {
+        "key": "price_threshold",
+        "name": "价格阈值",
+        "description": "价格阈值策略：价格低于买入阈值时买入，高于卖出阈值时卖出。支持每日指定执行时间。",
+        "icon": "🎚️",
+        "template": "strategy_config.html",
+    },
 }
 
 __all__ = [
@@ -88,5 +96,6 @@ __all__ = [
     "BollingerDecision", "DualMaDecision", "RsiDecision",
     "FuturesOpenHourDecision", "SignalTemplateDecision",
     "CloseReversalDecision",
+    "PriceThresholdDecision",
     "STRATEGY_REGISTRY",
 ]
