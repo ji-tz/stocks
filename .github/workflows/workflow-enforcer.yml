@@ -21,8 +21,10 @@ jobs:
 
       - id: branch_check
         name: 1️⃣ 分支命名
+        env:
+          # 分支名由 PR 提交方控制 → 经 env 传入，避免 shell 注入
+          BRANCH: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
           if echo "$BRANCH" | grep -qE '^feat/issue-[0-9]+-|^fix/|^chore/|^dependabot/|^renovate/'; then
             echo "✅ 分支名: $BRANCH"
           else
@@ -82,14 +84,20 @@ jobs:
 
       - id: ownership_check
         name: 3️⃣ 文件所有权
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null || echo "")
+          git fetch origin "$BASE_REF" --depth=1 2>/dev/null || true
+          # fail-closed：算不出变更列表就拒绝，不允许静默放行
+          if ! CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD" 2>/dev/null); then
+            echo "❌ 无法计算变更文件列表（origin/$BASE_REF...HEAD 失败）—— 按 fail-closed 处理"
+            exit 1
+          fi
           if [ -z "$CHANGED" ]; then
-            echo "（无变更文件或无法比较）"
+            echo "（变更文件列表为空：无文件级变更）"
             exit 0
           fi
-          bash .github/scripts/check-ownership.sh "${{ github.base_ref }}" $CHANGED
+          bash .github/scripts/check-ownership.sh "$BASE_REF" $CHANGED
 
       - id: pr_body_check
         name: 4️⃣ PR 主体完整性
