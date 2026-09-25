@@ -19,9 +19,12 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: 1️⃣ 分支命名
+      - id: branch_check
+        name: 1️⃣ 分支命名
+        env:
+          # 分支名由 PR 提交方控制 → 经 env 传入，避免 shell 注入
+          BRANCH: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
           if echo "$BRANCH" | grep -qE '^feat/issue-[0-9]+-|^fix/|^chore/|^dependabot/|^renovate/'; then
             echo "✅ 分支名: $BRANCH"
           else
@@ -33,31 +36,71 @@ jobs:
       - id: issue_check
         name: 2️⃣ Issue 关联
         run: |
-          TITLE="${{ github.event.pull_request.title }}"
-          # 通过 gh api 获取 body（避免 shell 插值导致 backtick/括号作为命令替换）
-          BODY=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
-            --jq '.body // ""')
+          REPO="${{ github.repository }}"
+          PR_NUM=${{ github.event.pull_request.number }}
+          # 标题/body 均通过 gh api 获取（避免 shell 插值导致 backtick/括号/引号注入）
+          PR_JSON=$(gh api "repos/$REPO/pulls/$PR_NUM" --jq '.title, .body // ""')
+          TITLE=$(printf '%s\n' "$PR_JSON" | sed -n '1p')
+          BODY=$(printf '%s\n' "$PR_JSON" | sed -n '2,$p')
           KEYWORD_PATTERN='(close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)[[:space:]]+([Ii]ssue[[:space:]]+)?#[0-9]+'
-          if echo "$BODY" | grep -qiE "$KEYWORD_PATTERN"; then
-            echo "✅ Body 关联: $(echo "$BODY" | grep -oiE "$KEYWORD_PATTERN")"
-          elif echo "$TITLE" | grep -qiE "$KEYWORD_PATTERN"; then
-            echo "✅ 标题关联: $(echo "$TITLE" | grep -oiE "$KEYWORD_PATTERN")"
-          else
+
+          REFS=$( { echo "$BODY"; echo "$TITLE"; } | grep -oiE "$KEYWORD_PATTERN" || true )
+          if [ -z "$REFS" ]; then
             echo "❌ 未关联 Issue（请在标题或 body 中含 close/fix/resolve #编号）"
             exit 1
           fi
+          echo "🔗 关联文本: $(echo "$REFS" | tr '\n' ' ')"
 
-      - name: 3️⃣ 文件所有权
+          # 提取被引用的全部编号（去重），逐个校验真实存在
+          NUMBERS=$(echo "$REFS" | grep -oE '#[0-9]+' | tr -d '#' | sort -un)
+          echo "🔢 待校验编号: $(echo $NUMBERS)"
+
+          FAIL=0
+          for N in $NUMBERS; do
+            set +e
+            INFO=$(gh api "repos/$REPO/issues/$N" \
+              --jq '[(if .pull_request then "PR" else "Issue" end), .state, .title] | join(" | ")' 2>&1)
+            RC=$?
+            set -e
+            if [ "$RC" -ne 0 ]; then
+              echo "❌ #$N 不存在或无法读取（gh api exit=$RC）：$INFO"
+              FAIL=1
+              continue
+            fi
+            if echo "$INFO" | grep -q '^PR |'; then
+              echo "❌ #$N 是 Pull Request 而不是 Issue：$INFO"
+              echo "   必须关联一个真实存在的 Issue"
+              FAIL=1
+              continue
+            fi
+            echo "  ✅ #$N 真实存在 → $INFO"
+          done
+
+          if [ "$FAIL" -ne 0 ]; then
+            echo "❌ Issue 关联存在性校验未通过（引用了不存在 / 非 Issue 的编号）"
+            exit 1
+          fi
+          echo "✅ 关联 Issue 全部真实存在"
+
+      - id: ownership_check
+        name: 3️⃣ 文件所有权
+        env:
+          BASE_REF: ${{ github.base_ref }}
         run: |
-          git fetch origin "${{ github.base_ref }}" --depth=1 2>/dev/null || true
-          CHANGED=$(git diff --name-only "origin/${{ github.base_ref }}...HEAD" 2>/dev/null || echo "")
+          git fetch origin "$BASE_REF" --depth=1 2>/dev/null || true
+          # fail-closed：算不出变更列表就拒绝，不允许静默放行
+          if ! CHANGED=$(git diff --name-only "origin/$BASE_REF...HEAD" 2>/dev/null); then
+            echo "❌ 无法计算变更文件列表（origin/$BASE_REF...HEAD 失败）—— 按 fail-closed 处理"
+            exit 1
+          fi
           if [ -z "$CHANGED" ]; then
-            echo "（无变更文件或无法比较）"
+            echo "（变更文件列表为空：无文件级变更）"
             exit 0
           fi
-          bash .github/scripts/check-ownership.sh "${{ github.base_ref }}" $CHANGED
+          bash .github/scripts/check-ownership.sh "$BASE_REF" $CHANGED
 
-      - name: 4️⃣ PR 主体完整性
+      - id: pr_body_check
+        name: 4️⃣ PR 主体完整性
         run: |
           BODY=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}" \
             --jq '.body // ""')
